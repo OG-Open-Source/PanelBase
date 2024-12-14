@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# 驗證 token
+source $(dirname "$0")/check_auth.sh
+
 # 設置 Content-Type
 echo "Content-type: application/json"
 echo ""
