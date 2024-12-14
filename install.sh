@@ -19,7 +19,10 @@ download_files() {
 	shift
 	files=("$@")
 	for file in "${files[@]}"; do
-		curl -sSLO "https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main/${file}" && mv $(basename ${file}) $target_dir/ && chmod 755 $target_dir/$(basename $file)
+		echo "Downloading $file..."
+		curl -sSL "https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main/${file}" -o "$target_dir/$(basename ${file})"
+		chmod 755 "$target_dir/$(basename ${file})"
+		echo "* File downloaded successfully to $target_dir/$(basename ${file})"
 	done
 }
 
@@ -554,11 +557,18 @@ test_auth=$(curl -s -X POST -H "Content-Type: application/json" \
 	-d "{\"username\":\"$admin_user\",\"password\":\"$admin_pass\"}" \
 	http://localhost:8080/cgi-bin/auth.cgi)
 
-if text "$test_auth" | grep -q '"status":"success"'; then
+echo "認證響應: $test_auth" >&2
+if echo "$test_auth" | grep -q '"status":"success"'; then
 	text "認證測試成功！"
+	chown -R www-data:www-data "$INSTALL_DIR/config"
+	chmod 755 "$INSTALL_DIR/config"
+	chmod 644 "$INSTALL_DIR/config/admin.conf"
+	touch "$INSTALL_DIR/config/token.conf"
+	chown www-data:www-data "$INSTALL_DIR/config/token.conf"
+	chmod 644 "$INSTALL_DIR/config/token.conf"
 else
 	error "認證測試失敗！"
-	text "請檢查 $INSTALL_DIR/logs/error.log 查看詳細信息"
+	text "請檢查 $INSTALL_DIR/logs/auth.log 和 $INSTALL_DIR/logs/error.log 查看詳細信息"
 fi
 
 text "安裝完成！"
