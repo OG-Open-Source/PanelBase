@@ -529,9 +529,11 @@ TASK "啟動 Lighttpd 服務" "
 
 # 設置管理員帳號
 text "設置管理員帳號..."
-INPUT "請輸入管理員用戶名: " admin_user
-INPUT "請輸入管理員密碼: " admin_pass
+read -p "請輸入管理員用戶名: " admin_user
+read -p "請輸入管理員密碼: " admin_pass
 echo "$admin_user:$(echo -n "$admin_pass" | sha256sum | cut -d' ' -f1)" > $INSTALL_DIR/config/admin.conf
+chown www-data:www-data $INSTALL_DIR/config/admin.conf
+chmod 644 $INSTALL_DIR/config/admin.conf
 
 # 測試認證前等待服務啟動
 text "等待服務啟動..."
@@ -541,12 +543,11 @@ sleep 3
 text "測試認證..."
 test_auth=$(curl -s -X POST -H "Content-Type: application/json" \
 	-d "{\"username\":\"$admin_user\",\"password\":\"$admin_pass\"}" \
-	--unix-socket /var/run/lighttpd.sock \
 	http://localhost:8080/cgi-bin/auth.cgi)
 
-echo "認證響應: $test_auth" >&2
+echo "認證響應: $test_auth"
 
-if [ "$(echo "$test_auth" | jq -r .status)" = "success" ]; then
+if [ "$(echo "$test_auth" | jq -r .status 2>/dev/null)" = "success" ]; then
 	text "認證測試成功！"
 	
 	# 確保配置目錄權限正確
@@ -572,6 +573,7 @@ if [ "$(echo "$test_auth" | jq -r .status)" = "success" ]; then
 else
 	error "認證測試失敗！"
 	text "請檢查 $INSTALL_DIR/logs/auth.log 和 $INSTALL_DIR/logs/error.log 查看詳細信息"
+	text "認證響應: $test_auth"
 fi
 
 text "安裝完成！"
