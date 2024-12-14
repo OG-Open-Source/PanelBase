@@ -5,7 +5,7 @@
 CHECK_ROOT
 CLEAN
 
-text "開始安裝 PanelBase... (Alpha 2)"
+text "開始安裝 PanelBase... (Alpha 3)"
 
 # 檢查必要命令
 deps=(lighttpd curl jq)
@@ -406,6 +406,13 @@ dir-listing.activate = "disable"
 # 設置 CGI 目錄訪問
 \$HTTP["url"] =~ "^/cgi-bin/" {
 	dir-listing.activate = "disable"
+	cgi.assign = (
+		".cgi" => "",
+		".sh"  => "/bin/bash",
+		".py"  => "/usr/bin/python3",
+		".pl"  => "/usr/bin/perl",
+		".rb"  => "/usr/bin/ruby"
+	)
 }
 
 alias.url = (
@@ -420,7 +427,8 @@ mimetype.assign = (
 	".css"  => "text/css",
 	".js"   => "application/javascript",
 	".json" => "application/json",
-	".xml"  => "application/xml"
+	".xml"  => "application/xml",
+	".cgi"  => "text/plain"
 )
 
 # 設置目錄權限
@@ -469,6 +477,7 @@ TASK "設置權限" "
 	find $INSTALL_DIR -type f -exec chmod 644 {} \;
 	
 	# 設置 CGI 腳本權限
+	chmod 755 $INSTALL_DIR/cgi-bin
 	find $INSTALL_DIR/cgi-bin -type f -exec chmod 755 {} \;
 	chown -R www-data:www-data $INSTALL_DIR/cgi-bin
 	
@@ -478,7 +487,7 @@ TASK "設置權限" "
 	touch $INSTALL_DIR/logs/auth.log
 	touch $INSTALL_DIR/logs/error.log
 	touch $INSTALL_DIR/logs/page.log
-	chmod 644 $INSTALL_DIR/logs/*.log
+	chmod 666 $INSTALL_DIR/logs/*.log
 	
 	# 設置配置目錄權限
 	chmod 755 $INSTALL_DIR/config
@@ -488,6 +497,14 @@ TASK "設置權限" "
 	chmod 755 $INSTALL_DIR/www
 	chmod 644 $INSTALL_DIR/www/*.html
 	chmod -R 755 $INSTALL_DIR/www/assets
+	
+	# 確保 CGI 腳本可執行
+	for script in $INSTALL_DIR/cgi-bin/*; do
+		if [ -f \"\$script\" ]; then
+			chmod 755 \"\$script\"
+			chown www-data:www-data \"\$script\"
+		fi
+	done
 "
 
 # 啟動服務
@@ -598,6 +615,6 @@ text "請訪問 http://your-server-ip:8080 來訪問面板"
 text "安裝資訊："
 text "安裝目錄：\t$INSTALL_DIR"
 text "CGI 目錄：\t$INSTALL_DIR/cgi-bin"
-text "網站根目錄：\t$INSTALL_DIR/www"
+text "網站目錄：\t$INSTALL_DIR/www"
 text "日誌目錄：\t$INSTALL_DIR/logs"
 text "配置文件：\t$LIGHTTPD_CONF"
