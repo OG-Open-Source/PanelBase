@@ -1,6 +1,6 @@
 #!/bin/bash
 
-bash <(curl -sL "https://raw.ogtt.tk/shell/get_utilkit.sh")
+[ -f ~/utilkit.sh ] && source ~/utilkit.sh || bash <(curl -sL raw.ogtt.tk/shell/get_utilkit.sh) && source ~/utilkit.sh
 
 CHECK_ROOT
 
