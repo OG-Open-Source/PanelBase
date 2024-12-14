@@ -313,13 +313,15 @@
                 });
 
                 const data = await response.json();
-                if (response.ok && data.status === 0) {
+                if (response.ok && data === 0) {
                     closeModal('usernameModal');
-                    showToast('用戶名修改成功', 'success');
-                    fetchUsername();
+                    showToast('用戶名修改成功，即將重新登入...', 'success');
+                    setTimeout(() => {
+                        handleLogout();
+                    }, 1500);
                 } else {
                     let message = '發生錯誤';
-                    switch (data.status) {
+                    switch (data) {
                         case 1:
                             message = '用戶名已存在';
                             break;
@@ -362,12 +364,15 @@
                 });
 
                 const data = await response.json();
-                if (response.ok && data.status === 0) {
+                if (response.ok && data === 0) {
                     closeModal('passwordModal');
-                    showToast('密碼修改成功', 'success');
+                    showToast('密碼修改成功，即將重新登入...', 'success');
+                    setTimeout(() => {
+                        handleLogout();
+                    }, 1500);
                 } else {
                     let message = '發生錯誤';
-                    switch (data.status) {
+                    switch (data) {
                         case 1:
                             message = '舊密碼錯誤';
                             break;
@@ -388,7 +393,7 @@
         // 初始化
         updateSystemInfo();
 
-        // ���秒更新一次資訊
+        // 秒更新一次資訊
         setInterval(updateSystemInfo, 1000);
 
         // 點擊對話框外部時關閉對話框

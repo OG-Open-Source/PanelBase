@@ -413,7 +413,10 @@
 					const data = await response.json();
 					if (response.ok && data === 0) {
 						closeModal('usernameModal');
-						showToast('用戶名修改成功', 'success');
+						showToast('用戶名修改成功，即將重新登入...', 'success');
+						setTimeout(() => {
+							handleLogout();
+						}, 1500);
 					} else {
 						let message = '發生錯誤';
 						switch (data) {
@@ -461,7 +464,10 @@
 					const data = await response.json();
 					if (response.ok && data === 0) {
 						closeModal('passwordModal');
-						showToast('密碼修改成功', 'success');
+						showToast('密碼修改成功，即將重新登入...', 'success');
+						setTimeout(() => {
+							handleLogout();
+						}, 1500);
 					} else {
 						let message = '發生錯誤';
 						switch (data) {
