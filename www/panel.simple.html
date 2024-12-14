@@ -64,7 +64,14 @@
             left: 0;
             width: 100%;
             height: 100%;
+            background: rgba(0,0,0,0);
+            transition: background-color 0.3s ease;
+            pointer-events: none;
+        }
+        .modal.show {
+            display: block;
             background: rgba(0,0,0,0.5);
+            pointer-events: auto;
         }
         .modal-content {
             background: white;
@@ -72,6 +79,13 @@
             border-radius: 5px;
             max-width: 400px;
             margin: 100px auto;
+            transform: translateY(-20px);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+        .modal.show .modal-content {
+            transform: translateY(0);
+            opacity: 1;
         }
         .form-group {
             margin-bottom: 15px;
@@ -219,10 +233,8 @@
             try {
                 const response = await fetch('/cgi-bin/auth.cgi?action=get_username');
                 if (response.ok) {
-                    const data = await response.json();
-                    if (data.status === 'success') {
-                        document.getElementById('username').textContent = data.username;
-                    }
+                    const username = await response.text();
+                    document.getElementById('username').textContent = username;
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -266,9 +278,13 @@
             }
         }
 
-        // 顯示修改用戶名對話框
+        // 顯示修改用���名對話框
         function showChangeUsername() {
-            document.getElementById('usernameModal').style.display = 'block';
+            const modal = document.getElementById('usernameModal');
+            modal.style.display = 'block';
+            // 強制重繪
+            modal.offsetHeight;
+            modal.classList.add('show');
             document.getElementById('usernameError').style.display = 'none';
             document.getElementById('newUsername').value = '';
             document.getElementById('usernamePassword').value = '';
@@ -276,7 +292,11 @@
 
         // 顯示修改密碼對話框
         function showChangePassword() {
-            document.getElementById('passwordModal').style.display = 'block';
+            const modal = document.getElementById('passwordModal');
+            modal.style.display = 'block';
+            // 強制重繪
+            modal.offsetHeight;
+            modal.classList.add('show');
             document.getElementById('passwordError').style.display = 'none';
             document.getElementById('oldPassword').value = '';
             document.getElementById('newPassword').value = '';
@@ -284,7 +304,11 @@
 
         // 關閉對話框
         function closeModal(modalId) {
-            document.getElementById(modalId).style.display = 'none';
+            const modal = document.getElementById(modalId);
+            modal.classList.remove('show');
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 300);
         }
 
         // 修改用戶名
@@ -376,7 +400,6 @@
         }
 
         // 初始化
-        fetchUsername();
         updateSystemInfo();
 
         // 每秒更新一次資訊
@@ -384,8 +407,8 @@
 
         // 點擊對話框外部時關閉對話框
         window.onclick = function(event) {
-            if (event.target.className === 'modal') {
-                event.target.style.display = 'none';
+            if (event.target.classList.contains('modal')) {
+                closeModal(event.target.id);
             }
         }
     </script>
