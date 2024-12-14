@@ -330,7 +330,7 @@ cat > $LIGHTTPD_CONF << EOL
 server.modules = (
 	"mod_access",
 	"mod_alias",
-	"mod_compress",
+	"mod_deflate",
 	"mod_redirect",
 	"mod_cgi",
 	"mod_rewrite"
@@ -423,18 +423,19 @@ mimetype.assign = (
 static-file.exclude-extensions = ( ".py", ".pl", ".rb", ".sh", ".cgi" )
 
 # 壓縮設置
-compress.cache-dir = "/var/cache/lighttpd/compress/"
-compress.filetype = ("text/plain", "text/html", "text/css", "text/xml", "application/javascript", "application/json")
+deflate.cache-dir = "/var/cache/lighttpd/compress/"
+deflate.mimetypes = ("text/plain", "text/html", "text/css", "text/xml", "application/javascript", "application/json")
+deflate.allowed-encodings = ("brotli", "gzip", "deflate")
 EOL
 
 # 確保 Lighttpd 配置文件權限正確
 chmod 644 $LIGHTTPD_CONF
 chown root:root $LIGHTTPD_CONF
 
-# 創建並設置上傳目錄
-mkdir -p /var/cache/lighttpd/uploads
-chown www-data:www-data /var/cache/lighttpd/uploads
-chmod 755 /var/cache/lighttpd/uploads
+# 創建並設置緩存目錄
+mkdir -p /var/cache/lighttpd/{uploads,compress}
+chown -R www-data:www-data /var/cache/lighttpd
+chmod -R 755 /var/cache/lighttpd
 
 # 設置權限
 TASK "設置權限" "
@@ -489,13 +490,13 @@ TASK "啟動 Lighttpd 服務" "
 	chmod 755 /var/log/lighttpd
 	
 	# 停止現有服務
-	systemctl stop lighttpd
+	systemctl stop lighttpd || true
 	
 	# 刪除舊的 PID 文件（如果存在）
 	rm -f /var/run/lighttpd/lighttpd.pid
 	
 	# 啟動服務
-	systemctl enable lighttpd
+	systemctl enable lighttpd || true
 	systemctl restart lighttpd
 	
 	# 檢查服務狀態
