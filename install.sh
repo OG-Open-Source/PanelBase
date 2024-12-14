@@ -19,7 +19,7 @@ download_files() {
 	shift
 	files=("$@")
 	for file in "${files[@]}"; do
-		GET "https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main/${file}" $target_dir && chmod 755 $target_dir/$(basename $file)
+		GET "https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main/${file}" $target_dir && chmod 755 $target_dir/$(basename $file) 2&>/dev/null
 	done
 }
 
@@ -41,24 +41,32 @@ cat > $INSTALL_DIR/www/index.html << 'EOL'
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>管理面板登入</title>
+	<title>管理面板</title>
 	<style>
 		body {
 			font-family: Arial, sans-serif;
 			background-color: #f5f5f5;
 			margin: 0;
 			padding: 0;
+		}
+		.login-container {
 			display: flex;
 			justify-content: center;
 			align-items: center;
 			height: 100vh;
 		}
-		.login-container {
+		.login-box {
 			background-color: white;
 			padding: 2rem;
 			border-radius: 8px;
 			box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 			width: 300px;
+		}
+		.panel-container {
+			display: none;
+			max-width: 1200px;
+			margin: 0 auto;
+			padding: 20px;
 		}
 		.form-group {
 			margin-bottom: 1rem;
@@ -67,7 +75,7 @@ cat > $INSTALL_DIR/www/index.html << 'EOL'
 			display: block;
 			margin-bottom: 0.5rem;
 		}
-		input {
+		input, select {
 			width: 100%;
 			padding: 0.5rem;
 			border: 1px solid #ddd;
@@ -91,30 +99,123 @@ cat > $INSTALL_DIR/www/index.html << 'EOL'
 			display: none;
 			margin-top: 1rem;
 		}
+		.status-info {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+			gap: 20px;
+			margin: 20px 0;
+		}
+		.status-card {
+			background-color: #fff;
+			padding: 15px;
+			border-radius: 4px;
+			box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+		}
+		#log-content {
+			background-color: #f8f8f8;
+			padding: 15px;
+			border-radius: 4px;
+			border: 1px solid #ddd;
+			height: 300px;
+			overflow-y: auto;
+		}
 	</style>
 </head>
 <body>
-	<div class="login-container">
-		<h2 style="text-align: center\; margin-bottom: 2rem\;">管理面板登入</h2>
-		<form id="loginForm">
-			<div class="form-group">
-				<label for="username">用戶名</label>
-				<input type="text" id="username" name="username" required>
-			</div>
-			<div class="form-group">
-				<label for="password">密碼</label>
-				<input type="password" id="password" name="password" required>
-			</div>
-			<button type="submit">登入</button>
-			<div id="error" class="error">登入失敗，請檢查用戶名和密碼</div>
-		</form>
+	<!-- 登入介面 -->
+	<div id="loginContainer" class="login-container">
+		<div class="login-box">
+			<h2 style="text-align: center; margin-bottom: 2rem;">管理面板登入</h2>
+			<form id="loginForm">
+				<div class="form-group">
+					<label for="username">用戶名</label>
+					<input type="text" id="username" name="username" required>
+				</div>
+				<div class="form-group">
+					<label for="password">密碼</label>
+					<input type="password" id="password" name="password" required>
+				</div>
+				<button type="submit">登入</button>
+				<div id="error" class="error">登入失敗，請檢查用戶名和密碼</div>
+			</form>
+		</div>
 	</div>
+
+	<!-- 面板介面 -->
+	<div id="panelContainer" class="panel-container">
+		<h1>系統管理面板</h1>
+		
+		<div class="status-info">
+			<div class="status-card">
+				<h2>系統狀態</h2>
+				<p>系統狀態：<span id="system-status">載入中...</span></p>
+				<p>CPU 使用率：<span id="cpu-usage">載入中...</span></p>
+				<p>記憶體使用率：<span id="memory-usage">載入中...</span></p>
+			</div>
+			
+			<div class="status-card">
+				<h2>帳號管理</h2>
+				<div class="form-group">
+					<label for="current-password">當前密碼</label>
+					<input type="password" id="current-password">
+				</div>
+				<div class="form-group">
+					<label for="new-password">新密碼</label>
+					<input type="password" id="new-password">
+				</div>
+				<div class="form-group">
+					<label for="confirm-password">確認密碼</label>
+					<input type="password" id="confirm-password">
+				</div>
+				<button onclick="changePassword()" style="margin-top: 1rem;">更新密碼</button>
+			</div>
+		</div>
+
+		<div class="status-card" style="margin-top: 20px;">
+			<h2>系統日誌</h2>
+			<div id="log-content">載入中...</div>
+		</div>
+	</div>
+
 	<script>
+		// 檢查登入狀態
+		async function checkAuth() {
+			try {
+				const response = await fetch('/cgi-bin/auth.cgi', {
+					method: 'GET',
+					headers: {
+						'Content-Type': 'application/json'
+					}
+				});
+				
+				const data = await response.json();
+				return data.status === 'success';
+			} catch (error) {
+				console.error('Error:', error);
+				return false;
+			}
+		}
+
+		// 顯示面板
+		function showPanel() {
+			document.getElementById('loginContainer').style.display = 'none';
+			document.getElementById('panelContainer').style.display = 'block';
+			updateSystemInfo();
+			updateLogs();
+		}
+
+		// 顯示登入
+		function showLogin() {
+			document.getElementById('loginContainer').style.display = 'flex';
+			document.getElementById('panelContainer').style.display = 'none';
+		}
+
+		// 登入表單處理
 		document.getElementById('loginForm').addEventListener('submit', async (e) => {
 			e.preventDefault();
 			const username = document.getElementById('username').value;
 			const password = document.getElementById('password').value;
-
+			
 			try {
 				const response = await fetch('/cgi-bin/auth.cgi', {
 					method: 'POST',
@@ -123,19 +224,111 @@ cat > $INSTALL_DIR/www/index.html << 'EOL'
 					},
 					body: JSON.stringify({ username, password })
 				});
-
+				
 				const data = await response.json();
-
+				
 				if (data.status === 'success') {
-					// 儲存 token 到 cookie
-					document.cookie = `auth_token=${data.token}; path=/`;
-					window.location.href = '/panel.html';
+					showPanel();
 				} else {
 					document.getElementById('error').style.display = 'block';
 				}
 			} catch (error) {
 				console.error('Error:', error);
 				document.getElementById('error').style.display = 'block';
+			}
+		});
+
+		// 更新系統信息
+		async function updateSystemInfo() {
+			try {
+				const response = await fetch('/cgi-bin/api.cgi/api/system-info');
+				const data = await response.json();
+				
+				if (data.status === 'error' && data.message === '未登入') {
+					showLogin();
+					return;
+				}
+
+				document.getElementById('system-status').textContent = '運行中';
+				document.getElementById('cpu-usage').textContent = data.cpu_usage;
+				document.getElementById('memory-usage').textContent = data.memory_usage;
+			} catch (error) {
+				console.error('Error:', error);
+			}
+		}
+
+		// 更新日誌
+		async function updateLogs() {
+			try {
+				const response = await fetch('/cgi-bin/api.cgi/api/logs');
+				const data = await response.json();
+				
+				if (data.status === 'error' && data.message === '未登入') {
+					showLogin();
+					return;
+				}
+
+				const logViewer = document.getElementById('log-content');
+				logViewer.innerHTML = data.join('<br>');
+				logViewer.scrollTop = logViewer.scrollHeight;
+			} catch (error) {
+				console.error('Error:', error);
+			}
+		}
+
+		// 更改密碼
+		async function changePassword() {
+			const currentPassword = document.getElementById('current-password').value;
+			const newPassword = document.getElementById('new-password').value;
+			const confirmPassword = document.getElementById('confirm-password').value;
+
+			if (newPassword !== confirmPassword) {
+				alert('新密碼與確認密碼不符');
+				return;
+			}
+
+			try {
+				const response = await fetch('/cgi-bin/api.cgi/api/change-password', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+					},
+					body: JSON.stringify({
+						current_password: currentPassword,
+						new_password: newPassword
+					})
+				});
+
+				const data = await response.json();
+				
+				if (data.status === 'error' && data.message === '未登入') {
+					showLogin();
+					return;
+				}
+
+				alert(data.message);
+				
+				if (data.status === 'success') {
+					document.getElementById('current-password').value = '';
+					document.getElementById('new-password').value = '';
+					document.getElementById('confirm-password').value = '';
+				}
+			} catch (error) {
+				console.error('Error:', error);
+				alert('更改密碼時發生錯誤');
+			}
+		}
+
+		// 定期更新
+		setInterval(updateSystemInfo, 5000);
+		setInterval(updateLogs, 10000);
+
+		// 初始檢查登入狀態
+		checkAuth().then(isAuthenticated => {
+			if (isAuthenticated) {
+				showPanel();
+			} else {
+				showLogin();
 			}
 		});
 	</script>
