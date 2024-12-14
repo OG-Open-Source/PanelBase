@@ -2,7 +2,7 @@
 
 # 顯示橫幅
 echo "================================="
-echo "=  PanelBase 安裝程序 (Beta 5)  ="
+echo "=  PanelBase 安裝程序 (Beta 6)  ="
 echo "================================="
 
 # 檢查是否為 root 用戶
@@ -33,7 +33,7 @@ while true; do
 done
 
 # 詢問是否使用自定義 HTML
-read -p "是否使用自定義的面板頁面？(y/N): " USE_CUSTOM_HTML
+read -p "是否使用自定義的面板頁面？(y/N) " USE_CUSTOM_HTML
 USE_CUSTOM_HTML=${USE_CUSTOM_HTML:-n}
 
 if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
