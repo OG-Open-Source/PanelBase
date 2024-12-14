@@ -333,12 +333,13 @@ server.modules = (
 	"mod_deflate",
 	"mod_redirect",
 	"mod_cgi",
-	"mod_rewrite"
+	"mod_rewrite",
+	"mod_accesslog"
 )
 
 server.document-root        = "$INSTALL_DIR/www"
 server.upload-dirs          = ( "/var/cache/lighttpd/uploads" )
-server.errorlog            = "$INSTALL_DIR/logs/error.log"
+server.errorlog            = "/var/log/lighttpd/error.log"
 server.pid-file            = "/var/run/lighttpd/lighttpd.pid"
 server.username            = "www-data"
 server.groupname           = "www-data"
@@ -381,8 +382,8 @@ cgi.assign = (
 	)
 }
 
-# 設置 CGI 環境變量
-setenv.add-environment = (
+# 環境變量設置
+server.set-environment = (
 	"PATH" => "/usr/local/bin:/usr/bin:/bin",
 	"SHELL" => "/bin/bash"
 )
@@ -396,12 +397,11 @@ url.rewrite-once = (
 )
 
 # 設置目錄訪問權限
-\$HTTP["url"] =~ "^/" {
-	dir-listing.activate = "disable"
-}
+server.dir-listing.activate = "disable"
 
+# 設置 CGI 目錄訪問
 \$HTTP["url"] =~ "^/cgi-bin/" {
-	access.deny-all = "disable"
+	server.follow-symlink = "enable"
 }
 
 alias.url = (
@@ -426,16 +426,32 @@ static-file.exclude-extensions = ( ".py", ".pl", ".rb", ".sh", ".cgi" )
 deflate.cache-dir = "/var/cache/lighttpd/compress/"
 deflate.mimetypes = ("text/plain", "text/html", "text/css", "text/xml", "application/javascript", "application/json")
 deflate.allowed-encodings = ("brotli", "gzip", "deflate")
+
+# 訪問日誌設置
+accesslog.filename = "/var/log/lighttpd/access.log"
 EOL
 
 # 確保 Lighttpd 配置文件權限正確
 chmod 644 $LIGHTTPD_CONF
 chown root:root $LIGHTTPD_CONF
 
+# 創建並設置日誌目錄
+mkdir -p /var/log/lighttpd
+chown -R www-data:www-data /var/log/lighttpd
+chmod -R 755 /var/log/lighttpd
+touch /var/log/lighttpd/error.log /var/log/lighttpd/access.log
+chown www-data:www-data /var/log/lighttpd/*.log
+chmod 644 /var/log/lighttpd/*.log
+
 # 創建並設置緩存目錄
 mkdir -p /var/cache/lighttpd/{uploads,compress}
 chown -R www-data:www-data /var/cache/lighttpd
 chmod -R 755 /var/cache/lighttpd
+
+# 創建並設置 PID 目錄
+mkdir -p /var/run/lighttpd
+chown www-data:www-data /var/run/lighttpd
+chmod 755 /var/run/lighttpd
 
 # 設置權限
 TASK "設置權限" "
