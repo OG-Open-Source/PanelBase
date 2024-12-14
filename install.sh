@@ -228,6 +228,8 @@ cat > $INSTALL_DIR/www/index.html << 'EOL'
 				const data = await response.json();
 				
 				if (data.status === 'success') {
+					// 設置 cookie
+					document.cookie = `auth_token=${data.token}; path=/`;
 					showPanel();
 				} else {
 					document.getElementById('error').style.display = 'block';
