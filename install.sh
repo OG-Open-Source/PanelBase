@@ -357,19 +357,30 @@ debug.log-timeouts = "enable"
 
 # CGI 配置
 cgi.assign = (
+	".cgi" => "",
 	".sh"  => "/bin/bash",
 	".py"  => "/usr/bin/python3",
 	".pl"  => "/usr/bin/perl",
-	".rb"  => "/usr/bin/ruby",
-	".cgi" => ""
+	".rb"  => "/usr/bin/ruby"
 )
 
 # 允許執行所有 CGI 腳本
 \$HTTP["url"] =~ "^/cgi-bin/" {
+	dir-listing.activate = "disable"
 	cgi.assign = (
-		""  => ""
+		".cgi" => "",
+		".sh"  => "/bin/bash",
+		".py"  => "/usr/bin/python3",
+		".pl"  => "/usr/bin/perl",
+		".rb"  => "/usr/bin/ruby"
 	)
 }
+
+# 設置 CGI 環境變量
+setenv.add-environment = (
+	"PATH" => "/usr/local/bin:/usr/bin:/bin",
+	"SHELL" => "/bin/bash"
+)
 
 # URL 重寫規則
 url.rewrite-once = (
@@ -378,6 +389,16 @@ url.rewrite-once = (
 	"^/assets/(.*)" => "/assets/$1",
 	"^/(.*)$" => "/cgi-bin/page.cgi"
 )
+
+# 設置目錄訪問權限
+\$HTTP["url"] =~ "^/" {
+	dir-listing.activate = "disable"
+}
+
+\$HTTP["url"] =~ "^/cgi-bin/" {
+	dir-listing.activate = "disable"
+	access.deny-all = "disable"
+}
 
 alias.url = (
 	"/cgi-bin/" => "$INSTALL_DIR/cgi-bin/",
@@ -411,28 +432,33 @@ chmod 755 /var/cache/lighttpd/uploads
 TASK "設置權限" "
 	# 確保目錄存在
 	mkdir -p $INSTALL_DIR/{config,cgi-bin,www,logs}
+	mkdir -p $INSTALL_DIR/www/assets
 	
-	# 設置目錄權限
+	# 設置基本權限
 	chown -R www-data:www-data $INSTALL_DIR
 	find $INSTALL_DIR -type d -exec chmod 755 {} \;
 	find $INSTALL_DIR -type f -exec chmod 644 {} \;
 	
 	# 設置 CGI 腳本權限
-	chmod 755 $INSTALL_DIR/cgi-bin/*
-	chown www-data:www-data $INSTALL_DIR/cgi-bin/*
+	find $INSTALL_DIR/cgi-bin -type f -exec chmod 755 {} \;
+	chown -R www-data:www-data $INSTALL_DIR/cgi-bin
 	
 	# 設置日誌目錄權限
 	chmod 755 $INSTALL_DIR/logs
-	chown www-data:www-data $INSTALL_DIR/logs
+	chown -R www-data:www-data $INSTALL_DIR/logs
 	touch $INSTALL_DIR/logs/auth.log
 	touch $INSTALL_DIR/logs/error.log
 	touch $INSTALL_DIR/logs/page.log
 	chmod 644 $INSTALL_DIR/logs/*.log
-	chown www-data:www-data $INSTALL_DIR/logs/*.log
 	
 	# 設置配置目錄權限
 	chmod 755 $INSTALL_DIR/config
-	chown www-data:www-data $INSTALL_DIR/config
+	chown -R www-data:www-data $INSTALL_DIR/config
+	
+	# 設置 www 目錄權限
+	chmod 755 $INSTALL_DIR/www
+	chmod 644 $INSTALL_DIR/www/*.html
+	chmod -R 755 $INSTALL_DIR/www/assets
 "
 
 # 啟動服務
@@ -447,10 +473,15 @@ INPUT "請輸入管理員用戶名: " admin_user
 INPUT "請輸入管理員密碼: " admin_pass
 echo "$admin_user:$(echo -n "$admin_pass" | sha256sum | cut -d' ' -f1)" > $INSTALL_DIR/config/admin.conf
 
+# 測試認證前等待服務啟動
+text "等待服務啟動..."
+sleep 3
+
 # 測試認證
 text "測試認證..."
 test_auth=$(curl -s -X POST -H "Content-Type: application/json" \
 	-d "{\"username\":\"$admin_user\",\"password\":\"$admin_pass\"}" \
+	--unix-socket /var/run/lighttpd.sock \
 	http://localhost:8080/cgi-bin/auth.cgi)
 
 echo "認證響應: $test_auth" >&2
