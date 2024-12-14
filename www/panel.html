@@ -90,6 +90,11 @@
 				margin-bottom: 10px;
 				display: none;
 			}
+			.random-number {
+				font-size: 1.2em;
+				font-weight: bold;
+				color: #2c3e50;
+			}
 		</style>
 	</head>
 	<body>
@@ -117,6 +122,9 @@
 
 						<span class="info-label">磁碟使用：</span>
 						<span class="info-value" id="disk-usage">載入中...</span>
+
+						<span class="info-label">隨機數：</span>
+						<span class="info-value random-number" id="random-number">載入中...</span>
 					</div>
 				</div>
 
@@ -179,10 +187,14 @@
 					// 更新磁碟使用情況
 					document.getElementById('disk-usage').textContent = data.disk;
 					
+					// 更新隨機數
+					document.getElementById('random-number').textContent = data.random;
+					
 					// 更新服務狀態
 					const lighttpdStatus = document.getElementById('lighttpd-status');
 					lighttpdStatus.textContent = data.lighttpd_status;
 					lighttpdStatus.className = data.lighttpd_status === '運行中' ? 'status-ok' : 'status-error';
+					
 				} catch (error) {
 					console.error('Error updating system info:', error);
 					showError('無法更新系統資訊');

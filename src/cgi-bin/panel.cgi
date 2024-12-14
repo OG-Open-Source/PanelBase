@@ -42,6 +42,9 @@ if echo "$QUERY_STRING" | grep -q "action="; then
 				LIGHTTPD_STATUS="已停止"
 			fi
 
+			# 生成隨機數
+			RANDOM_NUMBER=$(od -An -N2 -i /dev/urandom | tr -d ' ')
+
 			# 返回 JSON 格式的數據
 			echo "Content-type: application/json"
 			echo "Cache-Control: no-cache"
@@ -51,7 +54,8 @@ if echo "$QUERY_STRING" | grep -q "action="; then
 	"cpu": "${CPU_USAGE}",
 	"memory": "${MEM_INFO}",
 	"disk": "${DISK_INFO}",
-	"lighttpd_status": "${LIGHTTPD_STATUS}"
+	"lighttpd_status": "${LIGHTTPD_STATUS}",
+	"random": "${RANDOM_NUMBER}"
 }
 EOF
 			;;
@@ -114,6 +118,11 @@ cat << EOF
 		.status-error {
 			color: red;
 		}
+		.random-number {
+			font-size: 1.2em;
+			font-weight: bold;
+			color: #2c3e50;
+		}
 	</style>
 </head>
 <body>
@@ -146,6 +155,12 @@ echo "<strong>磁碟使用情況：</strong>"
 df -h / | tail -n 1 | awk '{print "總計: " $2 "  已使用: " $3 "  可用: " $4 "  使用率: " $5}'
 echo '</div>'
 
+# 隨機數
+echo '<div class="info-item">'
+echo "<strong>隨機數：</strong>"
+echo "<span class='random-number'>$(od -An -N2 -i /dev/urandom | tr -d ' ')</span>"
+echo '</div>'
+
 echo '</div>'
 
 # 服務狀態
@@ -158,16 +173,6 @@ if systemctl is-active lighttpd >/dev/null 2>&1; then
 	echo '<span class="status-ok">運行中</span>'
 else
 	echo '<span class="status-error">已停止</span>'
-fi
-echo '</div>'
-
-echo '<div class="info-item">'
-echo "<strong>隨機碼狀態：</strong>"
-RANDOM_BYTES=$(head -c 10 /dev/urandom | base64 | head -c 10)
-if [ -n "$RANDOM_BYTES" ]; then
-	echo '<span class="status-ok">已生成：'$RANDOM_BYTES'</span>'
-else
-	echo '<span class="status-error">生成失敗</span>'
 fi
 echo '</div>'
 
