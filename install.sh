@@ -19,7 +19,7 @@ download_files() {
 	shift
 	files=("$@")
 	for file in "${files[@]}"; do
-		GET "https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main/${file}" $target_dir && chmod 755 $target_dir/$(basename $file) &>/dev/null
+		GET "https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main/${file}" $target_dir && chmod 755 $target_dir/$(basename $file)
 	done
 }
 
@@ -30,8 +30,8 @@ CGI_FILES=(
 	"src/cgi-bin/example.py"
 	"src/cgi-bin/check_auth.sh"
 )
-download_files "$INSTALL_DIR/cgi-bin" "${CGI_FILES[@]}"
-download_files "$INSTALL_DIR/www/templates" "src/www/templates/panel.md"
+download_files "$INSTALL_DIR/cgi-bin" "${CGI_FILES[@]}" &>/dev/null
+download_files "$INSTALL_DIR/www/templates" "src/www/templates/panel.md" &>/dev/null
 
 # 創建登入頁面
 text "創建登入頁面..."
