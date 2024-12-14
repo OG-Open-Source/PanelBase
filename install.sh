@@ -2,7 +2,7 @@
 
 # 顯示橫幅
 echo "================================="
-echo "=  PanelBase 安裝程序 (Beta 3)  ="
+echo "=  PanelBase 安裝程序 (Beta 4)  ="
 echo "================================="
 
 # 檢查是否為 root 用戶
@@ -103,15 +103,27 @@ server.modules = (
 server.document-root = "$INSTALL_DIR/www"
 server.port = 8080
 
+# 設置用戶和組
 server.username = "www-data"
 server.groupname = "www-data"
 
+# 日誌配置
 server.errorlog = "$INSTALL_DIR/logs/error.log"
 accesslog.filename = "$INSTALL_DIR/logs/access.log"
+
+# 目錄訪問權限
+\$HTTP["url"] =~ "^/" {
+	dir-listing.activate = "disable"
+}
 
 # CGI 配置
 cgi.assign = ( ".cgi" => "" )
 alias.url = ( "/cgi-bin/" => "$INSTALL_DIR/cgi-bin/" )
+
+# 允許執行 CGI
+\$HTTP["url"] =~ "^/cgi-bin/" {
+	cgi.assign = ( "" => "" )
+}
 
 # MIME 類型
 mimetype.assign = (
@@ -132,6 +144,12 @@ mimetype.assign = (
 		)
 	}
 }
+
+# 設置默認文件
+index-file.names = ( "index.html" )
+
+# 設置文件訪問權限
+static-file.exclude-extensions = ( ".cgi" )
 EOF
 
 # 創建用戶配置文件
@@ -146,12 +164,23 @@ if ! id -u www-data >/dev/null 2>&1; then
 	useradd -r -s /usr/sbin/nologin www-data
 fi
 
-chown -R www-data:www-data $INSTALL_DIR
-chmod -R 755 $INSTALL_DIR
+# 設置目錄權限
+find $INSTALL_DIR -type d -exec chmod 755 {} \;
+find $INSTALL_DIR -type f -exec chmod 644 {} \;
+
+# 設置特殊權限
 chmod -R 755 $INSTALL_DIR/cgi-bin
 chmod 600 $INSTALL_DIR/config/users.conf
 chmod 600 $INSTALL_DIR/config/sessions.conf
-chmod 644 $INSTALL_DIR/www/index.html
+
+# 設置所有權
+chown -R www-data:www-data $INSTALL_DIR
+chown -R www-data:www-data /etc/lighttpd
+
+# 確保日誌目錄存在且具有正確的權限
+mkdir -p /var/log/lighttpd
+chown -R www-data:www-data /var/log/lighttpd
+chmod 755 /var/log/lighttpd
 
 # 重啟 lighttpd
 echo "重啟 lighttpd 服務..."
