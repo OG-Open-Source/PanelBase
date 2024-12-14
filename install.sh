@@ -277,7 +277,9 @@ if [ ! -f "$INSTALL_DIR/www/index.html" ]; then
                 const data = await response.json();
                 
                 if (data.status === 'success') {
-                    document.cookie = `auth_token=${data.token}; path=/`;
+                    // 設置 cookie，包含過期時間
+                    const expires = new Date(data.expire * 1000).toUTCString();
+                    document.cookie = `auth_token=${data.token}; path=/; expires=${expires}`;
                     showPanel();
                 } else {
                     document.getElementById('error').style.display = 'block';
@@ -406,6 +408,12 @@ if [ "$(echo "$test_auth" | jq -r .status)" = "success" ]; then
 	touch "$INSTALL_DIR/config/token.conf"
 	chown www-data:www-data "$INSTALL_DIR/config/token.conf"
 	chmod 644 "$INSTALL_DIR/config/token.conf"
+	
+	# 生成並保存安裝時間戳
+	install_time=$(date +%s)
+	echo "$install_time" > "$INSTALL_DIR/config/install_time.conf"
+	chown www-data:www-data "$INSTALL_DIR/config/install_time.conf"
+	chmod 644 "$INSTALL_DIR/config/install_time.conf"
 	
 	# 保存初始 token
 	echo "$test_auth" | jq -r .token > "$INSTALL_DIR/config/token.conf"
