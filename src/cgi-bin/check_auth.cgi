@@ -32,6 +32,12 @@ if [ -z "$VALID_SESSION" ]; then
 	exit 0
 fi
 
+if echo "$ORIGINAL_URL" | grep -q "^/cgi-bin/panel\.cgi"; then
+	# 執行 panel.cgi 並傳遞所有環境變數
+	exec /opt/panelbase/cgi-bin/panel.cgi
+	exit 0
+fi
+
 REQUESTED_FILE="${DOCUMENT_ROOT}${ORIGINAL_URL}"
 
 if [ ! -f "$REQUESTED_FILE" ]; then

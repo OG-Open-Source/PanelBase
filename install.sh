@@ -2,7 +2,7 @@
 
 # 顯示橫幅
 echo "================================="
-echo "=  PanelBase 安裝程序 (Beta 8)  ="
+echo "=  PanelBase 安裝程序 (Beta 9)  ="
 echo "================================="
 
 # 檢查是否為 root 用戶
@@ -167,7 +167,7 @@ mimetype.assign = (
 
 # URL 重寫規則
 \$HTTP["url"] !~ "^/\$" {
-	\$HTTP["url"] !~ "^/cgi-bin/auth\.cgi" {
+	\$HTTP["url"] !~ "^/cgi-bin/(auth|panel)\.cgi" {
 		url.rewrite-once = (
 			"^/.*" => "/cgi-bin/check_auth.cgi"
 		)
