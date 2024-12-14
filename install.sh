@@ -19,7 +19,7 @@ download_files() {
 	shift
 	files=("$@")
 	for file in "${files[@]}"; do
-		GET "https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main/${file}" $target_dir && chmod 755 $target_dir/$(basename $file) 2&>/dev/null
+		GET "https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main/${file}" $target_dir && chmod 755 $target_dir/$(basename $file) &>/dev/null
 	done
 }
 

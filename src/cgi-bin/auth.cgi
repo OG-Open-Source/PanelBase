@@ -54,7 +54,12 @@ if [ "$username" = "$stored_username" ] && [ "$password_hash" = "$stored_passwor
     # 生成 token（使用時間戳和隨機數）
     token=$(date +%s%N | sha256sum | cut -d' ' -f1)
     echo "$token" > /opt/panelbase/config/token.conf
+    chmod 644 /opt/panelbase/config/token.conf
+    chown www-data:www-data /opt/panelbase/config/token.conf
+    
+    # 返回成功響應，包含 token
     echo "{\"status\": \"success\", \"message\": \"認證成功\", \"token\": \"$token\"}"
 else
+    # 返回失敗響應
     echo "{\"status\": \"error\", \"message\": \"認證失敗\", \"debug\": {\"username_match\": \"$username = $stored_username\", \"password_match\": \"$password_hash = $stored_password_hash\"}}"
 fi 
