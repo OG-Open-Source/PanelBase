@@ -334,7 +334,8 @@ server.modules = (
 	"mod_redirect",
 	"mod_cgi",
 	"mod_rewrite",
-	"mod_accesslog"
+	"mod_accesslog",
+	"mod_setenv"
 )
 
 server.document-root        = "$INSTALL_DIR/www"
@@ -383,7 +384,7 @@ cgi.assign = (
 }
 
 # 環境變量設置
-server.set-environment = (
+setenv.add-environment = (
 	"PATH" => "/usr/local/bin:/usr/bin:/bin",
 	"SHELL" => "/bin/bash"
 )
@@ -397,11 +398,11 @@ url.rewrite-once = (
 )
 
 # 設置目錄訪問權限
-server.dir-listing.activate = "disable"
+dir-listing.activate = "disable"
 
 # 設置 CGI 目錄訪問
 \$HTTP["url"] =~ "^/cgi-bin/" {
-	server.follow-symlink = "enable"
+	dir-listing.activate = "disable"
 }
 
 alias.url = (

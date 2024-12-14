@@ -11,11 +11,11 @@ source $(dirname "$0")/check_auth.sh >/dev/null 2>&1
 auth_status=$?
 
 # 獲取請求的頁面路徑
-page_path="/opt/panelbase/www${REQUEST_URI:-/index.html}"
-page_path=${page_path%%\?*}  # 移除 URL 參數
+request_uri="${REQUEST_URI:-/index.html}"
+request_uri="${request_uri%%\?*}"  # 移除 URL 參數
 
 # 如果是登入頁面，直接顯示
-if [ "$page_path" = "/opt/panelbase/www/login.html" ]; then
+if [ "$request_uri" = "/login.html" ]; then
     echo "Content-type: text/html"
     echo ""
     cat /opt/panelbase/www/login.html
@@ -30,6 +30,9 @@ if [ $auth_status -ne 0 ]; then
     exit 0
 fi
 
+# 構建實際的文件路徑
+page_path="/opt/panelbase/www${request_uri}"
+
 # 檢查文件是否存在
 if [ ! -f "$page_path" ]; then
     echo "Status: 404 Not Found"
@@ -41,21 +44,11 @@ fi
 
 # 檢查文件類型並設置對應的 Content-Type
 case "${page_path##*.}" in
-    html)
-        echo "Content-type: text/html"
-        ;;
-    css)
-        echo "Content-type: text/css"
-        ;;
-    js)
-        echo "Content-type: application/javascript"
-        ;;
-    json)
-        echo "Content-type: application/json"
-        ;;
-    *)
-        echo "Content-type: text/plain"
-        ;;
+    html) echo "Content-type: text/html" ;;
+    css) echo "Content-type: text/css" ;;
+    js) echo "Content-type: application/javascript" ;;
+    json) echo "Content-type: application/json" ;;
+    *) echo "Content-type: text/plain" ;;
 esac
 echo ""
 
