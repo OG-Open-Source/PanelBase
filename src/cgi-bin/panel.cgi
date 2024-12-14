@@ -115,19 +115,19 @@ echo '<h2>系統資訊</h2>'
 # CPU 使用率
 echo '<div class="info-item">'
 echo "<strong>CPU 使用率：</strong>"
-echo "$(CPU_USAGE)"
+CPU_USAGE
 echo '</div>'
 
 # 記憶體使用情況
 echo '<div class="info-item">'
 echo "<strong>記憶體使用情況：</strong>"
-echo "$(MEM_USAGE)"
+MEM_USAGE
 echo '</div>'
 
 # 磁碟使用情況
 echo '<div class="info-item">'
 echo "<strong>磁碟使用情況：</strong>"
-echo "$(DISK_USAGE)"
+DISK_USAGE
 echo '</div>'
 
 echo '</div>'
