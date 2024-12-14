@@ -95,6 +95,27 @@
             border-radius: 4px;
             display: none;
         }
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 4px;
+            color: white;
+            font-size: 0.9rem;
+            z-index: 2000;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+        .toast.success {
+            background-color: #27ae60;
+        }
+        .toast.error {
+            background-color: #c0392b;
+        }
+        .toast.show {
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
@@ -171,16 +192,41 @@
     </div>
 
     <script>
+        // 顯示提示訊息
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            // 強制重繪
+            toast.offsetHeight;
+
+            // 顯示
+            toast.classList.add('show');
+
+            // 3秒後移除
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    document.body.removeChild(toast);
+                }, 300);
+            }, 3000);
+        }
+
         // 獲取用戶名
         async function fetchUsername() {
             try {
                 const response = await fetch('/cgi-bin/auth.cgi?action=get_username');
                 if (response.ok) {
-                    const data = await response.text();
-                    document.getElementById('username').textContent = data;
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        document.getElementById('username').textContent = data.username;
+                    }
                 }
             } catch (error) {
                 console.error('Error:', error);
+                showToast('無法獲取用戶名', 'error');
             }
         }
 
@@ -205,11 +251,18 @@
         async function handleLogout() {
             try {
                 const response = await fetch('/cgi-bin/auth.cgi?action=logout');
-                if (response.ok) {
-                    window.location.href = '/';
+                const data = await response.json();
+                if (response.ok && data.status === 0) {
+                    showToast('登出成功', 'success');
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 1000);
+                } else {
+                    throw new Error('Logout failed');
                 }
             } catch (error) {
                 console.error('Error:', error);
+                showToast('登出失敗', 'error');
             }
         }
 
@@ -249,12 +302,25 @@
                     body: `new_username=${encodeURIComponent(newUsername)}&password=${encodeURIComponent(password)}`
                 });
 
-                if (response.ok) {
+                const data = await response.json();
+                if (response.ok && data.status === 0) {
                     closeModal('usernameModal');
+                    showToast('用戶名修改成功', 'success');
                     fetchUsername();
                 } else {
-                    const error = await response.text();
-                    errorElement.textContent = error;
+                    let message = '發生錯誤';
+                    switch (data.status) {
+                        case 1:
+                            message = '用戶名已存在';
+                            break;
+                        case 2:
+                            message = '密碼錯誤';
+                            break;
+                        case 3:
+                            message = '未授權訪問';
+                            break;
+                    }
+                    errorElement.textContent = message;
                     errorElement.style.display = 'block';
                 }
             } catch (error) {
@@ -285,12 +351,21 @@
                     body: `old_password=${encodeURIComponent(oldPassword)}&new_password=${encodeURIComponent(newPassword)}`
                 });
 
-                if (response.ok) {
+                const data = await response.json();
+                if (response.ok && data.status === 0) {
                     closeModal('passwordModal');
-                    showError('密碼修改成功');
+                    showToast('密碼修改成功', 'success');
                 } else {
-                    const error = await response.text();
-                    errorElement.textContent = error;
+                    let message = '發生錯誤';
+                    switch (data.status) {
+                        case 1:
+                            message = '舊密碼錯誤';
+                            break;
+                        case 2:
+                            message = '未授權訪問';
+                            break;
+                    }
+                    errorElement.textContent = message;
                     errorElement.style.display = 'block';
                 }
             } catch (error) {
