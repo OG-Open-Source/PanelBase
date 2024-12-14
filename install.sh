@@ -32,6 +32,7 @@ CGI_FILES=(
 	"src/cgi-bin/api.cgi"
 	"src/cgi-bin/example.py"
 	"src/cgi-bin/check_auth.sh"
+	"src/cgi-bin/page.cgi"
 )
 download_files "$INSTALL_DIR/cgi-bin" "${CGI_FILES[@]}"
 
