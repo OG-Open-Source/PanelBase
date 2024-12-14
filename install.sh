@@ -347,6 +347,14 @@ server.port                = 8080
 index-file.names           = ( "index.html" )
 url.access-deny           = ( "~", ".inc" )
 
+# 調試設置
+debug.log-request-handling = "enable"
+debug.log-condition-handling = "enable"
+debug.log-file-not-found = "enable"
+debug.log-request-header = "enable"
+debug.log-response-header = "enable"
+debug.log-timeouts = "enable"
+
 # CGI 配置
 cgi.assign = (
 	".sh"  => "/bin/bash",
@@ -366,13 +374,14 @@ cgi.assign = (
 # URL 重寫規則
 url.rewrite-once = (
 	"^/login.html$" => "/cgi-bin/page.cgi",
-	"^/cgi-bin/.*" => "$0",
-	"^/assets/.*" => "$0",
-	"^/.*" => "/cgi-bin/page.cgi"
+	"^/cgi-bin/(.*)" => "/cgi-bin/$1",
+	"^/assets/(.*)" => "/assets/$1",
+	"^/(.*)$" => "/cgi-bin/page.cgi"
 )
 
 alias.url = (
-	"/cgi-bin/" => "$INSTALL_DIR/cgi-bin/"
+	"/cgi-bin/" => "$INSTALL_DIR/cgi-bin/",
+	"/assets/" => "$INSTALL_DIR/www/assets/"
 )
 
 # MIME 類型設置
@@ -389,12 +398,41 @@ mimetype.assign = (
 static-file.exclude-extensions = ( ".py", ".pl", ".rb", ".sh", ".cgi" )
 EOL
 
+# 確保 Lighttpd 配置文件權限正確
+chmod 644 $LIGHTTPD_CONF
+chown root:root $LIGHTTPD_CONF
+
+# 創建並設置上傳目錄
+mkdir -p /var/cache/lighttpd/uploads
+chown www-data:www-data /var/cache/lighttpd/uploads
+chmod 755 /var/cache/lighttpd/uploads
+
 # 設置權限
 TASK "設置權限" "
+	# 確保目錄存在
+	mkdir -p $INSTALL_DIR/{config,cgi-bin,www,logs}
+	
+	# 設置目錄權限
 	chown -R www-data:www-data $INSTALL_DIR
-	chmod -R 755 $INSTALL_DIR
-	chmod -R 755 $INSTALL_DIR/cgi-bin
-	chmod 644 $INSTALL_DIR/www/index.html
+	find $INSTALL_DIR -type d -exec chmod 755 {} \;
+	find $INSTALL_DIR -type f -exec chmod 644 {} \;
+	
+	# 設置 CGI 腳本權限
+	chmod 755 $INSTALL_DIR/cgi-bin/*
+	chown www-data:www-data $INSTALL_DIR/cgi-bin/*
+	
+	# 設置日誌目錄權限
+	chmod 755 $INSTALL_DIR/logs
+	chown www-data:www-data $INSTALL_DIR/logs
+	touch $INSTALL_DIR/logs/auth.log
+	touch $INSTALL_DIR/logs/error.log
+	touch $INSTALL_DIR/logs/page.log
+	chmod 644 $INSTALL_DIR/logs/*.log
+	chown www-data:www-data $INSTALL_DIR/logs/*.log
+	
+	# 設置配置目錄權限
+	chmod 755 $INSTALL_DIR/config
+	chown www-data:www-data $INSTALL_DIR/config
 "
 
 # 啟動服務
@@ -418,7 +456,7 @@ test_auth=$(curl -s -X POST -H "Content-Type: application/json" \
 echo "認證響應: $test_auth" >&2
 
 if [ "$(echo "$test_auth" | jq -r .status)" = "success" ]; then
-	text "認證測試���功！"
+	text "認證測試成功！"
 	
 	# 確保配置目錄權限正確
 	chown -R www-data:www-data "$INSTALL_DIR/config"
