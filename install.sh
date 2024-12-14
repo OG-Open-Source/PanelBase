@@ -558,14 +558,24 @@ test_auth=$(curl -s -X POST -H "Content-Type: application/json" \
 	http://localhost:8080/cgi-bin/auth.cgi)
 
 echo "認證響應: $test_auth" >&2
-if echo "$test_auth" | grep -q '"status":"success"'; then
+
+if [ "$(echo "$test_auth" | jq -r .status)" = "success" ]; then
 	text "認證測試成功！"
+	
+	# 確保配置錄權限正確
 	chown -R www-data:www-data "$INSTALL_DIR/config"
 	chmod 755 "$INSTALL_DIR/config"
 	chmod 644 "$INSTALL_DIR/config/admin.conf"
+	
+	# 創建並設置 token.conf 權限
 	touch "$INSTALL_DIR/config/token.conf"
 	chown www-data:www-data "$INSTALL_DIR/config/token.conf"
 	chmod 644 "$INSTALL_DIR/config/token.conf"
+	
+	# 保存初始 token
+	echo "$test_auth" | jq -r .token > "$INSTALL_DIR/config/token.conf"
+	
+	text "Token 已保存到配置文件"
 else
 	error "認證測試失敗！"
 	text "請檢查 $INSTALL_DIR/logs/auth.log 和 $INSTALL_DIR/logs/error.log 查看詳細信息"

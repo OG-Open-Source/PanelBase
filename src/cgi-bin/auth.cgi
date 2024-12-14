@@ -15,7 +15,7 @@ if [ -n "$HTTP_COOKIE" ] && [[ "$HTTP_COOKIE" =~ auth_token=([^;]+) ]]; then
     token="${BASH_REMATCH[1]}"
     stored_token=$(cat /opt/panelbase/config/token.conf 2>/dev/null)
     
-    if [ "$token" = "$stored_token" ]; then
+    if [ -n "$stored_token" ] && [ "$token" = "$stored_token" ]; then
         echo '{"status": "success", "message": "token 驗證成功"}'
         exit 0
     else
@@ -29,8 +29,13 @@ read -n $CONTENT_LENGTH POST_DATA
 echo "Received POST data: $POST_DATA" >&2
 
 # 解析用戶名和密碼
-username=$(echo "$POST_DATA" | grep -o '"username":"[^"]*' | cut -d'"' -f4)
-password=$(echo "$POST_DATA" | grep -o '"password":"[^"]*' | cut -d'"' -f4)
+username=$(echo "$POST_DATA" | jq -r '.username // empty')
+password=$(echo "$POST_DATA" | jq -r '.password // empty')
+
+if [ -z "$username" ] || [ -z "$password" ]; then
+    echo '{"status": "error", "message": "缺少用戶名或密碼"}'
+    exit 1
+fi
 
 echo "Username: $username" >&2
 echo "Password length: ${#password}" >&2
@@ -57,9 +62,7 @@ if [ "$username" = "$stored_username" ] && [ "$password_hash" = "$stored_passwor
     chmod 644 /opt/panelbase/config/token.conf
     chown www-data:www-data /opt/panelbase/config/token.conf
     
-    # 返回成功響應，包含 token
     echo "{\"status\": \"success\", \"message\": \"認證成功\", \"token\": \"$token\"}"
 else
-    # 返回失敗響應
-    echo "{\"status\": \"error\", \"message\": \"認證失敗\", \"debug\": {\"username_match\": \"$username = $stored_username\", \"password_match\": \"$password_hash = $stored_password_hash\"}}"
+    echo "{\"status\": \"error\", \"message\": \"認證失敗\"}"
 fi 
