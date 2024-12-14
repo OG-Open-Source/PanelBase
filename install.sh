@@ -5,7 +5,7 @@
 CHECK_ROOT
 CLEAN
 
-text "開始安裝 PanelBase... (Alpha 4)"
+text "開始安裝 PanelBase... (Alpha 5)"
 
 # 檢查必要命令
 deps=(lighttpd curl jq)
@@ -466,17 +466,17 @@ chown www-data:www-data /var/run/lighttpd
 chmod 755 /var/run/lighttpd
 
 # 設置權限
-text "設置權限"
+text "設置權限..."
 
 mkdir -p $INSTALL_DIR/{config,cgi-bin,www,logs}
 mkdir -p $INSTALL_DIR/www/assets
 
 chown -R www-data:www-data $INSTALL_DIR
-find $INSTALL_DIR -type d -exec chmod 755 {}
-find $INSTALL_DIR -type f -exec chmod 644 {}
+find $INSTALL_DIR -type d -exec chmod 755 {} \;
+find $INSTALL_DIR -type f -exec chmod 644 {} \;
 
 chmod 755 $INSTALL_DIR/cgi-bin
-find $INSTALL_DIR/cgi-bin -type f -exec chmod 755 {}
+find $INSTALL_DIR/cgi-bin -type f -exec chmod 755 {} \;
 chown -R www-data:www-data $INSTALL_DIR/cgi-bin
 
 chmod 755 $INSTALL_DIR/logs
@@ -492,13 +492,6 @@ chown -R www-data:www-data $INSTALL_DIR/config
 chmod 755 $INSTALL_DIR/www
 chmod 644 $INSTALL_DIR/www/*.html
 chmod -R 755 $INSTALL_DIR/www/assets
-
-for script in $INSTALL_DIR/cgi-bin/*; do
-    if [ -f "$script" ]; then
-        chmod 755 "$script"
-        chown www-data:www-data "$script"
-    fi
-done
 
 # 啟動服務
 text "啟動 Lighttpd 服務..."
