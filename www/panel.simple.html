@@ -260,16 +260,11 @@
         }
 
         // 處理登出
-        async function handleLogout() {
-            try {
-                await fetch('/cgi-bin/auth.cgi?action=logout');
-            } catch (error) {
-                console.error('Error:', error);
-                showToast('登出失敗', 'error');
-            }
+        function handleLogout() {
+            window.location.href = '/cgi-bin/auth.cgi?action=logout';
         }
 
-        // 顯示修改用���名對話框
+        // 顯示修改用戶名對話框
         function showChangeUsername() {
             const modal = document.getElementById('usernameModal');
             modal.style.display = 'block';
@@ -393,7 +388,7 @@
         // 初始化
         updateSystemInfo();
 
-        // 每秒更新一次資訊
+        // ���秒更新一次資訊
         setInterval(updateSystemInfo, 1000);
 
         // 點擊對話框外部時關閉對話框

@@ -315,13 +315,8 @@
 			}
 
 			// 處理登出
-			async function handleLogout() {
-				try {
-					await fetch('/cgi-bin/auth.cgi?action=logout');
-				} catch (error) {
-					console.error('Error logging out:', error);
-					showError('登出失敗');
-				}
+			function handleLogout() {
+				window.location.href = '/cgi-bin/auth.cgi?action=logout';
 			}
 
 			// 顯示修改用戶名對話框
@@ -395,7 +390,7 @@
 					}
 				} catch (error) {
 					console.error('Error:', error);
-					errorElement.textContent = '發生���誤';
+					errorElement.textContent = '發生錯誤';
 					errorElement.style.display = 'block';
 				}
 			}
