@@ -262,16 +262,7 @@
         // 處理登出
         async function handleLogout() {
             try {
-                const response = await fetch('/cgi-bin/auth.cgi?action=logout');
-                const data = await response.json();
-                if (response.ok && data.status === 0) {
-                    showToast('登出成功', 'success');
-                    setTimeout(() => {
-                        window.location.href = '/';
-                    }, 1000);
-                } else {
-                    throw new Error('Logout failed');
-                }
+                await fetch('/cgi-bin/auth.cgi?action=logout');
             } catch (error) {
                 console.error('Error:', error);
                 showToast('登出失敗', 'error');

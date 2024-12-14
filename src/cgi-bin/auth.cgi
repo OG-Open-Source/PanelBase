@@ -44,11 +44,15 @@ case "$ACTION" in
 		;;
 
 	"logout")
-		echo "Content-type: application/json"
-		echo "Set-Cookie: auth_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0"
-		echo "Status: 200"
+		if [ -n "$AUTH_TOKEN" ]; then
+			sed -i "/^$AUTH_TOKEN:/d" "$SESSION_FILE"
+		fi
+
+		echo "Content-type: text/html"
+		echo "Set-Cookie: auth_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
+		echo "Status: 302"
+		echo "Location: /"
 		echo
-		echo '0'
 		;;
 
 	"get_username")
@@ -72,12 +76,10 @@ case "$ACTION" in
 			OLD_PASSWORD=$(echo "$POST_DATA" | grep -oP 'old_password=\K[^&]+' | sed 's/%40/@/g' | sed 's/%2B/+/g' | sed 's/%20/ /g')
 			NEW_PASSWORD=$(echo "$POST_DATA" | grep -oP 'new_password=\K[^&]+' | sed 's/%40/@/g' | sed 's/%2B/+/g' | sed 's/%20/ /g')
 
-			# 驗證舊密碼
 			STORED_HASH=$(grep "^$USERNAME:" "$CONFIG_FILE" | cut -d: -f2)
 			OLD_HASH=$(echo -n "$OLD_PASSWORD" | md5sum | cut -d' ' -f1)
 
 			if [ "$STORED_HASH" = "$OLD_HASH" ]; then
-				# 更新密碼
 				NEW_HASH=$(echo -n "$NEW_PASSWORD" | md5sum | cut -d' ' -f1)
 				sed -i "s/^$USERNAME:.*/$USERNAME:$NEW_HASH/" "$CONFIG_FILE"
 
@@ -116,7 +118,6 @@ case "$ACTION" in
 					echo '1'
 				else
 					sed -i "s/^$CURRENT_USERNAME:/$NEW_USERNAME:/" "$CONFIG_FILE"
-					# 更新會話文件中的用戶名
 					sed -i "s/:$CURRENT_USERNAME:/:$NEW_USERNAME:/" "$SESSION_FILE"
 
 					echo "Content-type: application/json"
