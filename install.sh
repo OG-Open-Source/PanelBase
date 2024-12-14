@@ -23,29 +23,21 @@ text "下載必要文件..."
 
 # 下載 CGI 腳本
 download_files() {
-    local target_dir=$1
-    shift
-    local files=("$@")
-    
-    for file in "${files[@]}"; do
-        text "下載 $file..."
-        GET "${BASE_URL}/${file}"
-        if [ $? -eq 0 ]; then
-            mv $(basename $file) $target_dir/
-            chmod 755 $target_dir/$(basename $file)
-            success "下載 $file 成功"
-        else
-            error "下載 $file 失敗"
-        fi
-    done
+	target_dir=$1
+	shift
+	files=("$@")
+	for file in "${files[@]}"; do
+		text "下載 $file..."
+		GET "${BASE_URL}/${file}" $target_dir && chmod 755 $target_dir/$(basename $file)
+	done
 }
 
 # 下載 CGI 腳本
 cd $INSTALL_DIR/cgi-bin
 CGI_FILES=(
-    "src/cgi-bin/auth.cgi"
-    "src/cgi-bin/api.cgi"
-    "src/cgi-bin/example.py"
+	"src/cgi-bin/auth.cgi"
+	"src/cgi-bin/api.cgi"
+	"src/cgi-bin/example.py"
 )
 download_files "$INSTALL_DIR/cgi-bin" "${CGI_FILES[@]}"
 
@@ -58,11 +50,11 @@ LIGHTTPD_CONF="/etc/lighttpd/lighttpd.conf"
 text "${CLR3}配置 Lighttpd...${CLR0}"
 cat > $LIGHTTPD_CONF << EOL
 server.modules = (
-    "mod_access",
-    "mod_alias",
-    "mod_compress",
-    "mod_redirect",
-    "mod_cgi"
+	"mod_access",
+	"mod_alias",
+	"mod_compress",
+	"mod_redirect",
+	"mod_cgi"
 )
 
 server.document-root        = "$INSTALL_DIR/www"
@@ -78,32 +70,32 @@ url.access-deny           = ( "~", ".inc" )
 
 # CGI 配置
 cgi.assign = (
-    ".sh"  => "/bin/bash",
-    ".py"  => "/usr/bin/python3",
-    ".pl"  => "/usr/bin/perl",
-    ".rb"  => "/usr/bin/ruby",
-    ".cgi" => ""
+	".sh"  => "/bin/bash",
+	".py"  => "/usr/bin/python3",
+	".pl"  => "/usr/bin/perl",
+	".rb"  => "/usr/bin/ruby",
+	".cgi" => ""
 )
 
 # 允許執行所有 CGI 腳本
 \$HTTP["url"] =~ "^/cgi-bin/" {
-    cgi.assign = (
-        ""  => ""
-    )
+	cgi.assign = (
+		""  => ""
+	)
 }
 
 alias.url = (
-    "/cgi-bin/" => "$INSTALL_DIR/cgi-bin/"
+	"/cgi-bin/" => "$INSTALL_DIR/cgi-bin/"
 )
 
 # MIME 類型設置
 mimetype.assign = (
-    ".html" => "text/html",
-    ".txt"  => "text/plain",
-    ".css"  => "text/css",
-    ".js"   => "application/javascript",
-    ".json" => "application/json",
-    ".xml"  => "application/xml"
+	".html" => "text/html",
+	".txt"  => "text/plain",
+	".css"  => "text/css",
+	".js"   => "application/javascript",
+	".json" => "application/json",
+	".xml"  => "application/xml"
 )
 
 # 設置目錄權限
