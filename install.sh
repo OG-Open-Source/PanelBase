@@ -11,7 +11,6 @@ BASE_URL="https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/
 deps=(curl jq)
 CHECK_DEPS
 
-
 # 安裝必要套件
 text "正在安裝必要套件..."
 ADD lighttpd python3 python3-pip curl jq
@@ -33,7 +32,6 @@ download_files() {
 }
 
 # 下載 CGI 腳本
-cd $INSTALL_DIR/cgi-bin
 CGI_FILES=(
 	"src/cgi-bin/auth.cgi"
 	"src/cgi-bin/api.cgi"
@@ -42,7 +40,6 @@ CGI_FILES=(
 download_files "$INSTALL_DIR/cgi-bin" "${CGI_FILES[@]}"
 
 # 下載模板文件
-cd $INSTALL_DIR/www/templates
 download_files "$INSTALL_DIR/www/templates" "src/www/templates/panel.md"
 
 # 配置 Lighttpd
@@ -122,10 +119,9 @@ text "\n$admin_user:$(text -n "$admin_pass" | sha256sum | cut -d' ' -f1)" > $INS
 text "安裝完成！"
 text "請訪問 http://your-server-ip:8080 來訪問面板"
 
-
 text "安裝資訊："
-text "安裝目錄：\t$(highlight "$INSTALL_DIR")"
-text "CGI 目錄：\t$(highlight "$INSTALL_DIR/cgi-bin")"
-text "網站根目錄：\t$(highlight "$INSTALL_DIR/www")"
-text "日誌目錄：\t$(highlight "$INSTALL_DIR/logs")"
-text "配置文件：\t$(highlight "$LIGHTTPD_CONF")"
+text "安裝目錄：\t$INSTALL_DIR"
+text "CGI 目錄：\t$INSTALL_DIR/cgi-bin"
+text "網站根目錄：\t$INSTALL_DIR/www"
+text "日誌目錄：\t$INSTALL_DIR/logs"
+text "配置文件：\t$LIGHTTPD_CONF"
