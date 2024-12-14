@@ -88,8 +88,11 @@
             box-sizing: border-box;
         }
         .error {
-            color: red;
+            color: #c0392b;
             margin-top: 5px;
+            padding: 5px;
+            background: #fde8e8;
+            border-radius: 4px;
             display: none;
         }
     </style>
@@ -99,7 +102,6 @@
         <div class="header">
             <h1>簡易面板</h1>
             <div>
-                <span id="username"></span>
                 <button class="button" onclick="showChangeUsername()">修改用戶名</button>
                 <button class="button" onclick="showChangePassword()">修改密碼</button>
                 <button class="logout-btn" onclick="handleLogout()">登出</button>
@@ -268,6 +270,12 @@
             const newPassword = document.getElementById('newPassword').value;
             const errorElement = document.getElementById('passwordError');
 
+            if (newPassword.length < 6) {
+                errorElement.textContent = '新密碼長度必須至少為 6 個字符';
+                errorElement.style.display = 'block';
+                return;
+            }
+
             try {
                 const response = await fetch('/cgi-bin/auth.cgi?action=change_password', {
                     method: 'POST',
@@ -279,6 +287,7 @@
 
                 if (response.ok) {
                     closeModal('passwordModal');
+                    showError('密碼修改成功');
                 } else {
                     const error = await response.text();
                     errorElement.textContent = error;

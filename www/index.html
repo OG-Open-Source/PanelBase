@@ -90,7 +90,7 @@
 			const errorMessage = document.getElementById('errorMessage');
 
 			try {
-				const response = await fetch('/cgi-bin/auth.cgi', {
+				const response = await fetch('/cgi-bin/auth.cgi?action=login', {
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/x-www-form-urlencoded',
