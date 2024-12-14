@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>簡易面板</title>
+    <style>
+        /* 基本樣式 */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f0f0f0;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .header {
+            background: #333;
+            color: white;
+            padding: 10px;
+            margin: -20px -20px 20px -20px;
+            border-radius: 5px 5px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .info-item {
+            margin: 10px 0;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .button {
+            background: #333;
+            border: none;
+            color: white;
+            padding: 5px 15px;
+            cursor: pointer;
+            border-radius: 3px;
+            margin-left: 10px;
+        }
+        .button:hover {
+            background: #444;
+        }
+        .logout-btn {
+            background: none;
+            border: 1px solid white;
+            color: white;
+            padding: 5px 15px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            max-width: 400px;
+            margin: 100px auto;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            box-sizing: border-box;
+        }
+        .error {
+            color: red;
+            margin-top: 5px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>簡易面板</h1>
+            <div>
+                <span id="username"></span>
+                <button class="button" onclick="showChangeUsername()">修改用戶名</button>
+                <button class="button" onclick="showChangePassword()">修改密碼</button>
+                <button class="logout-btn" onclick="handleLogout()">登出</button>
+            </div>
+        </div>
+
+        <div class="info-item">
+            <strong>CPU 使用率：</strong>
+            <span id="cpu-usage">載入中...</span>
+        </div>
+
+        <div class="info-item">
+            <strong>記憶體使用：</strong>
+            <span id="memory-usage">載入中...</span>
+        </div>
+
+        <div class="info-item">
+            <strong>磁碟使用：</strong>
+            <span id="disk-usage">載入中...</span>
+        </div>
+
+        <div class="info-item">
+            <strong>隨機數：</strong>
+            <span id="random-number">載入中...</span>
+        </div>
+
+        <div class="info-item">
+            <strong>Lighttpd 狀態：</strong>
+            <span id="lighttpd-status">載入中...</span>
+        </div>
+    </div>
+
+    <!-- 修改用戶名對話框 -->
+    <div id="usernameModal" class="modal">
+        <div class="modal-content">
+            <h2>修改用戶名</h2>
+            <div class="form-group">
+                <label>新用戶名：</label>
+                <input type="text" id="newUsername">
+            </div>
+            <div class="form-group">
+                <label>確認密碼：</label>
+                <input type="password" id="usernamePassword">
+            </div>
+            <div id="usernameError" class="error"></div>
+            <button class="button" onclick="changeUsername()">確認</button>
+            <button class="button" onclick="closeModal('usernameModal')">取消</button>
+        </div>
+    </div>
+
+    <!-- 修改密碼對話框 -->
+    <div id="passwordModal" class="modal">
+        <div class="modal-content">
+            <h2>修改密碼</h2>
+            <div class="form-group">
+                <label>舊密碼：</label>
+                <input type="password" id="oldPassword">
+            </div>
+            <div class="form-group">
+                <label>新密碼：</label>
+                <input type="password" id="newPassword">
+            </div>
+            <div id="passwordError" class="error"></div>
+            <button class="button" onclick="changePassword()">確認</button>
+            <button class="button" onclick="closeModal('passwordModal')">取消</button>
+        </div>
+    </div>
+
+    <script>
+        // 獲取用戶名
+        async function fetchUsername() {
+            try {
+                const response = await fetch('/cgi-bin/auth.cgi?action=get_username');
+                if (response.ok) {
+                    const data = await response.text();
+                    document.getElementById('username').textContent = data;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // 更新系統資訊
+        async function updateSystemInfo() {
+            try {
+                const response = await fetch('/cgi-bin/panel.cgi?action=get_system_info');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('cpu-usage').textContent = data.cpu + '%';
+                    document.getElementById('memory-usage').textContent = data.memory;
+                    document.getElementById('disk-usage').textContent = data.disk;
+                    document.getElementById('random-number').textContent = data.random;
+                    document.getElementById('lighttpd-status').textContent = data.lighttpd_status;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // 處理登出
+        async function handleLogout() {
+            try {
+                const response = await fetch('/cgi-bin/auth.cgi?action=logout');
+                if (response.ok) {
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // 顯示修改用戶名對話框
+        function showChangeUsername() {
+            document.getElementById('usernameModal').style.display = 'block';
+            document.getElementById('usernameError').style.display = 'none';
+            document.getElementById('newUsername').value = '';
+            document.getElementById('usernamePassword').value = '';
+        }
+
+        // 顯示修改密碼對話框
+        function showChangePassword() {
+            document.getElementById('passwordModal').style.display = 'block';
+            document.getElementById('passwordError').style.display = 'none';
+            document.getElementById('oldPassword').value = '';
+            document.getElementById('newPassword').value = '';
+        }
+
+        // 關閉對話框
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        // 修改用戶名
+        async function changeUsername() {
+            const newUsername = document.getElementById('newUsername').value;
+            const password = document.getElementById('usernamePassword').value;
+            const errorElement = document.getElementById('usernameError');
+
+            try {
+                const response = await fetch('/cgi-bin/auth.cgi?action=change_username', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `new_username=${encodeURIComponent(newUsername)}&password=${encodeURIComponent(password)}`
+                });
+
+                if (response.ok) {
+                    closeModal('usernameModal');
+                    fetchUsername();
+                } else {
+                    const error = await response.text();
+                    errorElement.textContent = error;
+                    errorElement.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                errorElement.textContent = '發生錯誤';
+                errorElement.style.display = 'block';
+            }
+        }
+
+        // 修改密碼
+        async function changePassword() {
+            const oldPassword = document.getElementById('oldPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const errorElement = document.getElementById('passwordError');
+
+            try {
+                const response = await fetch('/cgi-bin/auth.cgi?action=change_password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `old_password=${encodeURIComponent(oldPassword)}&new_password=${encodeURIComponent(newPassword)}`
+                });
+
+                if (response.ok) {
+                    closeModal('passwordModal');
+                } else {
+                    const error = await response.text();
+                    errorElement.textContent = error;
+                    errorElement.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                errorElement.textContent = '發生錯誤';
+                errorElement.style.display = 'block';
+            }
+        }
+
+        // 初始化
+        fetchUsername();
+        updateSystemInfo();
+
+        // 每秒更新一次資訊
+        setInterval(updateSystemInfo, 1000);
+
+        // 點擊對話框外部時關閉對話框
+        window.onclick = function(event) {
+            if (event.target.className === 'modal') {
+                event.target.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html> 
