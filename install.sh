@@ -339,10 +339,16 @@ server.modules = (
 server.document-root        = "$INSTALL_DIR/www"
 server.upload-dirs          = ( "/var/cache/lighttpd/uploads" )
 server.errorlog            = "$INSTALL_DIR/logs/error.log"
-server.pid-file            = "/var/run/lighttpd.pid"
+server.pid-file            = "/var/run/lighttpd/lighttpd.pid"
 server.username            = "www-data"
 server.groupname           = "www-data"
 server.port                = 8080
+
+# 基本設置
+server.max-worker = 4
+server.max-fds = 2048
+server.follow-symlink = "enable"
+server.force-lowercase-filenames = "disable"
 
 index-file.names           = ( "index.html" )
 url.access-deny           = ( "~", ".inc" )
@@ -366,7 +372,6 @@ cgi.assign = (
 
 # 允許執行所有 CGI 腳本
 \$HTTP["url"] =~ "^/cgi-bin/" {
-	dir-listing.activate = "disable"
 	cgi.assign = (
 		".cgi" => "",
 		".sh"  => "/bin/bash",
@@ -396,7 +401,6 @@ url.rewrite-once = (
 }
 
 \$HTTP["url"] =~ "^/cgi-bin/" {
-	dir-listing.activate = "disable"
 	access.deny-all = "disable"
 }
 
@@ -417,6 +421,10 @@ mimetype.assign = (
 
 # 設置目錄權限
 static-file.exclude-extensions = ( ".py", ".pl", ".rb", ".sh", ".cgi" )
+
+# 壓縮設置
+compress.cache-dir = "/var/cache/lighttpd/compress/"
+compress.filetype = ("text/plain", "text/html", "text/css", "text/xml", "application/javascript", "application/json")
 EOL
 
 # 確保 Lighttpd 配置文件權限正確
@@ -463,8 +471,42 @@ TASK "設置權限" "
 
 # 啟動服務
 TASK "啟動 Lighttpd 服務" "
+	# 檢查配置文件語法
+	lighttpd -t -f $LIGHTTPD_CONF
+	if [ $? -ne 0 ]; then
+		error '配置文件語法檢查失敗'
+		exit 1
+	fi
+	
+	# 確保 PID 目錄存在且具有正確權限
+	mkdir -p /var/run/lighttpd
+	chown www-data:www-data /var/run/lighttpd
+	chmod 755 /var/run/lighttpd
+	
+	# 確保日誌目錄存在且具有正確權限
+	mkdir -p /var/log/lighttpd
+	chown www-data:www-data /var/log/lighttpd
+	chmod 755 /var/log/lighttpd
+	
+	# 停止現有服務
+	systemctl stop lighttpd
+	
+	# 刪除舊的 PID 文件（如果存在）
+	rm -f /var/run/lighttpd/lighttpd.pid
+	
+	# 啟動服務
 	systemctl enable lighttpd
 	systemctl restart lighttpd
+	
+	# 檢查服務狀態
+	if ! systemctl is-active lighttpd >/dev/null 2>&1; then
+		error '服務啟動失敗'
+		text '請檢查系統日誌以獲取更多信息：'
+		text '1. systemctl status lighttpd'
+		text '2. journalctl -xe'
+		text '3. cat /opt/panelbase/logs/error.log'
+		exit 1
+	fi
 "
 
 # 設置管理員帳號
