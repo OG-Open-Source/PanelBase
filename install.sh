@@ -2,7 +2,7 @@
 
 # 顯示橫幅
 echo "================================="
-echo "=  PanelBase 安裝程序 (Beta 2)  ="
+echo "=  PanelBase 安裝程序 (Beta 3)  ="
 echo "================================="
 
 # 檢查是否為 root 用戶
@@ -72,7 +72,7 @@ echo "下載面板文件..."
 BASE_URL="https://raw.githubusercontent.com/OG-Open-Source/PanelBase/main"
 
 # 下載並檢查每個文件
-for FILE in "src/cgi-bin/panel.cgi" "src/cgi-bin/auth.cgi" "src/cgi-bin/check_auth.cgi" "www/index.html" "config/lighttpd.conf"; do
+for FILE in "src/cgi-bin/panel.cgi" "src/cgi-bin/auth.cgi" "src/cgi-bin/check_auth.cgi" "www/index.html"; do
 	echo "下載 $FILE..."
 	HTTP_CODE=$(curl -s -w "%{http_code}" -o "${FILE##*/}" "$BASE_URL/$FILE")
 	if [ "$HTTP_CODE" != "200" ]; then
@@ -87,22 +87,52 @@ chmod +x panel.cgi auth.cgi check_auth.cgi
 # 移動文件到正確位置
 mv panel.cgi auth.cgi check_auth.cgi $INSTALL_DIR/cgi-bin/
 mv index.html $INSTALL_DIR/www/
-mv lighttpd.conf $INSTALL_DIR/config/
-
-# 創建配置目錄
-mkdir -p /etc/lighttpd/conf-enabled
 
 # 配置 lighttpd
 echo "配置 lighttpd..."
-cat > /etc/lighttpd/conf-enabled/10-cgi.conf << EOF
-server.modules += ( "mod_cgi" )
-cgi.assign = (
-	".cgi" => ""
+cat > /etc/lighttpd/lighttpd.conf << EOF
+server.modules = (
+	"mod_access",
+	"mod_alias",
+	"mod_compress",
+	"mod_redirect",
+	"mod_rewrite",
+	"mod_cgi"
 )
-EOF
 
-# 創建主配置文件連結
-ln -sf $INSTALL_DIR/config/lighttpd.conf /etc/lighttpd/lighttpd.conf
+server.document-root = "$INSTALL_DIR/www"
+server.port = 8080
+
+server.username = "www-data"
+server.groupname = "www-data"
+
+server.errorlog = "$INSTALL_DIR/logs/error.log"
+accesslog.filename = "$INSTALL_DIR/logs/access.log"
+
+# CGI 配置
+cgi.assign = ( ".cgi" => "" )
+alias.url = ( "/cgi-bin/" => "$INSTALL_DIR/cgi-bin/" )
+
+# MIME 類型
+mimetype.assign = (
+	".html" => "text/html",
+	".css"  => "text/css",
+	".js"   => "application/javascript",
+	".png"  => "image/png",
+	".jpg"  => "image/jpeg",
+	".gif"  => "image/gif",
+	".svg"  => "image/svg+xml"
+)
+
+# URL 重寫規則
+\$HTTP["url"] !~ "^/\$" {
+	\$HTTP["url"] !~ "^/cgi-bin/auth\.cgi" {
+		url.rewrite-once = (
+			"^/.*" => "/cgi-bin/check_auth.cgi"
+		)
+	}
+}
+EOF
 
 # 創建用戶配置文件
 echo "創建用戶配置..."
@@ -111,10 +141,17 @@ touch $INSTALL_DIR/config/sessions.conf
 
 # 設置權限
 echo "設置權限..."
+# 確保 www-data 用戶存在
+if ! id -u www-data >/dev/null 2>&1; then
+	useradd -r -s /usr/sbin/nologin www-data
+fi
+
 chown -R www-data:www-data $INSTALL_DIR
+chmod -R 755 $INSTALL_DIR
 chmod -R 755 $INSTALL_DIR/cgi-bin
 chmod 600 $INSTALL_DIR/config/users.conf
 chmod 600 $INSTALL_DIR/config/sessions.conf
+chmod 644 $INSTALL_DIR/www/index.html
 
 # 重啟 lighttpd
 echo "重啟 lighttpd 服務..."
@@ -123,7 +160,7 @@ systemctl restart lighttpd
 # 檢查服務是否正常運行
 if ! systemctl is-active --quiet lighttpd; then
 	echo "警告：lighttpd 服務未能正常啟動"
-	echo "請檢查日誌文件：/var/log/lighttpd/error.log"
+	echo "請檢查日誌文件：$INSTALL_DIR/logs/error.log"
 	exit 1
 fi
 
@@ -137,9 +174,12 @@ if ! netstat -tuln | grep -q ":8080 "; then
 	exit 1
 fi
 
+# 獲取服務器 IP
+SERVER_IP=$(hostname -I | awk '{print $1}')
+
 echo "================================="
 echo "安裝完成！"
-echo "請訪問 http://your-ip:8080"
+echo "請訪問 http://${SERVER_IP}:8080"
 echo "用戶名：$ADMIN_USER"
 echo "請使用您設定的密碼登入"
 echo "================================="
