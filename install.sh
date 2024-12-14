@@ -35,33 +35,25 @@ CGI_FILES=(
 )
 download_files "$INSTALL_DIR/cgi-bin" "${CGI_FILES[@]}"
 
-# 檢查是否存在自定義的 index.html
-if [ ! -f "$INSTALL_DIR/www/index.html" ]; then
-    text "創建預設登入頁面..."
-    cat > $INSTALL_DIR/www/index.html << 'EOL'
+# 創建登入頁面
+text "創建登入頁面..."
+cat > $INSTALL_DIR/www/login.html << 'EOL'
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>管理面板</title>
+    <title>管理面板登入</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             background-color: #f5f5f5;
             margin: 0;
             padding: 0;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .login-container {
+            min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
         }
         .login-box {
             background-color: white;
@@ -70,19 +62,13 @@ if [ ! -f "$INSTALL_DIR/www/index.html" ]; then
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             width: 300px;
         }
-        .panel {
-            display: none;
-            background-color: white;
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
         .form-group {
             margin-bottom: 1rem;
         }
         label {
             display: block;
             margin-bottom: 0.5rem;
+            color: #333;
         }
         input {
             width: 100%;
@@ -99,6 +85,7 @@ if [ ! -f "$INSTALL_DIR/www/index.html" ]; then
             border: none;
             border-radius: 4px;
             cursor: pointer;
+            margin-top: 1rem;
         }
         button:hover {
             background-color: #45a049;
@@ -108,6 +95,117 @@ if [ ! -f "$INSTALL_DIR/www/index.html" ]; then
             display: none;
             margin-top: 1rem;
         }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <h2 style="text-align: center; margin-bottom: 2rem;">管理面板登入</h2>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username">用戶名</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">密碼</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit">登入</button>
+            <div id="error" class="error">登入失敗，請檢查用戶名和密碼</div>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const response = await fetch('/cgi-bin/auth.cgi', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    // 設置 cookie，包含過期時間
+                    const expires = new Date(data.expire * 1000).toUTCString();
+                    document.cookie = `auth_token=${data.token}; path=/; expires=${expires}`;
+                    window.location.href = '/';
+                } else {
+                    document.getElementById('error').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('error').style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
+EOL
+
+# 創建面板頁面
+text "創建面板頁面..."
+cat > $INSTALL_DIR/www/index.html << 'EOL'
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>管理面板</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .panel {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-top: 20px;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #333;
+        }
+        input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
         .status-info {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -115,33 +213,19 @@ if [ ! -f "$INSTALL_DIR/www/index.html" ]; then
             margin: 20px 0;
         }
         .status-card {
-            background-color: #fff;
+            background-color: white;
             padding: 15px;
             border-radius: 4px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
+        h1, h2 {
+            color: #333;
+            margin-top: 0;
+        }
     </style>
 </head>
 <body>
-    <div id="loginPage" class="login-container">
-        <div class="login-box">
-            <h2 style="text-align: center; margin-bottom: 2rem;">管理面板登入</h2>
-            <form id="loginForm">
-                <div class="form-group">
-                    <label for="username">用戶名</label>
-                    <input type="text" id="username" name="username" required>
-                </div>
-                <div class="form-group">
-                    <label for="password">密碼</label>
-                    <input type="password" id="password" name="password" required>
-                </div>
-                <button type="submit">登入</button>
-                <div id="error" class="error">登入失敗，請檢查用戶名和密碼</div>
-            </form>
-        </div>
-    </div>
-
-    <div id="panelPage" class="container" style="display: none;">
+    <div class="container">
         <div class="panel">
             <h1>系統管理面板</h1>
             <div class="status-info">
@@ -172,37 +256,6 @@ if [ ! -f "$INSTALL_DIR/www/index.html" ]; then
     </div>
 
     <script>
-        // 檢查登入狀態
-        async function checkAuth() {
-            try {
-                const response = await fetch('/cgi-bin/auth.cgi', {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                const data = await response.json();
-                return data.status === 'success';
-            } catch (error) {
-                console.error('Error:', error);
-                return false;
-            }
-        }
-
-        // 顯示面板
-        function showPanel() {
-            document.getElementById('loginPage').style.display = 'none';
-            document.getElementById('panelPage').style.display = 'block';
-            updateSystemInfo();
-        }
-
-        // 顯示登入
-        function showLogin() {
-            document.getElementById('loginPage').style.display = 'flex';
-            document.getElementById('panelPage').style.display = 'none';
-        }
-
         // 更新系統信息
         async function updateSystemInfo() {
             try {
@@ -210,7 +263,7 @@ if [ ! -f "$INSTALL_DIR/www/index.html" ]; then
                 const data = await response.json();
                 
                 if (data.status === 'error' && data.message === '未登入') {
-                    showLogin();
+                    window.location.href = '/login.html';
                     return;
                 }
 
@@ -259,55 +312,13 @@ if [ ! -f "$INSTALL_DIR/www/index.html" ]; then
             }
         }
 
-        // 登入表單處理
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            
-            try {
-                const response = await fetch('/cgi-bin/auth.cgi', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ username, password })
-                });
-                
-                const data = await response.json();
-                
-                if (data.status === 'success') {
-                    // 設置 cookie，包含過期時間
-                    const expires = new Date(data.expire * 1000).toUTCString();
-                    document.cookie = `auth_token=${data.token}; path=/; expires=${expires}`;
-                    showPanel();
-                } else {
-                    document.getElementById('error').style.display = 'block';
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                document.getElementById('error').style.display = 'block';
-            }
-        });
-
         // 定期更新系統信息
         setInterval(updateSystemInfo, 5000);
-
-        // 初始檢查登入狀態
-        checkAuth().then(isAuthenticated => {
-            if (isAuthenticated) {
-                showPanel();
-            } else {
-                showLogin();
-            }
-        });
+        updateSystemInfo();
     </script>
 </body>
 </html>
 EOL
-else
-    text "使用現有的登入頁面..."
-fi
 
 # 設置登入頁面權限
 chmod 644 $INSTALL_DIR/www/index.html
@@ -320,7 +331,8 @@ server.modules = (
 	"mod_alias",
 	"mod_compress",
 	"mod_redirect",
-	"mod_cgi"
+	"mod_cgi",
+	"mod_rewrite"
 )
 
 server.document-root        = "$INSTALL_DIR/www"
@@ -349,6 +361,14 @@ cgi.assign = (
 		""  => ""
 	)
 }
+
+# URL 重寫規則
+url.rewrite-once = (
+	"^/login.html$" => "/cgi-bin/page.cgi",
+	"^/cgi-bin/.*" => "$0",
+	"^/assets/.*" => "$0",
+	"^/.*" => "/cgi-bin/page.cgi"
+)
 
 alias.url = (
 	"/cgi-bin/" => "$INSTALL_DIR/cgi-bin/"
@@ -397,7 +417,7 @@ test_auth=$(curl -s -X POST -H "Content-Type: application/json" \
 echo "認證響應: $test_auth" >&2
 
 if [ "$(echo "$test_auth" | jq -r .status)" = "success" ]; then
-	text "認證測試成功！"
+	text "認證測試���功！"
 	
 	# 確保配置目錄權限正確
 	chown -R www-data:www-data "$INSTALL_DIR/config"
