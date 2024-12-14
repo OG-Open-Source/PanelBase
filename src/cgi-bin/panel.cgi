@@ -1,7 +1,60 @@
 #!/bin/bash
 
+# 檢查是否為 API 請求
+if echo "$QUERY_STRING" | grep -q "action="; then
+	# 獲取 action 參數
+	ACTION=$(echo "$QUERY_STRING" | grep -oP 'action=\K[^&]+')
+
+	case "$ACTION" in
+		"get_username")
+			# 從 cookie 中獲取 token
+			AUTH_TOKEN=$(echo "$HTTP_COOKIE" | grep -oP 'auth_token=\K[^;]+')
+
+			# 從 sessions.conf 中獲取用戶名
+			USERNAME=$(awk -F: -v token="$AUTH_TOKEN" '$1 == token {print $2}' "/opt/panelbase/config/sessions.conf")
+
+			echo "Content-type: text/plain"
+			echo
+			echo "$USERNAME"
+			exit 0
+			;;
+
+		"get_system_info")
+			# 獲取 CPU 使用率
+			CPU_USAGE=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}')
+
+			# 獲取記憶體使用情況
+			MEMORY_INFO=$(free -h | grep "Mem:" | awk '{print "總計: " $2 "  已使用: " $3 "  可用: " $4}')
+
+			# 獲取磁碟使用情況
+			DISK_INFO=$(df -h / | tail -n 1 | awk '{print "總計: " $2 "  已使用: " $3 "  可用: " $4 "  使用率: " $5}')
+
+			# 檢查 lighttpd 狀態
+			if systemctl is-active lighttpd >/dev/null 2>&1; then
+				LIGHTTPD_STATUS="運行中"
+			else
+				LIGHTTPD_STATUS="已停止"
+			fi
+
+			# 返回 JSON 格式的數據
+			echo "Content-type: application/json"
+			echo
+			cat << EOF
+{
+	"cpu": $CPU_USAGE,
+	"memory": "$MEMORY_INFO",
+	"disk": "$DISK_INFO",
+	"lighttpd_status": "$LIGHTTPD_STATUS"
+}
+EOF
+			exit 0
+			;;
+	esac
+fi
+
+# 如果不是 API 請求，返回 HTML 頁面
 echo "Content-type: text/html"
-echo ""
+echo
 
 cat << EOF
 <!DOCTYPE html>
