@@ -5,7 +5,7 @@
 CHECK_ROOT
 CLEAN
 
-text "開始安裝 PanelBase... (Alpha 3)"
+text "開始安裝 PanelBase... (Alpha 4)"
 
 # 檢查必要命令
 deps=(lighttpd curl jq)
@@ -466,86 +466,66 @@ chown www-data:www-data /var/run/lighttpd
 chmod 755 /var/run/lighttpd
 
 # 設置權限
-TASK "設置權限" "
-	# 確保目錄存在
-	mkdir -p $INSTALL_DIR/{config,cgi-bin,www,logs}
-	mkdir -p $INSTALL_DIR/www/assets
-	
-	# 設置基本權限
-	chown -R www-data:www-data $INSTALL_DIR
-	find $INSTALL_DIR -type d -exec chmod 755 {} \;
-	find $INSTALL_DIR -type f -exec chmod 644 {} \;
-	
-	# 設置 CGI 腳本權限
-	chmod 755 $INSTALL_DIR/cgi-bin
-	find $INSTALL_DIR/cgi-bin -type f -exec chmod 755 {} \;
-	chown -R www-data:www-data $INSTALL_DIR/cgi-bin
-	
-	# 設置日誌目錄權限
-	chmod 755 $INSTALL_DIR/logs
-	chown -R www-data:www-data $INSTALL_DIR/logs
-	touch $INSTALL_DIR/logs/auth.log
-	touch $INSTALL_DIR/logs/error.log
-	touch $INSTALL_DIR/logs/page.log
-	chmod 666 $INSTALL_DIR/logs/*.log
-	
-	# 設置配置目錄權限
-	chmod 755 $INSTALL_DIR/config
-	chown -R www-data:www-data $INSTALL_DIR/config
-	
-	# 設置 www 目錄權限
-	chmod 755 $INSTALL_DIR/www
-	chmod 644 $INSTALL_DIR/www/*.html
-	chmod -R 755 $INSTALL_DIR/www/assets
-	
-	# 確保 CGI 腳本可執行
-	for script in $INSTALL_DIR/cgi-bin/*; do
-		if [ -f \"\$script\" ]; then
-			chmod 755 \"\$script\"
-			chown www-data:www-data \"\$script\"
-		fi
-	done
-"
+text "設置權限"
+
+mkdir -p $INSTALL_DIR/{config,cgi-bin,www,logs}
+mkdir -p $INSTALL_DIR/www/assets
+
+chown -R www-data:www-data $INSTALL_DIR
+find $INSTALL_DIR -type d -exec chmod 755 {}
+find $INSTALL_DIR -type f -exec chmod 644 {}
+
+chmod 755 $INSTALL_DIR/cgi-bin
+find $INSTALL_DIR/cgi-bin -type f -exec chmod 755 {}
+chown -R www-data:www-data $INSTALL_DIR/cgi-bin
+
+chmod 755 $INSTALL_DIR/logs
+chown -R www-data:www-data $INSTALL_DIR/logs
+touch $INSTALL_DIR/logs/auth.log
+touch $INSTALL_DIR/logs/error.log
+touch $INSTALL_DIR/logs/page.log
+chmod 666 $INSTALL_DIR/logs/*.log
+
+chmod 755 $INSTALL_DIR/config
+chown -R www-data:www-data $INSTALL_DIR/config
+
+chmod 755 $INSTALL_DIR/www
+chmod 644 $INSTALL_DIR/www/*.html
+chmod -R 755 $INSTALL_DIR/www/assets
+
+for script in $INSTALL_DIR/cgi-bin/*; do
+    if [ -f "$script" ]; then
+        chmod 755 "$script"
+        chown www-data:www-data "$script"
+    fi
+done
 
 # 啟動服務
-TASK "啟動 Lighttpd 服務" "
-	# 檢查配置文件語法
-	lighttpd -t -f $LIGHTTPD_CONF
-	if [ $? -ne 0 ]; then
-		error '配置文件語法檢查失敗'
-		exit 1
-	fi
-	
-	# 確保 PID 目錄存在且具有正確權限
-	mkdir -p /var/run/lighttpd
-	chown www-data:www-data /var/run/lighttpd
-	chmod 755 /var/run/lighttpd
-	
-	# 確保日誌目錄存在且具有正確權限
-	mkdir -p /var/log/lighttpd
-	chown www-data:www-data /var/log/lighttpd
-	chmod 755 /var/log/lighttpd
-	
-	# 停止現有服務
-	systemctl stop lighttpd || true
-	
-	# 刪除舊的 PID 文件（如果存在）
-	rm -f /var/run/lighttpd/lighttpd.pid
-	
-	# 啟動服務
-	systemctl enable lighttpd || true
-	systemctl restart lighttpd
-	
-	# 檢查服務狀態
-	if ! systemctl is-active lighttpd >/dev/null 2>&1; then
-		error '服務啟動失敗'
-		text '請檢查系統日誌以獲取更多信息：'
-		text '1. systemctl status lighttpd'
-		text '2. journalctl -xe'
-		text '3. cat /opt/panelbase/logs/error.log'
-		exit 1
-	fi
-"
+text "啟動 Lighttpd 服務..."
+
+lighttpd -t -f $LIGHTTPD_CONF
+[ $? -ne 0 ] && { error "配置文件語法檢查失敗"; exit 1; }
+
+mkdir -p /var/run/lighttpd
+chown www-data:www-data /var/run/lighttpd
+chmod 755 /var/run/lighttpd
+
+mkdir -p /var/log/lighttpd
+chown www-data:www-data /var/log/lighttpd
+chmod 755 /var/log/lighttpd
+systemctl stop lighttpd
+
+rm -f /var/run/lighttpd/lighttpd.pid
+systemctl enable lighttpd
+systemctl restart lighttpd
+if ! systemctl is-active lighttpd >/dev/null 2>&1; then
+    error "服務啟動失敗"
+    text "請檢查系統日誌以獲取更多信息："
+    text "1. systemctl status lighttpd"
+    text "2. journalctl -xe"
+    text "3. cat /opt/panelbase/logs/error.log"
+    exit 1
+fi
 
 # 設置管理員帳號
 text "設置管理員帳號..."
