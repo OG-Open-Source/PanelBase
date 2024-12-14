@@ -81,6 +81,15 @@
 			.status-error {
 				color: #c0392b;
 			}
+			.error-message {
+				color: #c0392b;
+				text-align: center;
+				padding: 10px;
+				background: #fde8e8;
+				border-radius: 4px;
+				margin-bottom: 10px;
+				display: none;
+			}
 		</style>
 	</head>
 	<body>
@@ -95,6 +104,7 @@
 		</div>
 
 		<div class="container">
+			<div id="errorMessage" class="error-message"></div>
 			<div class="panel-grid">
 				<div class="panel-item">
 					<h3>系統資訊</h3>
@@ -121,36 +131,61 @@
 		</div>
 
 		<script>
+			// 顯示錯誤訊息
+			function showError(message) {
+				const errorElement = document.getElementById('errorMessage');
+				errorElement.textContent = message;
+				errorElement.style.display = 'block';
+				setTimeout(() => {
+					errorElement.style.display = 'none';
+				}, 5000);
+			}
+
 			// 獲取用戶名
 			async function fetchUsername() {
 				try {
-					const response = await fetch('/cgi-bin/panel.cgi?action=get_username');
+					const response = await fetch('/cgi-bin/panel.cgi?action=get_username', {
+						cache: 'no-store'
+					});
 					if (response.ok) {
 						const data = await response.text();
 						document.getElementById('username').textContent = data;
+					} else {
+						throw new Error('Failed to fetch username');
 					}
 				} catch (error) {
 					console.error('Error fetching username:', error);
+					showError('無法獲取用戶名');
 				}
 			}
 
 			// 更新系統資訊
 			async function updateSystemInfo() {
 				try {
-					const response = await fetch('/cgi-bin/panel.cgi?action=get_system_info');
-					if (response.ok) {
-						const data = await response.json();
-						document.getElementById('cpu-usage').textContent = data.cpu + '%';
-						document.getElementById('memory-usage').textContent = data.memory;
-						document.getElementById('disk-usage').textContent = data.disk;
-						document.getElementById('lighttpd-status').textContent = data.lighttpd_status;
-
-						// 根據狀態設置顏色
-						const lighttpdStatus = document.getElementById('lighttpd-status');
-						lighttpdStatus.className = data.lighttpd_status === '運行中' ? 'status-ok' : 'status-error';
+					const response = await fetch('/cgi-bin/panel.cgi?action=get_system_info', {
+						cache: 'no-store'
+					});
+					if (!response.ok) {
+						throw new Error('Failed to fetch system info');
 					}
+					const data = await response.json();
+					
+					// 更新 CPU 使用率
+					document.getElementById('cpu-usage').textContent = data.cpu + '%';
+					
+					// 更新記憶體使用情況
+					document.getElementById('memory-usage').textContent = data.memory;
+					
+					// 更新磁碟使用情況
+					document.getElementById('disk-usage').textContent = data.disk;
+					
+					// 更新服務狀態
+					const lighttpdStatus = document.getElementById('lighttpd-status');
+					lighttpdStatus.textContent = data.lighttpd_status;
+					lighttpdStatus.className = data.lighttpd_status === '運行中' ? 'status-ok' : 'status-error';
 				} catch (error) {
 					console.error('Error updating system info:', error);
+					showError('無法更新系統資訊');
 				}
 			}
 
@@ -160,16 +195,19 @@
 					const response = await fetch('/cgi-bin/auth.cgi?action=logout');
 					if (response.ok) {
 						window.location.href = '/';
+					} else {
+						throw new Error('Logout failed');
 					}
 				} catch (error) {
 					console.error('Error logging out:', error);
+					showError('登出失敗');
 				}
 			}
 
 			// 初始化
 			fetchUsername();
 			updateSystemInfo();
-
+			
 			// 定期更新系統資訊
 			setInterval(updateSystemInfo, 5000);
 		</script>
