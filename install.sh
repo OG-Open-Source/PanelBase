@@ -2,7 +2,7 @@
 
 # 顯示橫幅
 echo "================================="
-echo "=  PanelBase 安裝程序 (Beta 4)  ="
+echo "=  PanelBase 安裝程序 (Beta 5)  ="
 echo "================================="
 
 # 檢查是否為 root 用戶
@@ -31,6 +31,18 @@ while true; do
 		echo "兩次輸入的密碼不一致，請重新輸入"
 	fi
 done
+
+# 詢問是否使用自定義 HTML
+read -p "是否使用自定義的面板頁面？(y/N): " USE_CUSTOM_HTML
+USE_CUSTOM_HTML=${USE_CUSTOM_HTML:-n}
+
+if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
+	read -p "請輸入自定義面板頁面的路徑：" CUSTOM_HTML_PATH
+	if [ ! -f "$CUSTOM_HTML_PATH" ]; then
+		echo "錯誤：找不到指定的文件"
+		exit 1
+	fi
+fi
 
 # 檢查系統類型
 if [ -f /etc/os-release ]; then
@@ -81,12 +93,29 @@ for FILE in "src/cgi-bin/panel.cgi" "src/cgi-bin/auth.cgi" "src/cgi-bin/check_au
 	fi
 done
 
+# 如果不使用自定義 HTML，則下載默認的面板頁面
+if [[ ! $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
+	echo "下載 panel.html..."
+	HTTP_CODE=$(curl -s -w "%{http_code}" -o "panel.html" "$BASE_URL/www/panel.html")
+	if [ "$HTTP_CODE" != "200" ]; then
+		echo "錯誤：無法下載面板頁面 (HTTP 代碼: $HTTP_CODE)"
+		exit 1
+	fi
+fi
+
 # 設置執行權限
 chmod +x panel.cgi auth.cgi check_auth.cgi
 
 # 移動文件到正確位置
 mv panel.cgi auth.cgi check_auth.cgi $INSTALL_DIR/cgi-bin/
 mv index.html $INSTALL_DIR/www/
+
+# 如果使用自定義 HTML，複製自定義頁面
+if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
+	cp "$CUSTOM_HTML_PATH" "$INSTALL_DIR/www/panel.html"
+else
+	mv panel.html $INSTALL_DIR/www/
+fi
 
 # 配置 lighttpd
 echo "配置 lighttpd..."
@@ -211,4 +240,7 @@ echo "安裝完成！"
 echo "請訪問 http://${SERVER_IP}:8080"
 echo "用戶名：$ADMIN_USER"
 echo "請使用您設定的密碼登入"
+if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
+	echo "已使用自定義面板頁面"
+fi
 echo "================================="
