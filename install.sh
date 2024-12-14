@@ -3,6 +3,9 @@
 [ -f ~/utilkit.sh ] && source ~/utilkit.sh || bash <(curl -sL raw.ogtt.tk/shell/get_utilkit.sh) && source ~/utilkit.sh
 
 CHECK_ROOT
+CLEAN
+
+text "開始安裝 PanelBase... (Alpha 1)"
 
 # 檢查必要命令
 deps=(lighttpd curl jq)
