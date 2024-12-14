@@ -5,7 +5,7 @@
 CHECK_ROOT
 CLEAN
 
-text "開始安裝 PanelBase... (Alpha 1)"
+text "開始安裝 PanelBase... (Alpha 2)"
 
 # 檢查必要命令
 deps=(lighttpd curl jq)
@@ -532,11 +532,29 @@ TASK "啟動 Lighttpd 服務" "
 
 # 設置管理員帳號
 text "設置管理員帳號..."
-read -p "請輸入管理員用戶名: " admin_user
-read -p "請輸入管理員密碼: " admin_pass
-echo "$admin_user:$(echo -n "$admin_pass" | sha256sum | cut -d' ' -f1)" > $INSTALL_DIR/config/admin.conf
-chown www-data:www-data $INSTALL_DIR/config/admin.conf
-chmod 644 $INSTALL_DIR/config/admin.conf
+admin_user=""
+admin_pass=""
+
+while [ -z "$admin_user" ]; do
+    printf "請輸入管理員用戶名: "
+    read -r admin_user
+done
+
+while [ -z "$admin_pass" ]; do
+    printf "請輸入管理員密碼: "
+    read -r admin_pass
+done
+
+# 創建配置目錄（如果不存在）
+mkdir -p "$INSTALL_DIR/config"
+
+# 生成密碼雜湊並保存
+password_hash=$(echo -n "$admin_pass" | sha256sum | cut -d' ' -f1)
+echo "$admin_user:$password_hash" > "$INSTALL_DIR/config/admin.conf"
+
+# 設置正確的權限
+chown www-data:www-data "$INSTALL_DIR/config/admin.conf"
+chmod 644 "$INSTALL_DIR/config/admin.conf"
 
 # 測試認證前等待服務啟動
 text "等待服務啟動..."
@@ -545,38 +563,33 @@ sleep 3
 # 測試認證
 text "測試認證..."
 test_auth=$(curl -s -X POST -H "Content-Type: application/json" \
-	-d "{\"username\":\"$admin_user\",\"password\":\"$admin_pass\"}" \
-	http://localhost:8080/cgi-bin/auth.cgi)
+    -d "{\"username\":\"$admin_user\",\"password\":\"$admin_pass\"}" \
+    http://localhost:8080/cgi-bin/auth.cgi)
 
 echo "認證響應: $test_auth"
 
 if [ "$(echo "$test_auth" | jq -r .status 2>/dev/null)" = "success" ]; then
-	text "認證測試成功！"
-	
-	# 確保配置目錄權限正確
-	chown -R www-data:www-data "$INSTALL_DIR/config"
-	chmod 755 "$INSTALL_DIR/config"
-	chmod 644 "$INSTALL_DIR/config/admin.conf"
-	
-	# 創建並設置 token.conf 權限
-	touch "$INSTALL_DIR/config/token.conf"
-	chown www-data:www-data "$INSTALL_DIR/config/token.conf"
-	chmod 644 "$INSTALL_DIR/config/token.conf"
-	
-	# 生成並保存安裝時間戳
-	install_time=$(date +%s)
-	echo "$install_time" > "$INSTALL_DIR/config/install_time.conf"
-	chown www-data:www-data "$INSTALL_DIR/config/install_time.conf"
-	chmod 644 "$INSTALL_DIR/config/install_time.conf"
-	
-	# 保存初始 token
-	echo "$test_auth" | jq -r .token > "$INSTALL_DIR/config/token.conf"
-	
-	text "Token 已保存到配置文件"
+    text "認證測試成功！"
+    
+    # 創建並設置 token.conf 權限
+    touch "$INSTALL_DIR/config/token.conf"
+    chown www-data:www-data "$INSTALL_DIR/config/token.conf"
+    chmod 644 "$INSTALL_DIR/config/token.conf"
+    
+    # 生成並保存安裝時間戳
+    install_time=$(date +%s)
+    echo "$install_time" > "$INSTALL_DIR/config/install_time.conf"
+    chown www-data:www-data "$INSTALL_DIR/config/install_time.conf"
+    chmod 644 "$INSTALL_DIR/config/install_time.conf"
+    
+    # 保存初始 token
+    echo "$test_auth" | jq -r .token > "$INSTALL_DIR/config/token.conf"
+    
+    text "Token 已保存到配置文件"
 else
-	error "認證測試失敗！"
-	text "請檢查 $INSTALL_DIR/logs/auth.log 和 $INSTALL_DIR/logs/error.log 查看詳細信息"
-	text "認證響應: $test_auth"
+    error "認證測試失敗！"
+    text "請檢查 $INSTALL_DIR/logs/auth.log 和 $INSTALL_DIR/logs/error.log 查看詳細信息"
+    text "認證響應: $test_auth"
 fi
 
 text "安裝完成！"
