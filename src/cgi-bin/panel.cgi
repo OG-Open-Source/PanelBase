@@ -161,6 +161,16 @@ else
 fi
 echo '</div>'
 
+echo '<div class="info-item">'
+echo "<strong>隨機碼狀態：</strong>"
+RANDOM_BYTES=$(head -c 10 /dev/urandom | base64 | head -c 10)
+if [ -n "$RANDOM_BYTES" ]; then
+	echo '<span class="status-ok">已生成：'$RANDOM_BYTES'</span>'
+else
+	echo '<span class="status-error">生成失敗</span>'
+fi
+echo '</div>'
+
 echo '</div>'
 
 cat << EOF
@@ -169,7 +179,7 @@ cat << EOF
 		// 自動重新整理頁面
 		setTimeout(function() {
 			location.reload();
-		}, 10000);
+		}, 1000);
 	</script>
 </body>
 </html>
