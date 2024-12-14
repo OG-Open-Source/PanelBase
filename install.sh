@@ -116,6 +116,19 @@ INPUT "請輸入管理員用戶名: " admin_user
 INPUT "請輸入管理員密碼: " admin_pass
 text "\n$admin_user:$(text -n "$admin_pass" | sha256sum | cut -d' ' -f1)" > $INSTALL_DIR/config/admin.conf
 
+# 測試認證
+text "測試認證..."
+test_auth=$(curl -s -X POST -H "Content-Type: application/json" \
+	-d "{\"username\":\"$admin_user\",\"password\":\"$admin_pass\"}" \
+	http://localhost:8080/cgi-bin/auth.cgi)
+
+if echo "$test_auth" | grep -q '"status":"success"'; then
+	text "認證測試成功！"
+else
+	error "認證測試失敗！"
+	text "請檢查 $INSTALL_DIR/logs/error.log 查看詳細信息"
+fi
+
 text "安裝完成！"
 text "請訪問 http://your-server-ip:8080 來訪問面板"
 
