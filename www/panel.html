@@ -75,11 +75,20 @@
 			.header h1 {
 				font-size: 1.8rem;
 				font-weight: 600;
+			}
+
+			.title-link {
 				background: linear-gradient(45deg, #3498db, #2ecc71);
 				-webkit-background-clip: text;
 				background-clip: text;
 				-webkit-text-fill-color: transparent;
 				text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+				text-decoration: none;
+				transition: opacity 0.3s ease;
+			}
+
+			.title-link:hover {
+				opacity: 0.8;
 			}
 
 			.user-controls {
@@ -385,7 +394,7 @@
 	<body>
 		<div class="header">
 			<div class="header-content">
-				<h1>PanelBase</h1>
+				<h1><a href="/" class="title-link">PanelBase</a></h1>
 				<div class="user-controls">
 					<button class="button" onclick="showChangeUsername()">
 						<i class="fas fa-user"></i>修改用戶名
@@ -539,7 +548,7 @@
 					document.getElementById('cpu-usage').textContent = `${cpuValue.toFixed(1)}%`;
 					updateCPUChart(cpuValue);
 					
-					// 更新記���體使用情況
+					// 更新記憶體使用情況
 					document.getElementById('memory-usage').textContent = data.memory;
 					
 					// 更新磁碟使用情況

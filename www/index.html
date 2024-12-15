@@ -180,7 +180,8 @@
 		.form-group i {
 			position: absolute;
 			left: 1rem;
-			top: 2.4rem;
+			top: 50%;
+			transform: translateY(-50%);
 			color: var(--text-secondary);
 		}
 
@@ -239,12 +240,10 @@
 		}
 
 		.language-selector {
-			position: absolute;
-			top: 1rem;
-			right: 1rem;
 			display: flex;
+			justify-content: center;
 			gap: 0.5rem;
-			z-index: 2;
+			margin-top: 1.5rem;
 		}
 
 		.language-button {
@@ -325,11 +324,6 @@
 	</div>
 
 	<div class="login-container">
-		<div class="language-selector">
-			<button class="language-button" onclick="changeLanguage('en')" data-lang="en">EN</button>
-			<button class="language-button active" onclick="changeLanguage('zh-TW')" data-lang="zh-TW">繁</button>
-			<button class="language-button" onclick="changeLanguage('zh-CN')" data-lang="zh-CN">简</button>
-		</div>
 		<div class="login-header">
 			<h1>PanelBase</h1>
 			<p data-i18n="login-prompt">請登入以繼續</p>
@@ -351,6 +345,11 @@
 				<span data-i18n="login-button">登入</span>
 			</button>
 		</form>
+		<div class="language-selector">
+			<button class="language-button" onclick="changeLanguage('en')" data-lang="en">EN</button>
+			<button class="language-button active" onclick="changeLanguage('zh-TW')" data-lang="zh-TW">繁</button>
+			<button class="language-button" onclick="changeLanguage('zh-CN')" data-lang="zh-CN">简</button>
+		</div>
 	</div>
 
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
