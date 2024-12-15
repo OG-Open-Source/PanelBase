@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta51"
+Version="Beta52"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -28,8 +28,8 @@ CHECK_ROOT
 INPUT "請輸入管理員用戶名：" ADMIN_NAME
 ADMIN_NAME=${ADMIN_NAME:-admin}
 
-if ! [[ $ADMIN_NAME =~ ^[a-z]+$ ]]; then
-    error "用戶名只能包含小寫英文字母"
+if ! [[ $ADMIN_NAME =~ ^[A-Za-z0-9]+$ ]]; then
+    error "用戶名只能包含英文字母和數字"
     exit 1
 fi
 
@@ -71,7 +71,7 @@ fi
 TASK "正在安裝必要的套件" "deps=(curl wget lighttpd); CHECK_DEPS -a;" true
 
 INSTALL_DIR="/opt/panelbase"
-TASK "創建必要的目錄" "ADD -d $INSTALL_DIR/{www,cgi-bin,config,logs}" true
+TASK "創���必要的目錄" "ADD -d $INSTALL_DIR/{www,cgi-bin,config,logs}" true
 
 text "下載面板文件..."
 BASE_URL="https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main"
@@ -229,7 +229,7 @@ chmod 755 /var/log/lighttpd
 TASK "重啟 lighttpd 服務" "systemctl restart lighttpd" true
 
 if ! systemctl is-active --quiet lighttpd; then
-	text "${CLR3}��告：lighttpd 服務未能正常啟動${CLR0}"
+	text "${CLR3}警告：lighttpd 服務未能正常啟動${CLR0}"
 	text "請檢查日誌文件：$INSTALL_DIR/logs/error.log"
 	exit 1
 fi
