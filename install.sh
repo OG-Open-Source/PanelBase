@@ -2,7 +2,7 @@
 
 cd ~ && clear
 echo "================================="
-echo "=  PanelBase 安裝程序 (Beta32)  ="
+echo "=  PanelBase 安裝程序 (Beta33)  ="
 echo "================================="
 
 # 檢查是否為 root 用戶
@@ -102,7 +102,7 @@ mkdir -p $INSTALL_DIR/{www,cgi-bin,config,logs,cache,static}
 
 # 下載面板文件
 echo "下載面板文件..."
-BASE_URL="https://raw.githubusercontent.com/OG-Open-Source/PanelBase/main"
+BASE_URL="https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main"
 FILES=(
 	"src/cgi-bin/panel.cgi"
 	"src/cgi-bin/auth.cgi"
@@ -119,7 +119,7 @@ download_file() {
 	
 	mkdir -p "$dest_dir"
 	echo "下載 $file..."
-	if ! curl -sSL -o "$dest_file" "$BASE_URL/$file"; then
+	if ! curl -sSL -o "$dest_file" "$BASE_URL/src/$file"; then
 		echo "錯誤：無法下載 $file"
 		return 1
 	fi
@@ -208,7 +208,7 @@ if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	echo "自定義面板文件安裝完成"
 else
 	echo "下載 panel.html..."
-	if ! download_file "www/panel.html"; then
+	if ! curl -sSL -o "$INSTALL_DIR/www/panel.html" "$BASE_URL/www/panel.html"; then
 		echo "安裝失敗：無法下載面板頁面"
 		exit 1
 	fi
