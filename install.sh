@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta48"
+Version="Beta49"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -138,70 +138,58 @@ else
 fi
 
 text "配置 lighttpd..."
-
 cat > /etc/lighttpd/lighttpd.conf << EOF
 server.modules = (
-    "mod_access",
-    "mod_alias",
-    "mod_compress",
-    "mod_redirect",
-    "mod_rewrite",
-    "mod_cgi"
+	"mod_access",
+	"mod_alias",
+	"mod_compress",
+	"mod_redirect",
+	"mod_rewrite",
+	"mod_cgi"
 )
 
-server.port = 80
+server.document-root = "$INSTALL_DIR/www"
+server.port = 8080
+
 server.username = "www-data"
 server.groupname = "www-data"
-server.document-root = "$INSTALL_DIR/www"
-server.pid-file = "/run/lighttpd.pid"
+
 server.errorlog = "$INSTALL_DIR/logs/error.log"
+accesslog.filename = "$INSTALL_DIR/logs/access.log"
 
-server.upload-dirs = ( "/var/cache/lighttpd/uploads" )
-server.follow-symlink = "enable"
+\$HTTP["url"] =~ "^/" {
+	dir-listing.activate = "disable"
+}
 
-cgi.assign = (
-    ".cgi" => ""
+cgi.assign = ( ".cgi" => "" )
+alias.url = ( "/cgi-bin/" => "$INSTALL_DIR/cgi-bin/" )
+
+\$HTTP["url"] =~ "^/cgi-bin/" {
+	cgi.assign = ( "" => "" )
+}
+
+mimetype.assign = (
+	".html" => "text/html",
+	".css"  => "text/css",
+	".js"   => "application/javascript",
+	".png"  => "image/png",
+	".jpg"  => "image/jpeg",
+	".gif"  => "image/gif",
+	".svg"  => "image/svg+xml"
 )
 
-include_shell "/usr/share/lighttpd/create-mime.conf.pl"
-include "/etc/lighttpd/conf-enabled/*.conf"
-EOF
-
-cat > /etc/lighttpd/conf-available/10-panelbase.conf << EOL
-url.rewrite-if-not-file = (
-    "^/$" => "/index.html"
-)
+\$HTTP["url"] !~ "^/\$" {
+	\$HTTP["url"] !~ "^/cgi-bin/(auth|panel)\.cgi" {
+		url.rewrite-once = (
+			"^/.*" => "/cgi-bin/check_auth.cgi"
+		)
+	}
+}
 
 index-file.names = ( "index.html" )
 
-alias.url += ( "/cgi-bin/" => "$INSTALL_DIR/cgi-bin/" )
-
-\$HTTP["url"] =~ "^/cgi-bin/" {
-    dir-listing.activate = "disable"
-}
-
-\$HTTP["url"] !~ "^/(cgi-bin/auth\.cgi|cgi-bin/check_auth\.cgi|index\.html).*" {
-    url.rewrite-once = (
-        "^/(.*)$" => "/cgi-bin/check_auth.cgi"
-    )
-}
-EOL
-
-mkdir -p /var/cache/lighttpd/uploads
-chown -R www-data:www-data /var/cache/lighttpd
-
-ln -sf /etc/lighttpd/conf-available/10-panelbase.conf /etc/lighttpd/conf-enabled/
-
-lighttpd -tt -f /etc/lighttpd/lighttpd.conf || {
-    error "Lighttpd 配置測試失敗"
-    exit 1
-}
-
-if ! systemctl restart lighttpd; then
-    error "Lighttpd 服務啟動失敗"
-    error "請檢查日誌文件：/opt/panelbase/logs/error.log"
-    exit 1
-fi
+static-file.exclude-extensions = ( ".cgi" )
+EOF
 
 text "創建用戶配置..."
 text "${ADMIN_NAME}:$(echo -n "${ADMIN_PASS}" | md5sum | cut -d' ' -f1)" > $INSTALL_DIR/config/users.conf

@@ -1,494 +1,478 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>PanelBase Login</title>
-	<style>
-		:root {
-			--gradient-start: #2980b9;
-			--gradient-end: #2c3e50;
-			--card-bg: rgba(255, 255, 255, 0.95);
-			--text-primary: #2c3e50;
-			--text-secondary: #7f8c8d;
-			--accent-color: #3498db;
-			--error-color: #e74c3c;
-			--border-color: rgba(0, 0, 0, 0.1);
-			--shadow-color: rgba(0, 0, 0, 0.1);
-			--input-bg: rgba(255, 255, 255, 0.9);
-		}
-
-		@media (prefers-color-scheme: dark) {
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>PanelBase Login</title>
+		<style>
 			:root {
-				--gradient-start: #1a1a2e;
-				--gradient-end: #16213e;
-				--card-bg: rgba(30, 30, 46, 0.95);
-				--text-primary: #ecf0f1;
-				--text-secondary: #bdc3c7;
+				--gradient-start: #2980b9;
+				--gradient-end: #2c3e50;
+				--card-bg: rgba(255, 255, 255, 0.95);
+				--text-primary: #2c3e50;
+				--text-secondary: #7f8c8d;
 				--accent-color: #3498db;
-				--border-color: rgba(255, 255, 255, 0.1);
-				--shadow-color: rgba(0, 0, 0, 0.3);
-				--input-bg: rgba(45, 45, 61, 0.9);
+				--error-color: #e74c3c;
+				--border-color: rgba(0, 0, 0, 0.1);
+				--shadow-color: rgba(0, 0, 0, 0.1);
+				--input-bg: rgba(255, 255, 255, 0.9);
 			}
-		}
 
-		* {
-			margin: 0;
-			padding: 0;
-			box-sizing: border-box;
-			transition: all 0.3s ease;
-		}
-
-		body {
-			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-			background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
-			color: var(--text-primary);
-			min-height: 100vh;
-			display: flex;
-			justify-content: center;
-			align-items: center;
-			padding: 20px;
-			position: relative;
-			overflow: hidden;
-		}
-
-		.background-animation {
-			position: absolute;
-			top: 0;
-			left: 0;
-			width: 100%;
-			height: 100%;
-			z-index: 0;
-			opacity: 0.5;
-		}
-
-		.circle {
-			position: absolute;
-			border-radius: 50%;
-			background: radial-gradient(circle at center, var(--accent-color), transparent);
-			animation: float 20s infinite linear;
-			opacity: 0.1;
-		}
-
-		.circle:nth-child(1) {
-			width: 300px;
-			height: 300px;
-			top: -150px;
-			left: -150px;
-			animation-delay: 0s;
-		}
-
-		.circle:nth-child(2) {
-			width: 400px;
-			height: 400px;
-			bottom: -200px;
-			right: -200px;
-			animation-delay: -5s;
-		}
-
-		.circle:nth-child(3) {
-			width: 200px;
-			height: 200px;
-			top: 50%;
-			left: 50%;
-			animation-delay: -10s;
-		}
-
-		@keyframes float {
-			0% {
-				transform: translate(0, 0) rotate(0deg);
+			@media (prefers-color-scheme: dark) {
+				:root {
+					--gradient-start: #1a1a2e;
+					--gradient-end: #16213e;
+					--card-bg: rgba(30, 30, 46, 0.95);
+					--text-primary: #ecf0f1;
+					--text-secondary: #bdc3c7;
+					--accent-color: #3498db;
+					--border-color: rgba(255, 255, 255, 0.1);
+					--shadow-color: rgba(0, 0, 0, 0.3);
+					--input-bg: rgba(45, 45, 61, 0.9);
+				}
 			}
-			50% {
-				transform: translate(100px, 100px) rotate(180deg);
+
+			* {
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+				transition: all 0.3s ease;
 			}
-			100% {
-				transform: translate(0, 0) rotate(360deg);
+
+			body {
+				font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+				background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+				color: var(--text-primary);
+				min-height: 100vh;
+				display: flex;
+				justify-content: center;
+				align-items: center;
+				padding: 20px;
+				position: relative;
+				overflow: hidden;
 			}
-		}
 
-		.login-container {
-			background: var(--card-bg);
-			padding: 2.5rem;
-			border-radius: 20px;
-			box-shadow: 0 8px 32px var(--shadow-color);
-			width: 100%;
-			max-width: 400px;
-			position: relative;
-			z-index: 1;
-			backdrop-filter: blur(10px);
-			border: 1px solid var(--border-color);
-			animation: fadeIn 0.5s ease-out;
-		}
-
-		@keyframes fadeIn {
-			from {
-				opacity: 0;
-				transform: translateY(-20px) scale(0.95);
+			.background-animation {
+				position: absolute;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 100%;
+				z-index: 0;
+				opacity: 0.5;
 			}
-			to {
-				opacity: 1;
-				transform: translateY(0) scale(1);
+
+			.circle {
+				position: absolute;
+				border-radius: 50%;
+				background: radial-gradient(circle at center, var(--accent-color), transparent);
+				animation: float 20s infinite linear;
+				opacity: 0.1;
 			}
-		}
 
-		.login-header {
-			text-align: center;
-			margin-bottom: 2rem;
-		}
+			.circle:nth-child(1) {
+				width: 300px;
+				height: 300px;
+				top: -150px;
+				left: -150px;
+				animation-delay: 0s;
+			}
 
-		.login-header h1 {
-			font-size: 2.5rem;
-			font-weight: 700;
-			margin-bottom: 0.5rem;
-			background: linear-gradient(45deg, #3498db, #2ecc71);
-			-webkit-background-clip: text;
-			background-clip: text;
-			-webkit-text-fill-color: transparent;
-			text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
-		}
+			.circle:nth-child(2) {
+				width: 400px;
+				height: 400px;
+				bottom: -200px;
+				right: -200px;
+				animation-delay: -5s;
+			}
 
-		.login-header p {
-			color: var(--text-secondary);
-			font-size: 1.1rem;
-		}
+			.circle:nth-child(3) {
+				width: 200px;
+				height: 200px;
+				top: 50%;
+				left: 50%;
+				animation-delay: -10s;
+			}
 
-		.form-group {
-			margin-bottom: 1.5rem;
-			position: relative;
-		}
+			@keyframes float {
+				0% {
+					transform: translate(0, 0) rotate(0deg);
+				}
+				50% {
+					transform: translate(100px, 100px) rotate(180deg);
+				}
+				100% {
+					transform: translate(0, 0) rotate(360deg);
+				}
+			}
 
-		.form-group label {
-			display: block;
-			margin-bottom: 0.5rem;
-			color: var(--text-primary);
-			font-weight: 500;
-			font-size: 0.95rem;
-		}
-
-		.form-group input {
-			width: 100%;
-			padding: 0.75rem 1rem;
-			padding-left: 2.5rem;
-			border: 1px solid var(--border-color);
-			border-radius: 12px;
-			background: var(--input-bg);
-			color: var(--text-primary);
-			font-size: 1rem;
-			transition: all 0.3s ease;
-		}
-
-		.form-group i {
-			position: absolute;
-			left: 1rem;
-			top: calc(50% + 0.7rem);
-			transform: translateY(-50%);
-			color: var(--text-secondary);
-		}
-
-		.form-group input:focus {
-			outline: none;
-			border-color: var(--accent-color);
-			box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
-		}
-
-		.error-message {
-			color: var(--error-color);
-			font-size: 0.9rem;
-			margin-top: 0.5rem;
-			display: none;
-			padding: 0.5rem;
-			border-radius: 8px;
-			background: rgba(231, 76, 60, 0.1);
-			text-align: center;
-		}
-
-		.submit-button {
-			width: 100%;
-			padding: 0.75rem;
-			background: var(--accent-color);
-			color: white;
-			border: none;
-			border-radius: 12px;
-			font-size: 1rem;
-			font-weight: 600;
-			cursor: pointer;
-			transition: all 0.3s ease;
-			position: relative;
-			overflow: hidden;
-		}
-
-		.submit-button::before {
-			content: '';
-			position: absolute;
-			top: 50%;
-			left: 50%;
-			width: 0;
-			height: 0;
-			background: rgba(255, 255, 255, 0.2);
-			border-radius: 50%;
-			transform: translate(-50%, -50%);
-			transition: width 0.6s ease, height 0.6s ease;
-		}
-
-		.submit-button:hover::before {
-			width: 300px;
-			height: 300px;
-		}
-
-		.submit-button:active {
-			transform: scale(0.98);
-		}
-
-		.language-selector {
-			display: flex;
-			justify-content: center;
-			gap: 0.5rem;
-			margin-top: 1.5rem;
-		}
-
-		.language-button {
-			background: none;
-			border: 1px solid var(--border-color);
-			color: var(--text-primary);
-			padding: 0.5rem 1rem;
-			border-radius: 8px;
-			cursor: pointer;
-			font-size: 0.9rem;
-			transition: all 0.3s ease;
-			backdrop-filter: blur(5px);
-		}
-
-		.language-button:hover {
-			background: var(--accent-color);
-			color: white;
-			border-color: var(--accent-color);
-			transform: translateY(-2px);
-		}
-
-		.language-button.active {
-			background: var(--accent-color);
-			color: white;
-			border-color: var(--accent-color);
-		}
-
-		@media (max-width: 480px) {
 			.login-container {
-				padding: 2rem;
+				background: var(--card-bg);
+				padding: 2.5rem;
+				border-radius: 20px;
+				box-shadow: 0 8px 32px var(--shadow-color);
+				width: 100%;
+				max-width: 400px;
+				position: relative;
+				z-index: 1;
+				backdrop-filter: blur(10px);
+				border: 1px solid var(--border-color);
+				animation: fadeIn 0.5s ease-out;
+			}
+
+			@keyframes fadeIn {
+				from {
+					opacity: 0;
+					transform: translateY(-20px) scale(0.95);
+				}
+				to {
+					opacity: 1;
+					transform: translateY(0) scale(1);
+				}
+			}
+
+			.login-header {
+				text-align: center;
+				margin-bottom: 2rem;
 			}
 
 			.login-header h1 {
-				font-size: 2rem;
+				font-size: 2.5rem;
+				font-weight: 700;
+				margin-bottom: 0.5rem;
+				background: linear-gradient(45deg, #3498db, #2ecc71);
+				-webkit-background-clip: text;
+				background-clip: text;
+				-webkit-text-fill-color: transparent;
+				text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+			}
+
+			.login-header p {
+				color: var(--text-secondary);
+				font-size: 1.1rem;
+			}
+
+			.form-group {
+				margin-bottom: 1.5rem;
+				position: relative;
+			}
+
+			.form-group label {
+				display: block;
+				margin-bottom: 0.5rem;
+				color: var(--text-primary);
+				font-weight: 500;
+				font-size: 0.95rem;
+			}
+
+			.form-group input {
+				width: 100%;
+				padding: 0.75rem 1rem;
+				padding-left: 2.5rem;
+				border: 1px solid var(--border-color);
+				border-radius: 12px;
+				background: var(--input-bg);
+				color: var(--text-primary);
+				font-size: 1rem;
+				transition: all 0.3s ease;
+			}
+
+			.form-group i {
+				position: absolute;
+				left: 1rem;
+				top: calc(50% + 0.7rem);
+				transform: translateY(-50%);
+				color: var(--text-secondary);
+			}
+
+			.form-group input:focus {
+				outline: none;
+				border-color: var(--accent-color);
+				box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+			}
+
+			.error-message {
+				color: var(--error-color);
+				font-size: 0.9rem;
+				margin-top: 0.5rem;
+				display: none;
+				padding: 0.5rem;
+				border-radius: 8px;
+				background: rgba(231, 76, 60, 0.1);
+				text-align: center;
+			}
+
+			.submit-button {
+				width: 100%;
+				padding: 0.75rem;
+				background: var(--accent-color);
+				color: white;
+				border: none;
+				border-radius: 12px;
+				font-size: 1rem;
+				font-weight: 600;
+				cursor: pointer;
+				transition: all 0.3s ease;
+				position: relative;
+				overflow: hidden;
+			}
+
+			.submit-button::before {
+				content: '';
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				width: 0;
+				height: 0;
+				background: rgba(255, 255, 255, 0.2);
+				border-radius: 50%;
+				transform: translate(-50%, -50%);
+				transition: width 0.6s ease, height 0.6s ease;
+			}
+
+			.submit-button:hover::before {
+				width: 300px;
+				height: 300px;
+			}
+
+			.submit-button:active {
+				transform: scale(0.98);
 			}
 
 			.language-selector {
-				position: relative;
-				top: 0;
-				right: 0;
+				display: flex;
 				justify-content: center;
-				margin-bottom: 1.5rem;
+				gap: 0.5rem;
+				margin-top: 1.5rem;
 			}
 
 			.language-button {
-				padding: 0.4rem 0.8rem;
+				background: none;
+				border: 1px solid var(--border-color);
+				color: var(--text-primary);
+				padding: 0.5rem 1rem;
+				border-radius: 8px;
+				cursor: pointer;
+				font-size: 0.9rem;
+				transition: all 0.3s ease;
+				backdrop-filter: blur(5px);
 			}
-		}
 
-		@keyframes spin {
-			0% { transform: rotate(0deg); }
-			100% { transform: rotate(360deg); }
-		}
+			.language-button:hover {
+				background: var(--accent-color);
+				color: white;
+				border-color: var(--accent-color);
+				transform: translateY(-2px);
+			}
 
-		.loading {
-			display: inline-block;
-			width: 1.5rem;
-			height: 1.5rem;
-			border: 3px solid rgba(255, 255, 255, 0.3);
-			border-radius: 50%;
-			border-top-color: white;
-			animation: spin 1s ease-in-out infinite;
-			margin-right: 0.5rem;
-			vertical-align: middle;
-			display: none;
-		}
+			.language-button.active {
+				background: var(--accent-color);
+				color: white;
+				border-color: var(--accent-color);
+			}
 
-		.submit-button.loading .loading {
-			display: inline-block;
-		}
-	</style>
-</head>
-<body>
-	<div class="background-animation">
-		<div class="circle"></div>
-		<div class="circle"></div>
-		<div class="circle"></div>
-	</div>
-
-	<div class="login-container">
-		<div class="login-header">
-			<h1>PanelBase</h1>
-			<p data-i18n="login-prompt">請登入以繼續</p>
-		</div>
-		<form id="loginForm" onsubmit="handleLogin(event)">
-			<div class="form-group">
-				<label for="username" data-i18n="username">用戶名</label>
-				<i class="fas fa-user"></i>
-				<input type="text" id="username" name="username" required autocomplete="username">
-			</div>
-			<div class="form-group">
-				<label for="password" data-i18n="password">密碼</label>
-				<i class="fas fa-lock"></i>
-				<input type="password" id="password" name="password" required autocomplete="current-password">
-				<div id="errorMessage" class="error-message"></div>
-			</div>
-			<button type="submit" class="submit-button">
-				<span class="loading"></span>
-				<span data-i18n="login-button">登入</span>
-			</button>
-		</form>
-		<div class="language-selector">
-			<button class="language-button" onclick="changeLanguage('en')" data-lang="en">EN</button>
-			<button class="language-button active" onclick="changeLanguage('zh-TW')" data-lang="zh-TW">繁</button>
-			<button class="language-button" onclick="changeLanguage('zh-CN')" data-lang="zh-CN">简</button>
-		</div>
-	</div>
-
-	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-
-	<script>
-		async function checkAuth() {
-			try {
-				const response = await fetch('/cgi-bin/check_auth.cgi', {
-					method: 'GET',
-					credentials: 'same-origin'
-				});
-				
-				if (response.ok && await response.json() === 0) {
-					window.location.href = '/panel.html';
+			@media (max-width: 480px) {
+				.login-container {
+					padding: 2rem;
 				}
-			} catch (error) {
-				console.error('Auth check failed:', error);
+
+				.login-header h1 {
+					font-size: 2rem;
+				}
+
+				.language-selector {
+					position: relative;
+					top: 0;
+					right: 0;
+					justify-content: center;
+					margin-bottom: 1.5rem;
+				}
+
+				.language-button {
+					padding: 0.4rem 0.8rem;
+				}
 			}
-		}
 
-		const i18n = {
-			'en': {
-				'login-prompt': 'Please login to continue',
-				'username': 'Username',
-				'password': 'Password',
-				'login-button': 'Login',
-				'logging-in': 'Logging in...',
-				'error-invalid': 'Invalid username or password',
-				'error-server': 'Server error, please try again later'
-			},
-			'zh-TW': {
-				'login-prompt': '請登入以繼續',
-				'username': '用戶名',
-				'password': '密碼',
-				'login-button': '登入',
-				'logging-in': '登入中...',
-				'error-invalid': '用戶名或密碼錯誤',
-				'error-server': '發生錯誤，請稍後再試'
-			},
-			'zh-CN': {
-				'login-prompt': '请登录以继续',
-				'username': '用户名',
-				'password': '密码',
-				'login-button': '登录',
-				'logging-in': '登录中...',
-				'error-invalid': '用户名或密码错误',
-				'error-server': '发生错误，请稍后再试'
+			@keyframes spin {
+				0% { transform: rotate(0deg); }
+				100% { transform: rotate(360deg); }
 			}
-		};
 
-		function getBrowserLanguage() {
-			const lang = navigator.language || navigator.userLanguage;
-			if (lang.startsWith('zh')) {
-				return lang === 'zh-TW' ? 'zh-TW' : 'zh-CN';
+			.loading {
+				display: inline-block;
+				width: 1.5rem;
+				height: 1.5rem;
+				border: 3px solid rgba(255, 255, 255, 0.3);
+				border-radius: 50%;
+				border-top-color: white;
+				animation: spin 1s ease-in-out infinite;
+				margin-right: 0.5rem;
+				vertical-align: middle;
+				display: none;
 			}
-			return 'en';
-		}
 
-		let currentLanguage = localStorage.getItem('panelbase-language') || getBrowserLanguage();
+			.submit-button.loading .loading {
+				display: inline-block;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="background-animation">
+			<div class="circle"></div>
+			<div class="circle"></div>
+			<div class="circle"></div>
+		</div>
 
-		function updateTexts() {
-			document.querySelectorAll('[data-i18n]').forEach(element => {
-				const key = element.getAttribute('data-i18n');
-				element.textContent = i18n[currentLanguage][key];
-			});
-			document.documentElement.lang = currentLanguage;
-		}
+		<div class="login-container">
+			<div class="login-header">
+				<h1>PanelBase</h1>
+				<p data-i18n="login-prompt">請登入以繼續</p>
+			</div>
+			<form id="loginForm" onsubmit="handleLogin(event)">
+				<div class="form-group">
+					<label for="username" data-i18n="username">用戶名</label>
+					<i class="fas fa-user"></i>
+					<input type="text" id="username" name="username" required autocomplete="username">
+				</div>
+				<div class="form-group">
+					<label for="password" data-i18n="password">密碼</label>
+					<i class="fas fa-lock"></i>
+					<input type="password" id="password" name="password" required autocomplete="current-password">
+					<div id="errorMessage" class="error-message"></div>
+				</div>
+				<button type="submit" class="submit-button">
+					<span class="loading"></span>
+					<span data-i18n="login-button">登入</span>
+				</button>
+			</form>
+			<div class="language-selector">
+				<button class="language-button" onclick="changeLanguage('en')" data-lang="en">EN</button>
+				<button class="language-button active" onclick="changeLanguage('zh-TW')" data-lang="zh-TW">繁</button>
+				<button class="language-button" onclick="changeLanguage('zh-CN')" data-lang="zh-CN">简</button>
+			</div>
+		</div>
 
-		function changeLanguage(lang) {
-			currentLanguage = lang;
-			localStorage.setItem('panelbase-language', lang);
-			updateTexts();
-			
-			document.querySelectorAll('.language-button').forEach(button => {
-				button.classList.toggle('active', button.getAttribute('data-lang') === lang);
-			});
-		}
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
-		async function handleLogin(event) {
-			event.preventDefault();
-			const errorMessage = document.getElementById('errorMessage');
-			const submitButton = document.querySelector('.submit-button');
-			
-			try {
-				submitButton.disabled = true;
-				submitButton.classList.add('loading');
-				submitButton.querySelector('[data-i18n="login-button"]').textContent = i18n[currentLanguage]['logging-in'];
-				
-				const username = document.getElementById('username').value;
-				const password = document.getElementById('password').value;
-				
-				const response = await fetch('/cgi-bin/auth.cgi?action=login', {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/x-www-form-urlencoded',
-					},
-					body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+		<script>
+			const i18n = {
+				'en': {
+					'login-prompt': 'Please login to continue',
+					'username': 'Username',
+					'password': 'Password',
+					'login-button': 'Login',
+					'logging-in': 'Logging in...',
+					'error-invalid': 'Invalid username or password',
+					'error-server': 'Server error, please try again later'
+				},
+				'zh-TW': {
+					'login-prompt': '請登入以繼續',
+					'username': '用戶名',
+					'password': '密碼',
+					'login-button': '登入',
+					'logging-in': '登入中...',
+					'error-invalid': '用戶名或密碼錯誤',
+					'error-server': '發生錯誤，請稍後再試'
+				},
+				'zh-CN': {
+					'login-prompt': '请登录以继续',
+					'username': '用户名',
+					'password': '密码',
+					'login-button': '登录',
+					'logging-in': '登录中...',
+					'error-invalid': '用户名或密码错误',
+					'error-server': '发生错误，请稍后再试'
+				}
+			};
+
+			function getBrowserLanguage() {
+				const lang = navigator.language || navigator.userLanguage;
+				if (lang.startsWith('zh')) {
+					return lang === 'zh-TW' ? 'zh-TW' : 'zh-CN';
+				}
+				return 'en';
+			}
+
+			let currentLanguage = localStorage.getItem('panelbase-language') || getBrowserLanguage();
+
+			function updateTexts() {
+				document.querySelectorAll('[data-i18n]').forEach(element => {
+					const key = element.getAttribute('data-i18n');
+					element.textContent = i18n[currentLanguage][key];
 				});
+				document.documentElement.lang = currentLanguage;
+			}
 
-				const data = await response.json();
+			function changeLanguage(lang) {
+				currentLanguage = lang;
+				localStorage.setItem('panelbase-language', lang);
+				updateTexts();
 				
-				if (response.ok && data === 0) {
-					submitButton.style.background = '#27ae60';
-					setTimeout(() => {
-						window.location.href = '/panel.html';
-					}, 500);
-				} else {
-					errorMessage.textContent = i18n[currentLanguage]['error-invalid'];
+				document.querySelectorAll('.language-button').forEach(button => {
+					button.classList.toggle('active', button.getAttribute('data-lang') === lang);
+				});
+			}
+
+			async function handleLogin(event) {
+				event.preventDefault();
+				const errorMessage = document.getElementById('errorMessage');
+				const submitButton = document.querySelector('.submit-button');
+				
+				try {
+					submitButton.disabled = true;
+					submitButton.classList.add('loading');
+					submitButton.querySelector('[data-i18n="login-button"]').textContent = i18n[currentLanguage]['logging-in'];
+					
+					const username = document.getElementById('username').value;
+					const password = document.getElementById('password').value;
+					
+					const response = await fetch('/cgi-bin/auth.cgi?action=login', {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/x-www-form-urlencoded',
+						},
+						body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+					});
+
+					const data = await response.json();
+					
+					if (response.ok && data === 0) {
+						submitButton.style.background = '#27ae60';
+						setTimeout(() => {
+							window.location.href = '/panel.html';
+						}, 500);
+					} else {
+						errorMessage.textContent = i18n[currentLanguage]['error-invalid'];
+						errorMessage.style.display = 'block';
+						submitButton.disabled = false;
+						submitButton.classList.remove('loading');
+						submitButton.querySelector('[data-i18n="login-button"]').textContent = i18n[currentLanguage]['login-button'];
+						
+						const form = document.getElementById('loginForm');
+						form.style.animation = 'shake 0.5s';
+						setTimeout(() => form.style.animation = '', 500);
+					}
+				} catch (error) {
+					console.error('Error:', error);
+					errorMessage.textContent = i18n[currentLanguage]['error-server'];
 					errorMessage.style.display = 'block';
 					submitButton.disabled = false;
 					submitButton.classList.remove('loading');
 					submitButton.querySelector('[data-i18n="login-button"]').textContent = i18n[currentLanguage]['login-button'];
-					
-					const form = document.getElementById('loginForm');
-					form.style.animation = 'shake 0.5s';
-					setTimeout(() => form.style.animation = '', 500);
 				}
-			} catch (error) {
-				console.error('Error:', error);
-				errorMessage.textContent = i18n[currentLanguage]['error-server'];
-				errorMessage.style.display = 'block';
-				submitButton.disabled = false;
-				submitButton.classList.remove('loading');
-				submitButton.querySelector('[data-i18n="login-button"]').textContent = i18n[currentLanguage]['login-button'];
 			}
-		}
 
-		const style = document.createElement('style');
-		style.textContent = `
-			@keyframes shake {
-				0%, 100% { transform: translateX(0); }
-				25% { transform: translateX(-10px); }
-				75% { transform: translateX(10px); }
-			}
-		`;
-		document.head.appendChild(style);
+			const style = document.createElement('style');
+			style.textContent = `
+				@keyframes shake {
+					0%, 100% { transform: translateX(0); }
+					25% { transform: translateX(-10px); }
+					75% { transform: translateX(10px); }
+				}
+			`;
+			document.head.appendChild(style);
 
-		changeLanguage(currentLanguage);
-		checkAuth();
-	</script>
-</body>
+			changeLanguage(currentLanguage);
+		</script>
+	</body>
 </html>
