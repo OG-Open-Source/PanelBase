@@ -245,9 +245,7 @@
         // 更新系統資訊
         async function updateSystemInfo() {
             try {
-                const response = await fetch('/cgi-bin/panel.cgi?path=system&method=GET&action=info', {
-                    cache: 'no-store'
-                });
+                const response = await fetch('/cgi-bin/panel.cgi?action=get_system_info');
                 if (response.ok) {
                     const data = await response.json();
                     document.getElementById('cpu-usage').textContent = data.cpu + '%';
@@ -278,7 +276,7 @@
             document.getElementById('usernamePassword').value = '';
         }
 
-        // 顯示��改密碼對話框
+        // 顯示修改密碼對話框
         function showChangePassword() {
             const modal = document.getElementById('passwordModal');
             modal.style.display = 'block';
@@ -373,7 +371,7 @@
                         handleLogout();
                     }, 1500);
                 } else {
-                    let message = '發���錯誤';
+                    let message = '發生錯誤';
                     switch (data) {
                         case 1:
                             message = '舊密碼錯誤';
