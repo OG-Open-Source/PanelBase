@@ -355,6 +355,21 @@
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
 	<script>
+		async function checkAuth() {
+			try {
+				const response = await fetch('/cgi-bin/check_auth.cgi', {
+					method: 'GET',
+					credentials: 'same-origin'
+				});
+				
+				if (response.ok && await response.json() === 0) {
+					window.location.href = '/panel.html';
+				}
+			} catch (error) {
+				console.error('Auth check failed:', error);
+			}
+		}
+
 		const i18n = {
 			'en': {
 				'login-prompt': 'Please login to continue',
@@ -473,6 +488,7 @@
 		document.head.appendChild(style);
 
 		changeLanguage(currentLanguage);
+		checkAuth();
 	</script>
 </body>
 </html>
