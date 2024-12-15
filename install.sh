@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta50"
+Version="Beta51"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -28,7 +28,6 @@ CHECK_ROOT
 INPUT "請輸入管理員用戶名：" ADMIN_NAME
 ADMIN_NAME=${ADMIN_NAME:-admin}
 
-# 驗證用戶名格式
 if ! [[ $ADMIN_NAME =~ ^[a-z]+$ ]]; then
     error "用戶名只能包含小寫英文字母"
     exit 1
@@ -83,7 +82,7 @@ for FILE in "src/cgi-bin/panel.cgi" "src/cgi-bin/auth.cgi" "src/cgi-bin/check_au
 done
 
 if [[ ! $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
-	text "��載 panel.html..."
+	text "下載 panel.html..."
 	HTTP_CODE=$(curl -s -w "%{http_code}" -o "panel.html" "$BASE_URL/www/panel.html")
 	[ "$HTTP_CODE" != "200" ] && { error "無法下載面板頁面 (HTTP 代碼: $HTTP_CODE)"; exit 1; }
 fi
