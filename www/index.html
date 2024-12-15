@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="en">
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>PanelBase 登入</title>
+	<title>PanelBase Login</title>
 	<style>
 		:root {
 			--bg-color: #f5f5f5;
@@ -59,6 +59,7 @@
 			width: 100%;
 			max-width: 400px;
 			animation: fadeIn 0.5s ease-out;
+			position: relative;
 		}
 
 		@keyframes fadeIn {
@@ -146,6 +147,37 @@
 			transform: translateY(0);
 		}
 
+		.language-selector {
+			position: absolute;
+			top: 1rem;
+			right: 1rem;
+			display: flex;
+			gap: 0.5rem;
+		}
+
+		.language-button {
+			background: none;
+			border: 1px solid var(--border-color);
+			color: var(--text-color);
+			padding: 0.25rem 0.5rem;
+			border-radius: 4px;
+			cursor: pointer;
+			font-size: 0.8rem;
+			transition: all 0.3s ease;
+		}
+
+		.language-button:hover {
+			background-color: var(--button-bg);
+			color: white;
+			border-color: var(--button-bg);
+		}
+
+		.language-button.active {
+			background-color: var(--button-bg);
+			color: white;
+			border-color: var(--button-bg);
+		}
+
 		@media (max-width: 480px) {
 			.login-container {
 				padding: 1.5rem;
@@ -154,30 +186,101 @@
 			.login-header h1 {
 				font-size: 1.75rem;
 			}
+
+			.language-selector {
+				position: relative;
+				top: 0;
+				right: 0;
+				justify-content: center;
+				margin-bottom: 1rem;
+			}
 		}
 	</style>
 </head>
 <body>
 	<div class="login-container">
+		<div class="language-selector">
+			<button class="language-button" onclick="changeLanguage('en')" data-lang="en">EN</button>
+			<button class="language-button active" onclick="changeLanguage('zh-TW')" data-lang="zh-TW">繁</button>
+			<button class="language-button" onclick="changeLanguage('zh-CN')" data-lang="zh-CN">简</button>
+		</div>
 		<div class="login-header">
 			<h1>PanelBase</h1>
-			<p>請登入以繼續</p>
+			<p data-i18n="login-prompt">請登入以繼續</p>
 		</div>
 		<form id="loginForm" onsubmit="handleLogin(event)">
 			<div class="form-group">
-				<label for="username">用戶名</label>
+				<label for="username" data-i18n="username">用戶名</label>
 				<input type="text" id="username" name="username" required autocomplete="username">
 			</div>
 			<div class="form-group">
-				<label for="password">密碼</label>
+				<label for="password" data-i18n="password">密碼</label>
 				<input type="password" id="password" name="password" required autocomplete="current-password">
 				<div id="errorMessage" class="error-message"></div>
 			</div>
-			<button type="submit" class="submit-button">登入</button>
+			<button type="submit" class="submit-button" data-i18n="login-button">登入</button>
 		</form>
 	</div>
 
 	<script>
+		const i18n = {
+			'en': {
+				'login-prompt': 'Please login to continue',
+				'username': 'Username',
+				'password': 'Password',
+				'login-button': 'Login',
+				'logging-in': 'Logging in...',
+				'error-invalid': 'Invalid username or password',
+				'error-server': 'Server error, please try again later'
+			},
+			'zh-TW': {
+				'login-prompt': '請登入以繼續',
+				'username': '用戶名',
+				'password': '密碼',
+				'login-button': '登入',
+				'logging-in': '登入中...',
+				'error-invalid': '用戶名或密碼錯誤',
+				'error-server': '發生錯誤，請稍後再試'
+			},
+			'zh-CN': {
+				'login-prompt': '请登录以继续',
+				'username': '用户名',
+				'password': '密码',
+				'login-button': '登录',
+				'logging-in': '登录中...',
+				'error-invalid': '用户名或密码错误',
+				'error-server': '发生错误，请稍后再试'
+			}
+		};
+
+		function getBrowserLanguage() {
+			const lang = navigator.language || navigator.userLanguage;
+			if (lang.startsWith('zh')) {
+				return lang === 'zh-TW' ? 'zh-TW' : 'zh-CN';
+			}
+			return 'en';
+		}
+
+		let currentLanguage = localStorage.getItem('panelbase-language') || getBrowserLanguage();
+
+		function updateTexts() {
+			document.querySelectorAll('[data-i18n]').forEach(element => {
+				const key = element.getAttribute('data-i18n');
+				element.textContent = i18n[currentLanguage][key];
+			});
+			document.documentElement.lang = currentLanguage;
+		}
+
+		function changeLanguage(lang) {
+			currentLanguage = lang;
+			localStorage.setItem('panelbase-language', lang);
+			updateTexts();
+			
+			document.querySelectorAll('.language-button').forEach(button => {
+				button.classList.toggle('active', button.getAttribute('data-lang') === lang);
+			});
+		}
+
 		async function handleLogin(event) {
 			event.preventDefault();
 			const errorMessage = document.getElementById('errorMessage');
@@ -185,7 +288,7 @@
 			
 			try {
 				submitButton.disabled = true;
-				submitButton.textContent = '登入中...';
+				submitButton.textContent = i18n[currentLanguage]['logging-in'];
 				
 				const username = document.getElementById('username').value;
 				const password = document.getElementById('password').value;
@@ -203,10 +306,10 @@
 				if (response.ok && data === 0) {
 					window.location.href = '/panel.html';
 				} else {
-					errorMessage.textContent = '用戶名或密碼錯誤';
+					errorMessage.textContent = i18n[currentLanguage]['error-invalid'];
 					errorMessage.style.display = 'block';
 					submitButton.disabled = false;
-					submitButton.textContent = '登入';
+					submitButton.textContent = i18n[currentLanguage]['login-button'];
 					
 					// 輕微震動效果
 					const form = document.getElementById('loginForm');
@@ -215,13 +318,12 @@
 				}
 			} catch (error) {
 				console.error('Error:', error);
-				errorMessage.textContent = '發生錯誤，請稍後再試';
+				errorMessage.textContent = i18n[currentLanguage]['error-server'];
 				errorMessage.style.display = 'block';
 				submitButton.disabled = false;
-				submitButton.textContent = '登入';
+				submitButton.textContent = i18n[currentLanguage]['login-button'];
 			}
 		}
-
 
 		const style = document.createElement('style');
 		style.textContent = `
@@ -232,6 +334,8 @@
 			}
 		`;
 		document.head.appendChild(style);
+
+		changeLanguage(currentLanguage);
 	</script>
 </body>
 </html>
