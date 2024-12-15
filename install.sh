@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta38"
+Version="Beta39"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -112,19 +112,20 @@ if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 		exit 1
 	else
 		text "找到 panel.html：$PANEL_HTML"
-		if [ "$(dirname "$PANEL_HTML")" != "$TMP_DIR" ]; then
-			text "移動 panel.html 到頂層目錄..."
-			mv "$PANEL_HTML" "$TMP_DIR/"
-		fi
+		cp -f "$PANEL_HTML" "$INSTALL_DIR/www/panel.html"
+		
+		PANEL_DIR=$(dirname "$PANEL_HTML")
+		
+		for file in "$PANEL_DIR"/*; do
+			if [ -f "$file" ] && [ "$(basename "$file")" != "index.html" ] && [ "$(basename "$file")" != "panel.html" ]; then
+				cp -f "$file" "$INSTALL_DIR/www/"
+			fi
+		done
+		
+		for dir in "$PANEL_DIR"/*; do
+			[ -d "$dir" ] && cp -rf "$dir" "$INSTALL_DIR/www/"
+		done
 	fi
-	
-	if [ -f "$TMP_DIR/index.html" ]; then
-		text "${CLR3}注意：忽略壓縮檔中的 index.html${CLR0}"
-		rm "$TMP_DIR/index.html"
-	fi
-	
-	text "複製文件到安裝目錄..."
-	cp -rv "$TMP_DIR"/* "$INSTALL_DIR/www/"
 	
 	text "安裝目錄文件列表："
 	ls -la "$INSTALL_DIR/www/"
@@ -209,7 +210,7 @@ chmod 600 $INSTALL_DIR/config/sessions.conf
 chown -R www-data:www-data $INSTALL_DIR
 chown -R www-data:www-data /etc/lighttpd
 
-ADD -d /var/log/lighttpd
+mkdir -p /var/log/lighttpd
 chown -R www-data:www-data /var/log/lighttpd
 chmod 755 /var/log/lighttpd
 
