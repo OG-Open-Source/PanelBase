@@ -2,7 +2,7 @@
 
 cd ~ && clear
 echo "================================="
-echo "=  PanelBase 安裝程序 (Beta28)  ="
+echo "=  PanelBase 安裝程序 (Beta29)  ="
 echo "================================="
 
 # 檢查是否為 root 用戶

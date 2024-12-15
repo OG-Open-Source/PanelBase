@@ -32,49 +32,6 @@ route_request() {
     $route_handler
 }
 
-# 系統資訊相關函數
-get_system_info() {
-    local cache_key="system_info"
-    local data cpu_info cpu_cores memory_total memory_used disk_info uptime load_average
-    
-    data=$(get_cache "$cache_key") && echo "$data" && return 0
-    
-    # 收集系統資訊
-    cpu_info=$(cat /proc/cpuinfo | grep 'model name' | head -n1 | cut -d: -f2 | xargs)
-    cpu_cores=$(nproc)
-    memory_total=$(free -m | awk '/^Mem:/{print $2}')
-    memory_used=$(free -m | awk '/^Mem:/{print $3}')
-    disk_info=$(df -h / | awk 'NR==2{print $2","$3","$5}')
-    uptime=$(uptime -p)
-    load_average=$(uptime | grep -oP 'load average: \K.*')
-    
-    # 構建 JSON 響應
-    data=$(cat << EOF
-{
-    "cpu": {
-        "model": "$(json_escape "$cpu_info")",
-        "cores": $cpu_cores
-    },
-    "memory": {
-        "total": $memory_total,
-        "used": $memory_used
-    },
-    "disk": {
-        "total": "$(echo $disk_info | cut -d, -f1)",
-        "used": "$(echo $disk_info | cut -d, -f2)",
-        "usage": "$(echo $disk_info | cut -d, -f3)"
-    },
-    "uptime": "$(json_escape "$uptime")",
-    "load_average": "$(json_escape "$load_average")"
-}
-EOF
-)
-    
-    # 設置緩存
-    set_cache "$cache_key" "$data"
-    echo "$data"
-}
-
 # 服務控制相關函數
 service_action() {
     local service="$1"
@@ -108,7 +65,7 @@ ACTION=$(echo "$QUERY_STRING" | grep -oP 'action=\K[^&]+')
 case "$ACTION" in
     "system_info")
         check_auth || send_unauthorized
-        send_success "$(get_system_info)"
+        route_request "system" "GET" "info"
         ;;
         
     "service")
