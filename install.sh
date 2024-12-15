@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta52"
+Version="Beta53"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -71,7 +71,7 @@ fi
 TASK "正在安裝必要的套件" "deps=(curl wget lighttpd); CHECK_DEPS -a;" true
 
 INSTALL_DIR="/opt/panelbase"
-TASK "創���必要的目錄" "ADD -d $INSTALL_DIR/{www,cgi-bin,config,logs}" true
+TASK "創建必要的目錄" "ADD -d $INSTALL_DIR/{www,cgi-bin,config,logs}" true
 
 text "下載面板文件..."
 BASE_URL="https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main"
@@ -91,6 +91,12 @@ chmod +x panel.cgi auth.cgi check_auth.cgi
 
 mv panel.cgi auth.cgi check_auth.cgi $INSTALL_DIR/cgi-bin/
 mv index.html $INSTALL_DIR/www/
+
+text "下載 Font Awesome..."
+mkdir -p $INSTALL_DIR/www/css
+curl -sSLO "https://use.fontawesome.com/releases/v5.15.4/fontawesome-free-5.15.4-web.zip"
+unzip -j fontawesome-free-5.15.4-web.zip "css/all.min.css" "webfonts/*" -d $INSTALL_DIR/www/css/
+rm fontawesome-free-5.15.4-web.zip
 
 if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	text "正在處理自定義面板文件..."
@@ -187,7 +193,11 @@ mimetype.assign = (
 	".png"  => "image/png",
 	".jpg"  => "image/jpeg",
 	".gif"  => "image/gif",
-	".svg"  => "image/svg+xml"
+	".svg"  => "image/svg+xml",
+	".woff" => "font/woff",
+	".woff2" => "font/woff2",
+	".ttf"  => "font/ttf",
+	".eot"  => "application/vnd.ms-fontobject"
 )
 
 \$HTTP["url"] !~ "^/\$" {
