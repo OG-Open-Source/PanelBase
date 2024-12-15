@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta53"
+Version="Beta54"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -91,12 +91,6 @@ chmod +x panel.cgi auth.cgi check_auth.cgi
 
 mv panel.cgi auth.cgi check_auth.cgi $INSTALL_DIR/cgi-bin/
 mv index.html $INSTALL_DIR/www/
-
-text "下載 Font Awesome..."
-mkdir -p $INSTALL_DIR/www/css
-curl -sSLO "https://use.fontawesome.com/releases/v5.15.4/fontawesome-free-5.15.4-web.zip"
-unzip -j fontawesome-free-5.15.4-web.zip "css/all.min.css" "webfonts/*" -d $INSTALL_DIR/www/css/
-rm fontawesome-free-5.15.4-web.zip
 
 if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	text "正在處理自定義面板文件..."

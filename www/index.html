@@ -4,7 +4,7 @@
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<title>PanelBase Login</title>
-		<link rel="stylesheet" href="/css/all.min.css">
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 		<style>
 			:root {
 				--primary-color: #007AFF;
@@ -60,9 +60,9 @@
 				top: 0;
 				left: 0;
 				right: 0;
-				
+
 				bottom: 0;
-				background: 
+				background:
 					linear-gradient(45deg, transparent 45%, rgba(var(--primary-rgb), 0.03) 50%, transparent 55%),
 					linear-gradient(-45deg, transparent 45%, rgba(var(--primary-rgb), 0.03) 50%, transparent 55%);
 				background-size: 30px 30px;
@@ -85,7 +85,7 @@
 			}
 
 			.container:hover {
-				box-shadow: 
+				box-shadow:
 					0 15px 35px rgba(0, 0, 0, 0.12),
 					0 0 1px rgba(0, 0, 0, 0.1);
 			}
@@ -291,7 +291,7 @@
 				color: var(--text-color);
 			}
 
-			:root.dark-mode p, 
+			:root.dark-mode p,
 			:root.dark-mode label {
 				color: var(--text-color);
 			}
@@ -324,7 +324,7 @@
 					color: var(--text-color);
 				}
 
-				:root:not(.light-mode) p, 
+				:root:not(.light-mode) p,
 				:root:not(.light-mode) label {
 					color: var(--text-color);
 				}
@@ -351,6 +351,16 @@
 				padding: 8px;
 				border-radius: var(--border-radius-sm);
 				transition: all 0.3s ease;
+				width: 36px;
+				height: 36px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+
+			.theme-switcher button i {
+				width: 18px;
+				text-align: center;
 			}
 
 			.theme-switcher button:hover {
@@ -496,9 +506,9 @@
 					<label for="username" data-i18n="username">Username</label>
 					<div class="input-container">
 						<i class="fas fa-user"></i>
-						<input type="text" id="username" name="username" required 
-							autocomplete="username" 
-							pattern="[A-Za-z0-9]+" 
+						<input type="text" id="username" name="username" required
+							autocomplete="username"
+							pattern="[A-Za-z0-9]+"
 							title="Username"
 							onkeypress="return /[A-Za-z0-9]/.test(event.key)">
 					</div>
@@ -507,7 +517,7 @@
 					<label for="password" data-i18n="password">Password</label>
 					<div class="input-container">
 						<i class="fas fa-lock"></i>
-						<input type="password" id="password" name="password" required 
+						<input type="password" id="password" name="password" required
 							autocomplete="current-password"
 							pattern="[A-Za-z0-9!@$]+"
 							title="Password"
@@ -591,7 +601,7 @@
 				currentLanguage = lang;
 				localStorage.setItem('panelbase-language', lang);
 				updateTexts();
-				
+
 				document.querySelectorAll('[data-lang]').forEach(button => {
 					button.style.fontWeight = button.getAttribute('data-lang') === lang ? 'bold' : 'normal';
 				});
@@ -615,11 +625,11 @@
 					errorMessage.hidden = false;
 					return;
 				}
-				
+
 				try {
 					submitButton.disabled = true;
 					submitButton.querySelector('[data-i18n="login-button"]').textContent = i18n[currentLanguage]['logging-in'];
-					
+
 					const response = await fetch('/cgi-bin/auth.cgi?action=login', {
 						method: 'POST',
 						headers: {
@@ -629,7 +639,7 @@
 					});
 
 					const data = await response.json();
-					
+
 					if (response.ok && data === 0) {
 						window.location.href = '/panel.html';
 					} else {
@@ -651,17 +661,26 @@
 
 			function toggleTheme() {
 				const html = document.documentElement;
-				const isDark = html.classList.toggle('dark-mode');
-				const themeIcon = document.querySelector('#themeToggle i');
-				
-				themeIcon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
-				localStorage.setItem('theme-preference', isDark ? 'dark' : 'light');
+				const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+				const isDark = html.classList.contains('dark-mode') || (!html.classList.contains('light-mode') && prefersDark);
+
+				if (isDark) {
+					html.classList.remove('dark-mode');
+					html.classList.add('light-mode');
+					document.querySelector('#themeToggle i').className = 'fas fa-moon';
+					localStorage.setItem('theme-preference', 'light');
+				} else {
+					html.classList.remove('light-mode');
+					html.classList.add('dark-mode');
+					document.querySelector('#themeToggle i').className = 'fas fa-sun';
+					localStorage.setItem('theme-preference', 'dark');
+				}
 			}
 
 			const savedTheme = localStorage.getItem('theme-preference');
-			if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-				document.documentElement.classList.add('dark-mode');
-				document.querySelector('#themeToggle i').className = 'fas fa-sun';
+			if (savedTheme) {
+				document.documentElement.classList.add(`${savedTheme}-mode`);
+				document.querySelector('#themeToggle i').className = `fas fa-${savedTheme === 'dark' ? 'sun' : 'moon'}`;
 			}
 		</script>
 	</body>
