@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta49"
+Version="Beta50"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -28,6 +28,12 @@ CHECK_ROOT
 INPUT "請輸入管理員用戶名：" ADMIN_NAME
 ADMIN_NAME=${ADMIN_NAME:-admin}
 
+# 驗證用戶名格式
+if ! [[ $ADMIN_NAME =~ ^[a-z]+$ ]]; then
+    error "用戶名只能包含小寫英文字母"
+    exit 1
+fi
+
 while true; do
 	read -s -p "請輸入管理員密碼：" ADMIN_PASS
 	ADMIN_PASS=${ADMIN_PASS:-1917159}
@@ -37,7 +43,14 @@ while true; do
 	text
 
 	if [ "$ADMIN_PASS" = "$ADMIN_PASS2" ]; then
-		[ ${#ADMIN_PASS} -lt 6 ] && error "密碼長度必須至少為 6 個字符" || break
+		[ ${#ADMIN_PASS} -lt 6 ] && { error "密碼長度必須至少為 6 個字符"; continue; }
+		
+		if ! [[ $ADMIN_PASS =~ ^[A-Za-z0-9!@$]+$ ]]; then
+			error "密碼只能包含英文字母、數字和特殊符號 !@$"
+			continue
+		fi
+		
+		break
 	else
 		error "兩次輸入的密碼不一致，請重新輸入"
 	fi
@@ -70,7 +83,7 @@ for FILE in "src/cgi-bin/panel.cgi" "src/cgi-bin/auth.cgi" "src/cgi-bin/check_au
 done
 
 if [[ ! $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
-	text "下載 panel.html..."
+	text "��載 panel.html..."
 	HTTP_CODE=$(curl -s -w "%{http_code}" -o "panel.html" "$BASE_URL/www/panel.html")
 	[ "$HTTP_CODE" != "200" ] && { error "無法下載面板頁面 (HTTP 代碼: $HTTP_CODE)"; exit 1; }
 fi
@@ -217,7 +230,7 @@ chmod 755 /var/log/lighttpd
 TASK "重啟 lighttpd 服務" "systemctl restart lighttpd" true
 
 if ! systemctl is-active --quiet lighttpd; then
-	text "${CLR3}警告：lighttpd 服務未能正常啟動${CLR0}"
+	text "${CLR3}��告：lighttpd 服務未能正常啟動${CLR0}"
 	text "請檢查日誌文件：$INSTALL_DIR/logs/error.log"
 	exit 1
 fi

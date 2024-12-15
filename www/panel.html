@@ -451,12 +451,20 @@
 			<div class="modal-content">
 				<h2>修改用戶名</h2>
 				<div class="form-group">
-					<label>新用戶名</label>
-					<input type="text" id="newUsername" placeholder="請輸入新用戶名">
+					<label>新用戶名（僅允許小寫英文字母）</label>
+					<input type="text" id="newUsername" 
+						placeholder="請輸入新用戶名"
+						pattern="[a-z]+"
+						title="只允許小寫英文字母"
+						onkeypress="return /[a-z]/.test(event.key)">
 				</div>
 				<div class="form-group">
 					<label>確認密碼</label>
-					<input type="password" id="usernamePassword" placeholder="請輸入當前密碼">
+					<input type="password" id="usernamePassword" 
+						placeholder="請輸入當前密碼"
+						pattern="[A-Za-z0-9!@$]+"
+						title="只允許英文字母、數字和特殊符號 !@$"
+						onkeypress="return /[A-Za-z0-9!@$]/.test(event.key)">
 				</div>
 				<div id="usernameError" class="error-message"></div>
 				<div class="modal-buttons">
@@ -472,11 +480,19 @@
 				<h2>修改密碼</h2>
 				<div class="form-group">
 					<label>當前密碼</label>
-					<input type="password" id="oldPassword" placeholder="請輸入當前密碼">
+					<input type="password" id="oldPassword" 
+						placeholder="請輸入當前密碼"
+						pattern="[A-Za-z0-9!@$]+"
+						title="只允許英文字母、數字和特殊符號 !@$"
+						onkeypress="return /[A-Za-z0-9!@$]/.test(event.key)">
 				</div>
 				<div class="form-group">
-					<label>新密碼</label>
-					<input type="password" id="newPassword" placeholder="請輸入新密碼">
+					<label>新密碼（僅允許 A-Z、a-z、0-9、!@$）</label>
+					<input type="password" id="newPassword" 
+						placeholder="請輸入新密碼"
+						pattern="[A-Za-z0-9!@$]+"
+						title="只允許英文字母、數字和特殊符號 !@$"
+						onkeypress="return /[A-Za-z0-9!@$]/.test(event.key)">
 				</div>
 				<div id="passwordError" class="error-message"></div>
 				<div class="modal-buttons">
@@ -513,7 +529,7 @@
 				});
 			}
 
-			// 顯示提示訊息
+			// 顯��提示訊息
 			function showToast(message, type = 'success') {
 				const toast = document.createElement('div');
 				toast.className = `toast ${type}`;
@@ -612,6 +628,20 @@
 				const password = document.getElementById('usernamePassword').value;
 				const errorElement = document.getElementById('usernameError');
 
+				// 驗證用戶名格式
+				if (!/^[a-z]+$/.test(newUsername)) {
+					errorElement.textContent = '用戶名只能包含小寫英文字母';
+					errorElement.style.display = 'block';
+					return;
+				}
+
+				// 驗證密碼格式
+				if (!/^[A-Za-z0-9!@$]+$/.test(password)) {
+					errorElement.textContent = '密碼格式不正確';
+					errorElement.style.display = 'block';
+					return;
+				}
+
 				try {
 					const response = await fetch('/cgi-bin/auth.cgi?action=change_username', {
 						method: 'POST',
@@ -656,6 +686,20 @@
 				const oldPassword = document.getElementById('oldPassword').value;
 				const newPassword = document.getElementById('newPassword').value;
 				const errorElement = document.getElementById('passwordError');
+
+				// 驗證舊密碼格式
+				if (!/^[A-Za-z0-9!@$]+$/.test(oldPassword)) {
+					errorElement.textContent = '當前密碼格式不正確';
+					errorElement.style.display = 'block';
+					return;
+				}
+
+				// 驗證新密碼格式
+				if (!/^[A-Za-z0-9!@$]+$/.test(newPassword)) {
+					errorElement.textContent = '新密碼格式不正確';
+					errorElement.style.display = 'block';
+					return;
+				}
 
 				if (newPassword.length < 6) {
 					errorElement.textContent = '新密碼長度必須至少為 6 個字符';

@@ -326,23 +326,31 @@
 		<div class="login-container">
 			<div class="login-header">
 				<h1>PanelBase</h1>
-				<p data-i18n="login-prompt">請登入以繼續</p>
+				<p data-i18n="login-prompt">Please login to continue</p>
 			</div>
 			<form id="loginForm" onsubmit="handleLogin(event)">
 				<div class="form-group">
-					<label for="username" data-i18n="username">用戶名</label>
+					<label for="username" data-i18n="username">Username</label>
 					<i class="fas fa-user"></i>
-					<input type="text" id="username" name="username" required autocomplete="username">
+					<input type="text" id="username" name="username" required 
+						autocomplete="username" 
+						pattern="[a-z]+" 
+						title="Username (lowercase letters only)"
+						onkeypress="return /[a-z]/.test(event.key)">
 				</div>
 				<div class="form-group">
-					<label for="password" data-i18n="password">密碼</label>
+					<label for="password" data-i18n="password">Password</label>
 					<i class="fas fa-lock"></i>
-					<input type="password" id="password" name="password" required autocomplete="current-password">
+					<input type="password" id="password" name="password" required 
+						autocomplete="current-password"
+						pattern="[A-Za-z0-9!@$]+"
+						title="Password (A-Z, a-z, 0-9, !@$ only)"
+						onkeypress="return /[A-Za-z0-9!@$]/.test(event.key)">
 					<div id="errorMessage" class="error-message"></div>
 				</div>
 				<button type="submit" class="submit-button">
 					<span class="loading"></span>
-					<span data-i18n="login-button">登入</span>
+					<span data-i18n="login-button">Login</span>
 				</button>
 			</form>
 			<div class="language-selector">
@@ -358,30 +366,33 @@
 			const i18n = {
 				'en': {
 					'login-prompt': 'Please login to continue',
-					'username': 'Username',
-					'password': 'Password',
+					'username': 'Username (lowercase letters only)',
+					'password': 'Password (A-Z, a-z, 0-9, !@$ only)',
 					'login-button': 'Login',
 					'logging-in': 'Logging in...',
 					'error-invalid': 'Invalid username or password',
-					'error-server': 'Server error, please try again later'
+					'error-server': 'Server error, please try again later',
+					'error-invalid-chars': 'Invalid characters detected'
 				},
 				'zh-TW': {
 					'login-prompt': '請登入以繼續',
-					'username': '用戶名',
-					'password': '密碼',
+					'username': '用戶名（僅允許小寫英文字母）',
+					'password': '密碼（僅允許 A-Z、a-z、0-9、!@$）',
 					'login-button': '登入',
 					'logging-in': '登入中...',
 					'error-invalid': '用戶名或密碼錯誤',
-					'error-server': '發生錯誤，請稍後再試'
+					'error-server': '發生錯誤，請稍後再試',
+					'error-invalid-chars': '包含無效字符'
 				},
 				'zh-CN': {
 					'login-prompt': '请登录以继续',
-					'username': '用户名',
-					'password': '密码',
+					'username': '用户名（仅允许小写英文字母）',
+					'password': '密码（仅允许 A-Z、a-z、0-9、!@$）',
 					'login-button': '登录',
 					'logging-in': '登录中...',
 					'error-invalid': '用户名或密码错误',
-					'error-server': '发生错误，请稍后再试'
+					'error-server': '发生错误，请稍后再试',
+					'error-invalid-chars': '包含无效字符'
 				}
 			};
 
@@ -417,14 +428,26 @@
 				event.preventDefault();
 				const errorMessage = document.getElementById('errorMessage');
 				const submitButton = document.querySelector('.submit-button');
+				const username = document.getElementById('username').value;
+				const password = document.getElementById('password').value;
+
+				// 驗證用戶名和密碼格式
+				if (!/^[a-z]+$/.test(username)) {
+					errorMessage.textContent = i18n[currentLanguage]['error-invalid-chars'];
+					errorMessage.style.display = 'block';
+					return;
+				}
+
+				if (!/^[A-Za-z0-9!@$]+$/.test(password)) {
+					errorMessage.textContent = i18n[currentLanguage]['error-invalid-chars'];
+					errorMessage.style.display = 'block';
+					return;
+				}
 				
 				try {
 					submitButton.disabled = true;
 					submitButton.classList.add('loading');
 					submitButton.querySelector('[data-i18n="login-button"]').textContent = i18n[currentLanguage]['logging-in'];
-					
-					const username = document.getElementById('username').value;
-					const password = document.getElementById('password').value;
 					
 					const response = await fetch('/cgi-bin/auth.cgi?action=login', {
 						method: 'POST',
