@@ -2,7 +2,7 @@
 
 # 顯示橫幅
 echo "================================="
-echo "=  PanelBase 安裝程序 (Beta25)  ="
+echo "=  PanelBase 安裝程序 (Beta26)  ="
 echo "================================="
 
 # 檢查是否為 root 用戶
@@ -17,10 +17,10 @@ ADMIN_USER=${ADMIN_USER:-admin}
 
 while true; do
 	read -s -p "請輸入管理員密碼：" ADMIN_PASS
-	ADMIN_PASS=${ADMIN_PASS:-admin}
+	ADMIN_PASS=${ADMIN_PASS:-1917159}
 	echo
 	read -s -p "請再次輸入密碼：" ADMIN_PASS2
-	ADMIN_PASS2=${ADMIN_PASS2:-admin}
+	ADMIN_PASS2=${ADMIN_PASS2:-1917159}
 	echo
 
 	if [ "$ADMIN_PASS" = "$ADMIN_PASS2" ]; then
@@ -139,18 +139,42 @@ mv index.html $INSTALL_DIR/www/
 if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	echo "正在處理自定義面板文件..."
 	TMP_DIR=$(mktemp -d)
+	echo "臨時目錄：$TMP_DIR"
 	
 	case "$FILE_EXT" in
-		"zip") unzip -q "$CUSTOM_ARCHIVE_PATH" -d "$TMP_DIR" ;;
-		"tar") tar xf "$CUSTOM_ARCHIVE_PATH" -C "$TMP_DIR" ;;
-		"gz"|"tgz") tar xzf "$CUSTOM_ARCHIVE_PATH" -C "$TMP_DIR" ;;
+		"zip")
+			echo "解壓縮 ZIP 文件..."
+			unzip -q "$CUSTOM_ARCHIVE_PATH" -d "$TMP_DIR"
+			;;
+		"tar")
+			echo "解壓縮 TAR 文件..."
+			tar xf "$CUSTOM_ARCHIVE_PATH" -C "$TMP_DIR"
+			;;
+		"gz"|"tgz")
+			echo "解壓縮 GZIP 文件..."
+			tar xzf "$CUSTOM_ARCHIVE_PATH" -C "$TMP_DIR"
+			;;
 	esac
 
-	# 檢查必要文件
-	if [ ! -f "$TMP_DIR/panel.html" ]; then
-		echo "錯誤：壓縮檔中缺少 panel.html 文件"
+	# 列出解壓後的文件
+	echo "解壓縮後的文件列表："
+	ls -la "$TMP_DIR"
+
+	# 遞迴搜索 panel.html
+	PANEL_HTML=$(find "$TMP_DIR" -name "panel.html" -type f)
+	
+	if [ -z "$PANEL_HTML" ]; then
+		echo "錯誤：在壓縮檔中找不到 panel.html 文件"
+		echo "請確保文件名稱正確（區分大小寫）"
 		rm -rf "$TMP_DIR"
 		exit 1
+	else
+		echo "找到 panel.html：$PANEL_HTML"
+		# 如果 panel.html 不在頂層目錄，將其移動到頂層
+		if [ "$(dirname "$PANEL_HTML")" != "$TMP_DIR" ]; then
+			echo "移動 panel.html 到頂層目錄..."
+			mv "$PANEL_HTML" "$TMP_DIR/"
+		fi
 	fi
 
 	# 如果存在 index.html，先移除它
@@ -160,7 +184,12 @@ if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	fi
 
 	# 複製所有文件到安裝目錄
-	cp -r "$TMP_DIR"/* "$INSTALL_DIR/www/"
+	echo "複製文件到安裝目錄..."
+	cp -rv "$TMP_DIR"/* "$INSTALL_DIR/www/"
+	
+	# 確認文件複製結果
+	echo "安裝目錄文件列表："
+	ls -la "$INSTALL_DIR/www/"
 	
 	# 清理臨時目錄
 	rm -rf "$TMP_DIR"
@@ -270,7 +299,7 @@ systemctl restart lighttpd
 
 # 檢查服務是否正常運行
 if ! systemctl is-active --quiet lighttpd; then
-	echo "警告：lighttpd 服務未能正常啟動"
+	echo "警告：lighttpd 服務未���正常啟動"
 	echo "請檢查日誌文件：$INSTALL_DIR/logs/error.log"
 	exit 1
 fi
