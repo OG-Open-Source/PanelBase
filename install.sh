@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta36"
+Version="Beta37"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -20,7 +20,7 @@ CLR0="\033[0m"
 
 CLEAN
 text "${CLR3}=================================${CLR0}"
-text "${CLR3}=      PanelBase  安裝程序      =${CLR0}"
+text "${CLR3}=      PanelBase  安裝程序      =${CLR0}$Version"
 text "${CLR3}=================================${CLR0}"
 
 CHECK_ROOT
@@ -49,7 +49,6 @@ USE_CUSTOM_HTML=${USE_CUSTOM_HTML:-n}
 if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	INPUT "請輸入自定義面板壓縮檔的路徑：" CUSTOM_ARCHIVE_PATH
 	[ ! -f "$CUSTOM_ARCHIVE_PATH" ] && { error "找不到指定的壓縮檔"; exit 1; }
-
 	FILE_EXT="${CUSTOM_ARCHIVE_PATH##*.}"
 	deps=(unzip tar gz tgz)
 	CHECK_DEPS -a
@@ -57,17 +56,13 @@ fi
 
 [ -f /etc/os-release ] && { source /etc/os-release; OS=$NAME; } || { error "無法確定操作系統類型"; exit 1; }
 
-text "正在安裝必要的套件..."
-deps=(curl wget lighttpd)
-CHECK_DEPS -a
+TASK "正在安裝必要的套件" "deps=(curl wget lighttpd); CHECK_DEPS -a;" true
 
-text "創建必要的目錄..."
 INSTALL_DIR="/opt/panelbase"
-ADD -d $INSTALL_DIR/{www,cgi-bin,config,logs}
+TASK "創建必要的目錄" "ADD -d $INSTALL_DIR/{www,cgi-bin,config,logs}" true
 
 text "下載面板文件..."
 BASE_URL="https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main"
-
 for FILE in "src/cgi-bin/panel.cgi" "src/cgi-bin/auth.cgi" "src/cgi-bin/check_auth.cgi" "www/index.html"; do
 	text "下載 $FILE..."
 	HTTP_CODE=$(curl -s -w "%{http_code}" -o "${FILE##*/}" "$BASE_URL/$FILE")
@@ -181,8 +176,7 @@ ADD -d /var/log/lighttpd
 chown -R www-data:www-data /var/log/lighttpd
 chmod 755 /var/log/lighttpd
 
-text "重啟 lighttpd 服務..."
-systemctl restart lighttpd
+TASK "重啟 lighttpd 服務" "systemctl restart lighttpd" true
 
 if ! systemctl is-active --quiet lighttpd; then
 	text "${CLR3}警告：lighttpd 服務未能正常啟動${CLR0}"
