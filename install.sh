@@ -2,7 +2,7 @@
 
 # 顯示橫幅
 echo "================================="
-echo "=  PanelBase 安裝程序 (Beta22)  ="
+echo "=  PanelBase 安裝程序 (Beta24)  ="
 echo "================================="
 
 # 檢查是否為 root 用戶
@@ -12,13 +12,15 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # 設定用戶名和密碼
-read -p "請輸入管理員用戶名（預設：admin）：" ADMIN_USER
+read -p "請輸入管理員用戶名：" ADMIN_USER
 ADMIN_USER=${ADMIN_USER:-admin}
 
 while true; do
 	read -s -p "請輸入管理員密碼：" ADMIN_PASS
+	ADMIN_PASS=${ADMIN_PASS:-admin}
 	echo
 	read -s -p "請再次輸入密碼：" ADMIN_PASS2
+	ADMIN_PASS2=${ADMIN_PASS2:-admin}
 	echo
 
 	if [ "$ADMIN_PASS" = "$ADMIN_PASS2" ]; then
@@ -37,11 +39,34 @@ read -p "是否使用自定義的面板頁面？(y/N) " USE_CUSTOM_HTML
 USE_CUSTOM_HTML=${USE_CUSTOM_HTML:-n}
 
 if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
-	read -p "請輸入自定義面板頁面的路徑：" CUSTOM_HTML_PATH
-	if [ ! -f "$CUSTOM_HTML_PATH" ]; then
-		echo "錯誤：找不到指定的文件"
+	read -p "請輸入自定義面板壓縮檔的路徑：" CUSTOM_ARCHIVE_PATH
+	if [ ! -f "$CUSTOM_ARCHIVE_PATH" ]; then
+		echo "錯誤：找不到指定的壓縮檔"
 		exit 1
 	fi
+
+	# 檢查壓縮檔格式
+	FILE_EXT="${CUSTOM_ARCHIVE_PATH##*.}"
+	case "$FILE_EXT" in
+		"zip")
+			if ! command -v unzip >/dev/null 2>&1; then
+				echo "正在安裝 unzip..."
+				case $OS in
+					"Ubuntu"|"Debian GNU/Linux")
+						apt-get install -y unzip
+						;;
+					"CentOS Linux"|"Red Hat Enterprise Linux")
+						yum install -y unzip
+						;;
+				esac
+			fi
+			;;
+		"tar"|"gz"|"tgz") ;;
+		*)
+			echo "錯誤：不支援的壓縮檔格式。請使用 zip、tar 或 tar.gz 格式"
+			exit 1
+			;;
+	esac
 fi
 
 # 檢查系統類型
@@ -110,9 +135,37 @@ chmod +x panel.cgi auth.cgi check_auth.cgi
 mv panel.cgi auth.cgi check_auth.cgi $INSTALL_DIR/cgi-bin/
 mv index.html $INSTALL_DIR/www/
 
-# 如果使用自定義 HTML，複製自定義頁面
+# 如果使用自定義 HTML，解壓縮並複製文件
 if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
-	cp "$CUSTOM_HTML_PATH" "$INSTALL_DIR/www/panel.html"
+	echo "正在處理自定義面板文件..."
+	TMP_DIR=$(mktemp -d)
+	
+	case "$FILE_EXT" in
+		"zip") unzip -q "$CUSTOM_ARCHIVE_PATH" -d "$TMP_DIR" ;;
+		"tar") tar xf "$CUSTOM_ARCHIVE_PATH" -C "$TMP_DIR" ;;
+		"gz"|"tgz") tar xzf "$CUSTOM_ARCHIVE_PATH" -C "$TMP_DIR" ;;
+	esac
+
+	# 檢查必要文件
+	if [ ! -f "$TMP_DIR/panel.html" ]; then
+		echo "錯誤：壓縮檔中缺少 panel.html 文件"
+		rm -rf "$TMP_DIR"
+		exit 1
+	fi
+
+	# 如果存在 index.html，先移除它
+	if [ -f "$TMP_DIR/index.html" ]; then
+		echo "注意：忽略壓縮檔中的 index.html"
+		rm "$TMP_DIR/index.html"
+	fi
+
+	# 複製所有文件到安裝目錄
+	cp -r "$TMP_DIR"/* "$INSTALL_DIR/www/"
+	
+	# 清理臨時目錄
+	rm -rf "$TMP_DIR"
+	
+	echo "自定義面板文件安裝完成"
 else
 	mv panel.html $INSTALL_DIR/www/
 fi
