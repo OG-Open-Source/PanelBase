@@ -2,7 +2,7 @@
 
 cd ~ && clear
 echo "================================="
-echo "=  PanelBase 安裝程序 (Beta31)  ="
+echo "=  PanelBase 安裝程序 (Beta32)  ="
 echo "================================="
 
 # 檢查是否為 root 用戶
@@ -98,115 +98,53 @@ esac
 # 創建必要的目錄
 echo "創建必要的目錄..."
 INSTALL_DIR="/opt/panelbase"
-mkdir -p $INSTALL_DIR
-mkdir -p $INSTALL_DIR/www
-mkdir -p $INSTALL_DIR/cgi-bin
-mkdir -p $INSTALL_DIR/config
-mkdir -p $INSTALL_DIR/logs
-mkdir -p $INSTALL_DIR/cache
+mkdir -p $INSTALL_DIR/{www,cgi-bin,config,logs,cache,static}
 
 # 下載面板文件
 echo "下載面板文件..."
 BASE_URL="https://raw.githubusercontent.com/OG-Open-Source/PanelBase/main"
+FILES=(
+	"src/cgi-bin/panel.cgi"
+	"src/cgi-bin/auth.cgi"
+	"src/cgi-bin/check_auth.cgi"
+	"src/cgi-bin/common.cgi"
+	"www/index.html"
+	"config/routes.conf"
+)
 
-# 下載並檢查每個文件
-for FILE in "src/cgi-bin/panel.cgi" "src/cgi-bin/auth.cgi" "src/cgi-bin/check_auth.cgi" "src/cgi-bin/common.cgi" "www/index.html" "config/routes.conf"; do
-	echo "下載 $FILE..."
-	DEST_DIR="$INSTALL_DIR/$(dirname $FILE)"
-	mkdir -p "$DEST_DIR"
-	HTTP_CODE=$(curl -s -w "%{http_code}" -o "$INSTALL_DIR/$FILE" "$BASE_URL/$FILE")
-	if [ "$HTTP_CODE" != "200" ]; then
-		echo "錯誤：無法下載 $FILE (HTTP 代碼: $HTTP_CODE)"
+download_file() {
+	local file="$1"
+	local dest_dir="$INSTALL_DIR/$(dirname $file)"
+	local dest_file="$dest_dir/$(basename $file)"
+	
+	mkdir -p "$dest_dir"
+	echo "下載 $file..."
+	if ! curl -sSL -o "$dest_file" "$BASE_URL/$file"; then
+		echo "錯誤：無法下載 $file"
+		return 1
+	fi
+	
+	if [ ! -f "$dest_file" ]; then
+		echo "錯誤：文件 $dest_file 下載失敗"
+		return 1
+	fi
+	
+	# 檢查文件大小
+	if [ ! -s "$dest_file" ]; then
+		echo "錯誤：文件 $dest_file 為空"
+		return 1
+	fi
+	
+	return 0
+}
+
+# 下載所有文件
+for file in "${FILES[@]}"; do
+	if ! download_file "$file"; then
+		echo "安裝失敗：無法下載必要文件"
 		exit 1
 	fi
 done
-
-# 如果不使用自定義 HTML，則下載默認的面板頁面
-if [[ ! $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
-	echo "下載 panel.html..."
-	HTTP_CODE=$(curl -s -w "%{http_code}" -o "$INSTALL_DIR/www/panel.html" "$BASE_URL/www/panel.html")
-	if [ "$HTTP_CODE" != "200" ]; then
-		echo "錯誤：無法下載面板頁面 (HTTP 代碼: $HTTP_CODE)"
-		exit 1
-	fi
-fi
-
-# 設置執行權限
-echo "設置 CGI 腳本權限..."
-chmod 755 $INSTALL_DIR/cgi-bin/*.cgi
-chown www-data:www-data $INSTALL_DIR/cgi-bin/*.cgi
-
-# 設置目錄權限
-echo "設置目錄權限..."
-find $INSTALL_DIR -type d -exec chmod 755 {} \;
-find $INSTALL_DIR -type f -exec chmod 644 {} \;
-
-# 設置特殊權限
-echo "設置特殊權限..."
-chmod 755 $INSTALL_DIR/cgi-bin
-chmod 644 $INSTALL_DIR/config/routes.conf
-chmod 600 $INSTALL_DIR/config/users.conf
-chmod 600 $INSTALL_DIR/config/sessions.conf
-chmod 777 $INSTALL_DIR/cache
-chmod 755 $INSTALL_DIR/logs
-
-# 設置所有權
-echo "設置文件所有權..."
-chown -R www-data:www-data $INSTALL_DIR
-chown -R www-data:www-data /etc/lighttpd
-
-# 確保日誌目錄存在且具有正確的權限
-mkdir -p /var/log/lighttpd
-chown -R www-data:www-data /var/log/lighttpd
-chmod 755 /var/log/lighttpd
-
-# 測試 CGI 腳本
-echo "測試 CGI 腳本..."
-for script in $INSTALL_DIR/cgi-bin/*.cgi; do
-    if ! sudo -u www-data bash -n "$script"; then
-        echo "錯誤：CGI 腳本 $script 語法檢查失敗"
-        exit 1
-    fi
-done
-
-# 檢查配置文件
-echo "檢查配置文件..."
-if ! lighttpd -t -f /etc/lighttpd/lighttpd.conf; then
-    echo "錯誤：lighttpd 配置檢查失敗"
-    exit 1
-fi
-
-# 重啟 lighttpd
-echo "重啟 lighttpd 服務..."
-systemctl restart lighttpd
-
-# 等待服務啟動
-echo "等待服務啟動..."
-sleep 2
-
-# 檢查服務狀態
-if ! systemctl is-active --quiet lighttpd; then
-    echo "錯誤：lighttpd 服務未能正常啟動"
-    echo "錯誤日誌："
-    tail -n 20 "$INSTALL_DIR/logs/error.log"
-    exit 1
-fi
-
-# 檢查端口
-if ! netstat -tuln | grep -q ":8080 "; then
-    echo "錯誤：服務未能在 8080 端口啟動"
-    echo "當前監聽的端口："
-    netstat -tuln | grep LISTEN
-    exit 1
-fi
-
-# 測試 CGI 訪問
-echo "測試 CGI 訪問..."
-if ! curl -s "http://localhost:8080/cgi-bin/check_auth.cgi" | grep -q "Content-type"; then
-    echo "錯誤：CGI 訪問測試失敗"
-    echo "請檢查 lighttpd 錯誤日誌：$INSTALL_DIR/logs/error.log"
-    exit 1
-fi
 
 # 如果使用自定義 HTML，解壓縮並複製文件
 if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
@@ -228,11 +166,11 @@ if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 			tar xzf "$CUSTOM_ARCHIVE_PATH" -C "$TMP_DIR"
 			;;
 	esac
-
+	
 	# 列出解壓後的文件
 	echo "解壓縮後的文件列表："
 	ls -la "$TMP_DIR"
-
+	
 	# 遞迴搜索 panel.html
 	PANEL_HTML=$(find "$TMP_DIR" -name "panel.html" -type f)
 	
@@ -249,13 +187,13 @@ if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 			mv "$PANEL_HTML" "$TMP_DIR/"
 		fi
 	fi
-
+	
 	# 如果存在 index.html，先移除它
 	if [ -f "$TMP_DIR/index.html" ]; then
 		echo "注意：忽略壓縮檔中的 index.html"
 		rm "$TMP_DIR/index.html"
 	fi
-
+	
 	# 複製所有文件到安裝目錄
 	echo "複製文件到安裝目錄..."
 	cp -rv "$TMP_DIR"/* "$INSTALL_DIR/www/"
@@ -268,7 +206,56 @@ if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	rm -rf "$TMP_DIR"
 	
 	echo "自定義面板文件安裝完成"
+else
+	echo "下載 panel.html..."
+	if ! download_file "www/panel.html"; then
+		echo "安裝失敗：無法下載面板頁面"
+		exit 1
+	fi
 fi
+
+# 設置執行權限
+echo "設置 CGI 腳本權限..."
+find "$INSTALL_DIR/cgi-bin" -type f -name "*.cgi" -exec chmod 755 {} \;
+find "$INSTALL_DIR/cgi-bin" -type f -name "*.cgi" -exec chown www-data:www-data {} \;
+
+# 設置目錄權限
+echo "設置目錄權限..."
+find "$INSTALL_DIR" -type d -exec chmod 755 {} \;
+
+# 設置特殊權限
+echo "設置特殊權限..."
+chmod 755 "$INSTALL_DIR/cgi-bin"
+touch "$INSTALL_DIR/config/users.conf"
+touch "$INSTALL_DIR/config/sessions.conf"
+chmod 600 "$INSTALL_DIR/config/users.conf"
+chmod 600 "$INSTALL_DIR/config/sessions.conf"
+chmod 777 "$INSTALL_DIR/cache"
+chmod 755 "$INSTALL_DIR/logs"
+
+# 設置所有權
+echo "設置文件所有權..."
+chown -R www-data:www-data "$INSTALL_DIR"
+chown -R www-data:www-data /etc/lighttpd
+
+# 確保日誌目錄存在且具有正確的權限
+mkdir -p /var/log/lighttpd
+chown -R www-data:www-data /var/log/lighttpd
+chmod 755 /var/log/lighttpd
+
+# 測試 CGI 腳本
+echo "測試 CGI 腳本..."
+for script in "$INSTALL_DIR"/cgi-bin/*.cgi; do
+	if [ -f "$script" ]; then
+		if ! sudo -u www-data bash -n "$script"; then
+			echo "錯誤：CGI 腳本 $script 語法檢查失敗"
+			exit 1
+		fi
+	else
+		echo "錯誤：找不到 CGI 腳本"
+		exit 1
+	fi
+done
 
 # 配置 lighttpd
 echo "配置 lighttpd..."
@@ -336,53 +323,29 @@ EOF
 
 # 創建用戶配置文件
 echo "創建用戶配置..."
-echo "${ADMIN_USER}:$(echo -n "${ADMIN_PASS}" | md5sum | cut -d' ' -f1)" > $INSTALL_DIR/config/users.conf
-touch $INSTALL_DIR/config/sessions.conf
-
-# 設置權限
-echo "設置權限..."
-# 確保 www-data 用戶存在
-if ! id -u www-data >/dev/null 2>&1; then
-	useradd -r -s /usr/sbin/nologin www-data
-fi
-
-# 設置目錄權限
-find $INSTALL_DIR -type d -exec chmod 755 {} \;
-find $INSTALL_DIR -type f -exec chmod 644 {} \;
-
-# 設置特殊權限
-chmod -R 755 $INSTALL_DIR/cgi-bin
-chmod 600 $INSTALL_DIR/config/users.conf
-chmod 600 $INSTALL_DIR/config/sessions.conf
-chmod 777 $INSTALL_DIR/cache
-
-# 設置所有權
-chown -R www-data:www-data $INSTALL_DIR
-chown -R www-data:www-data /etc/lighttpd
-
-# 確保日誌目錄存在且具有正確的權限
-mkdir -p /var/log/lighttpd
-chown -R www-data:www-data /var/log/lighttpd
-chmod 755 /var/log/lighttpd
+echo "${ADMIN_USER}:$(echo -n "${ADMIN_PASS}" | md5sum | cut -d' ' -f1)" > "$INSTALL_DIR/config/users.conf"
 
 # 重啟 lighttpd
 echo "重啟 lighttpd 服務..."
 systemctl restart lighttpd
 
-# 檢查服務是否正常運行
+# 等待服務啟動
+echo "等待服務啟動..."
+sleep 2
+
+# 檢查服務狀態
 if ! systemctl is-active --quiet lighttpd; then
-	echo "警告：lighttpd 服務未能正常啟動"
-	echo "請檢查日誌文件：$INSTALL_DIR/logs/error.log"
+	echo "錯誤：lighttpd 服務未能正常啟動"
+	echo "錯誤日誌："
+	tail -n 20 "$INSTALL_DIR/logs/error.log"
 	exit 1
 fi
 
-# 等待服務完全啟動
-sleep 2
-
-# 檢查服務是否監聽在指定端口
+# 檢查端口
 if ! netstat -tuln | grep -q ":8080 "; then
-	echo "警告：服務未能在 8080 端口啟動"
-	echo "請檢查是否有其他服務佔用該端口"
+	echo "錯誤：服務未能在 8080 端口啟動"
+	echo "當前監聽的端口："
+	netstat -tuln | grep LISTEN
 	exit 1
 fi
 
