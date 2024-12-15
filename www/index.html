@@ -403,10 +403,6 @@
 				opacity: 0.9;
 			}
 
-			:root.dark-mode .footer {
-				background: rgba(44, 44, 46, 0.8);
-			}
-
 			.background-shapes {
 				position: fixed;
 				width: 100%;
@@ -488,6 +484,18 @@
 				background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
 			}
 		</style>
+		<script>
+			(function() {
+				const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+				const savedTheme = localStorage.getItem('theme-preference');
+				
+				if (savedTheme) {
+					document.documentElement.classList.add(`${savedTheme}-mode`);
+				} else if (prefersDark) {
+					document.documentElement.classList.add('dark-mode');
+				}
+			})();
+		</script>
 	</head>
 	<body>
 		<div class="background-shapes">
@@ -677,11 +685,18 @@
 				}
 			}
 
-			const savedTheme = localStorage.getItem('theme-preference');
-			if (savedTheme) {
-				document.documentElement.classList.add(`${savedTheme}-mode`);
-				document.querySelector('#themeToggle i').className = `fas fa-${savedTheme === 'dark' ? 'sun' : 'moon'}`;
-			}
+			document.addEventListener('DOMContentLoaded', function() {
+				const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+				const savedTheme = localStorage.getItem('theme-preference');
+				
+				if (savedTheme) {
+					document.documentElement.classList.add(`${savedTheme}-mode`);
+					document.querySelector('#themeToggle i').className = `fas fa-${savedTheme === 'dark' ? 'sun' : 'moon'}`;
+				} else if (prefersDark) {
+					document.documentElement.classList.add('dark-mode');
+					document.querySelector('#themeToggle i').className = 'fas fa-sun';
+				}
+			});
 		</script>
 	</body>
 </html>
