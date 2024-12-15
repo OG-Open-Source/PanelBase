@@ -3,7 +3,6 @@
 # 配置
 CACHE_DIR="/opt/panelbase/cache"
 CACHE_TIMEOUT=60  # 緩存過期時間（秒）
-ROUTES_FILE="/opt/panelbase/config/routes.conf"
 
 # 創建緩存目錄
 mkdir -p "$CACHE_DIR"
@@ -55,6 +54,7 @@ validate_param() {
     local param_value="$2"
     local param_type="$3"
     local required="$4"
+    local extra_param="$5"
     
     # 檢查必填參數
     if [ "$required" = "true" ] && [ -z "$param_value" ]; then
@@ -93,15 +93,13 @@ validate_param() {
             fi
             ;;
         "enum")
-            local valid_values="$5"
-            if ! echo "$valid_values" | grep -q "^$param_value$"; then
-                echo "錯誤：參數 $param_name 必須為以下值之一：$valid_values"
+            if ! echo "$extra_param" | grep -q "^$param_value$"; then
+                echo "錯誤：參數 $param_name 必須為以下值之一：$extra_param"
                 return 1
             fi
             ;;
         "regex")
-            local pattern="$5"
-            if ! [[ "$param_value" =~ $pattern ]]; then
+            if ! [[ "$param_value" =~ $extra_param ]]; then
                 echo "錯誤：參數 $param_name 格式不正確"
                 return 1
             fi
@@ -110,66 +108,96 @@ validate_param() {
     return 0
 }
 
-# 路由相關函數
-load_routes() {
-    if [ ! -f "$ROUTES_FILE" ]; then
-        echo "錯誤：找不到路由配置文件"
-        return 1
-    fi
-    source "$ROUTES_FILE"
-}
-
-route_request() {
-    local path="$1"
-    local method="$2"
-    local action="$3"
-    
-    # 載入路由配置
-    load_routes
-    
-    # 檢查路由是否存在
-    local route_handler="route_${path}_${method}_${action}"
-    if [ "$(type -t $route_handler)" != "function" ]; then
-        echo "Content-type: application/json"
-        echo "Status: 404"
-        echo
-        echo '{"error": "Not Found", "message": "找不到指定的路由"}'
-        return 1
-    fi
-    
-    # 執行路由處理函數
-    $route_handler
-}
-
 # 解析查詢字符串
 parse_query_string() {
     local query="$1"
-    local params=()
-    IFS='&' read -ra pairs <<< "$query"
-    for pair in "${pairs[@]}"; do
-        IFS='=' read -r key value <<< "$pair"
-        # URL 解碼
-        value=$(echo -e "${value//%/\\x}")
-        # 轉義特殊字符
-        value="${value//\'/\\\'}"
-        params["$key"]="$value"
-    done
+    declare -A params
+    
+    if [ -n "$query" ]; then
+        IFS='&' read -ra pairs <<< "$query"
+        for pair in "${pairs[@]}"; do
+            IFS='=' read -r key value <<< "$pair"
+            # URL 解碼
+            value=$(echo -e "${value//%/\\x}")
+            # 轉義特殊字符
+            value="${value//\'/\\\'}"
+            params["$key"]="$value"
+        done
+    fi
+    
     declare -p params
 }
 
-# 示例用法：
-# source common.cgi
-# 
-# # 使用緩存
-# cache_key="system_info"
-# if ! data=$(get_cache "$cache_key"); then
-#     data=$(get_system_info)
-#     set_cache "$cache_key" "$data"
-# fi
-# 
-# # 驗證參數
-# validate_param "age" "25" "int" "true"
-# validate_param "email" "user@example.com" "email" "true"
-# 
-# # 路由請求
-# route_request "user" "GET" "profile" 
+# URL 編碼函數
+url_encode() {
+    local string="$1"
+    local length="${#string}"
+    local encoded=""
+    
+    for (( i=0; i<length; i++ )); do
+        local c="${string:i:1}"
+        case "$c" in
+            [a-zA-Z0-9.~_-]) encoded+="$c" ;;
+            *) encoded+=$(printf '%%%02X' "'$c") ;;
+        esac
+    done
+    
+    echo "$encoded"
+}
+
+# URL 解碼函數
+url_decode() {
+    local encoded="$1"
+    echo -e "${encoded//%/\\x}"
+}
+
+# JSON 相關函數
+json_escape() {
+    local string="$1"
+    string="${string//\\/\\\\}"
+    string="${string//\"/\\\"}"
+    string="${string//	/\\t}"
+    string="${string//
+/\\n}"
+    string="${string//\r/\\r}"
+    echo "$string"
+}
+
+# 錯誤處理函數
+send_error() {
+    local status="$1"
+    local message="$2"
+    
+    echo "Content-type: application/json"
+    echo "Status: $status"
+    echo
+    echo "{\"error\": \"$(json_escape "$message")\"}"
+    exit 1
+}
+
+send_success() {
+    local data="$1"
+    
+    echo "Content-type: application/json"
+    echo "Status: 200"
+    echo
+    echo "$data"
+}
+
+# 如果是被其他腳本導入，則不執行以下代碼
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+    return 0
+fi
+
+# 處理請求
+ACTION=$(echo "$QUERY_STRING" | grep -oP 'action=\K[^&]+')
+
+case "$ACTION" in
+    "clear_cache")
+        clear_cache
+        send_success '{"status": "success"}'
+        ;;
+    *)
+        send_error 400 "無效的操作"
+        ;;
+esac

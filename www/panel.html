@@ -326,7 +326,7 @@
 			// 更新系統資訊
 			async function updateSystemInfo() {
 				try {
-					const response = await fetch('/cgi-bin/panel.cgi?action=get_system_info', {
+					const response = await fetch('/cgi-bin/panel.cgi?path=system&method=GET&action=info', {
 						cache: 'no-store'
 					});
 					if (!response.ok) {

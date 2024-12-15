@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# 顯示橫幅
+cd ~ && clear
 echo "================================="
-echo "=  PanelBase 安裝程序 (Beta26)  ="
+echo "=  PanelBase 安裝程序 (Beta27)  ="
 echo "================================="
 
 # 檢查是否為 root 用戶

@@ -1,105 +1,120 @@
 #!/bin/bash
 
-AUTH_TOKEN=$(echo "$HTTP_COOKIE" | grep -oP 'auth_token=\K[^;]+')
+# 導入共用函數和認證
+source /opt/panelbase/cgi-bin/common.cgi
+source /opt/panelbase/cgi-bin/auth.cgi
 
-ORIGINAL_URL="$REQUEST_URI"
-DOCUMENT_ROOT="/opt/panelbase/www"
+# 配置
+PANEL_ROOT="/opt/panelbase"
+STATIC_ROOT="$PANEL_ROOT/static"
+HTML_ROOT="$PANEL_ROOT/html"
 
-if [ -z "$AUTH_TOKEN" ]; then
-	# 沒有 token，重定向到登入頁面
-	echo "Status: 302"
-	echo "Location: /"
-	echo
-	exit 0
-fi
+# 檢查是否為靜態文件請求
+is_static_file() {
+    local path="$1"
+    [[ "$path" =~ \.(css|js|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot)$ ]]
+}
 
-SESSION_FILE="/opt/panelbase/config/sessions.conf"
-if [ ! -f "$SESSION_FILE" ]; then
-	echo "Status: 302"
-	echo "Location: /"
-	echo
-	exit 0
-fi
+# 獲取文件的 MIME 類型
+get_mime_type() {
+    local file="$1"
+    case "${file##*.}" in
+        css)  echo "text/css" ;;
+        js)   echo "application/javascript" ;;
+        jpg|jpeg) echo "image/jpeg" ;;
+        png)  echo "image/png" ;;
+        gif)  echo "image/gif" ;;
+        ico)  echo "image/x-icon" ;;
+        svg)  echo "image/svg+xml" ;;
+        woff) echo "font/woff" ;;
+        woff2) echo "font/woff2" ;;
+        ttf)  echo "font/ttf" ;;
+        eot)  echo "application/vnd.ms-fontobject" ;;
+        *)    echo "application/octet-stream" ;;
+    esac
+}
 
-CURRENT_TIME=$(date +%s)
-VALID_SESSION=$(awk -F: -v token="$AUTH_TOKEN" -v time="$CURRENT_TIME" \
-	'$1 == token && (time - $3) < 86400 {print $2}' "$SESSION_FILE")
+# 處理靜態文件請求
+serve_static_file() {
+    local path="$1"
+    local file_path
+    
+    # 移除 URL 中的查詢字符串
+    path="${path%%\?*}"
+    
+    # 檢查文件是否存在
+    file_path="$STATIC_ROOT$path"
+    if [ ! -f "$file_path" ]; then
+        send_error 404 "找不到文件"
+        return 1
+    }
+    
+    # 設置 MIME 類型
+    local mime_type=$(get_mime_type "$file_path")
+    echo "Content-type: $mime_type"
+    echo
+    
+    # 輸出文件內容
+    cat "$file_path"
+    return 0
+}
 
-if [ -z "$VALID_SESSION" ]; then
-	echo "Status: 302"
-	echo "Location: /"
-	echo
-	exit 0
-fi
+# 處理 HTML 文件請求
+serve_html_file() {
+    local path="$1"
+    local file_path
+    
+    # 移除 URL 中的查詢字符串
+    path="${path%%\?*}"
+    
+    # 如果路徑為根目錄，預設為 index.html
+    if [ "$path" = "/" ]; then
+        path="/index.html"
+    fi
+    
+    # 檢查文件是否存在
+    file_path="$HTML_ROOT$path"
+    if [ ! -f "$file_path" ]; then
+        # 如果找不到文件，檢查是否需要認證
+        if ! check_auth; then
+            file_path="$HTML_ROOT/login.html"
+        else
+            file_path="$HTML_ROOT/panel.html"
+        fi
+    fi
+    
+    # 輸出 HTML 內容
+    echo "Content-type: text/html"
+    echo
+    cat "$file_path"
+    return 0
+}
 
-if echo "$ORIGINAL_URL" | grep -q "^/cgi-bin/panel\.cgi"; then
-	# 執行 panel.cgi 並傳遞所有環境變數
-	exec /opt/panelbase/cgi-bin/panel.cgi
-	exit 0
-fi
+# 主程序
+main() {
+    local path="$REQUEST_URI"
+    
+    # 檢查是否為靜態文件請求
+    if is_static_file "$path"; then
+        serve_static_file "$path"
+        exit $?
+    fi
+    
+    # 檢查是否為 API 請求
+    if echo "$QUERY_STRING" | grep -q "action="; then
+        # 轉發到對應的 CGI 處理器
+        if echo "$QUERY_STRING" | grep -q "action=\(login\|logout\|get_username\|change_password\|change_username\)"; then
+            exec /opt/panelbase/cgi-bin/auth.cgi
+        else
+            exec /opt/panelbase/cgi-bin/panel.cgi
+        fi
+        exit $?
+    fi
+    
+    # 處理 HTML 文件請求
+    serve_html_file "$path"
+    exit $?
+}
 
-REQUESTED_FILE="${DOCUMENT_ROOT}${ORIGINAL_URL}"
-
-if [ ! -f "$REQUESTED_FILE" ]; then
-	echo "Content-type: text/html"
-	echo "Status: 404"
-	echo
-	cat << EOF
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-	<meta charset="UTF-8">
-	<title>404 - 頁面未找到</title>
-	<style>
-		body {
-			font-family: Arial, sans-serif;
-			text-align: center;
-			padding: 50px;
-			background: #f5f5f5;
-		}
-		.error-container {
-			background: white;
-			padding: 30px;
-			border-radius: 8px;
-			box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-			display: inline-block;
-		}
-		h1 { color: #e74c3c; }
-		.back-link {
-			margin-top: 20px;
-			color: #3498db;
-			text-decoration: none;
-		}
-		.back-link:hover {
-			text-decoration: underline;
-		}
-	</style>
-</head>
-<body>
-	<div class="error-container">
-		<h1>404 - 頁面未找到</h1>
-		<p>抱歉，您請求的頁面不存在。</p>
-		<a href="/panel.html" class="back-link">返回主頁</a>
-	</div>
-</body>
-</html>
-EOF
-	exit 0
-fi
-
-EXTENSION="${REQUESTED_FILE##*.}"
-case "$EXTENSION" in
-	"html") CONTENT_TYPE="text/html" ;;
-	"css") CONTENT_TYPE="text/css" ;;
-	"js") CONTENT_TYPE="application/javascript" ;;
-	"png") CONTENT_TYPE="image/png" ;;
-	"jpg"|"jpeg") CONTENT_TYPE="image/jpeg" ;;
-	"gif") CONTENT_TYPE="image/gif" ;;
-	"svg") CONTENT_TYPE="image/svg+xml" ;;
-	*) CONTENT_TYPE="application/octet-stream" ;;
-esac
-
-echo "Content-type: $CONTENT_TYPE"
-echo
-
-cat "$REQUESTED_FILE"
+# 執行主程序
+main

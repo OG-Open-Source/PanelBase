@@ -1,89 +1,160 @@
 #!/bin/bash
 
-# 載入共用函數
+# 導入共用函數和認證
 source /opt/panelbase/cgi-bin/common.cgi
+source /opt/panelbase/cgi-bin/auth.cgi
 
-# 檢查是否為 API 請求
-if echo "$QUERY_STRING" | grep -q "action="; then
-	# 獲取請求參數
-	PATH_INFO=$(echo "$QUERY_STRING" | grep -oP 'path=\K[^&]+')
-	METHOD="$REQUEST_METHOD"
-	ACTION=$(echo "$QUERY_STRING" | grep -oP 'action=\K[^&]+')
+# 配置
+ROUTES_FILE="/opt/panelbase/config/routes.conf"
 
-	# 路由請求
-	route_request "$PATH_INFO" "$METHOD" "$ACTION"
-	exit 0
+# 路由相關函數
+load_routes() {
+    if [ ! -f "$ROUTES_FILE" ]; then
+        send_error 500 "找不到路由配置文件"
+        return 1
+    fi
+    source "$ROUTES_FILE"
+}
+
+route_request() {
+    local path="$1"
+    local method="$2"
+    local action="$3"
+    
+    # 載入路由配置
+    load_routes
+    
+    # 檢查路由是否存在
+    local route_handler="route_${path}_${method}_${action}"
+    if [ "$(type -t $route_handler)" != "function" ]; then
+        send_error 404 "找不到指定的路由"
+        return 1
+    fi
+    
+    # 檢查認證
+    if ! check_auth; then
+        send_unauthorized
+        return 1
+    fi
+    
+    # 執行路由處理函數
+    $route_handler
+}
+
+# 系統資訊相關函數
+get_system_info() {
+    local cache_key="system_info"
+    local data
+    
+    if ! data=$(get_cache "$cache_key"); then
+        # 收集系統資訊
+        local cpu_info=$(cat /proc/cpuinfo | grep 'model name' | head -n1 | cut -d: -f2 | xargs)
+        local cpu_cores=$(nproc)
+        local memory_total=$(free -m | awk '/^Mem:/{print $2}')
+        local memory_used=$(free -m | awk '/^Mem:/{print $3}')
+        local disk_info=$(df -h / | awk 'NR==2{print $2","$3","$5}')
+        local uptime=$(uptime -p)
+        local load_average=$(uptime | grep -oP 'load average: \K.*')
+        
+        # 構建 JSON 響應
+        data="{
+            \"cpu\": {
+                \"model\": \"$(json_escape "$cpu_info")\",
+                \"cores\": $cpu_cores
+            },
+            \"memory\": {
+                \"total\": $memory_total,
+                \"used\": $memory_used
+            },
+            \"disk\": {
+                \"total\": \"$(echo $disk_info | cut -d, -f1)\",
+                \"used\": \"$(echo $disk_info | cut -d, -f2)\",
+                \"usage\": \"$(echo $disk_info | cut -d, -f3)\"
+            },
+            \"uptime\": \"$(json_escape "$uptime")\",
+            \"load_average\": \"$(json_escape "$load_average")\"
+        }"
+        
+        # 設置緩存
+        set_cache "$cache_key" "$data"
+    fi
+    
+    echo "$data"
+}
+
+# 服務控制相關函數
+service_action() {
+    local service="$1"
+    local action="$2"
+    
+    # 驗證參數
+    if ! validate_param "service" "$service" "regex" "true" "^[a-zA-Z0-9_-]+$"; then
+        return 1
+    fi
+    
+    if ! validate_param "action" "$action" "enum" "true" "start|stop|restart|status"; then
+        return 1
+    fi
+    
+    # 執行服務操作
+    local result
+    case "$action" in
+        "status")
+            result=$(systemctl status "$service" 2>&1)
+            ;;
+        *)
+            result=$(systemctl "$action" "$service" 2>&1)
+            ;;
+    esac
+    
+    local status=$?
+    echo "{\"status\": $status, \"output\": \"$(json_escape "$result")\"}"
+}
+
+# 如果是被其他腳本導入，則不執行以下代碼
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+    return 0
 fi
 
-# 如果不是 API 請求，返回 HTML 頁面
-echo "Content-type: text/html"
-echo
+# 處理請求
+ACTION=$(echo "$QUERY_STRING" | grep -oP 'action=\K[^&]+')
 
-# 檢查緩存
-cache_key="panel_html"
-if ! html=$(get_cache "$cache_key"); then
-	# 生成 HTML 內容
-	html=$(cat << EOF
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>PanelBase 管理面板</title>
-	<style>
-		body {
-			font-family: Arial, sans-serif;
-			margin: 0;
-			padding: 20px;
-			background-color: #f5f5f5;
-		}
-		.container {
-			max-width: 1200px;
-			margin: 0 auto;
-			background-color: white;
-			padding: 20px;
-			border-radius: 5px;
-			box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-		}
-		.header {
-			background-color: #2c3e50;
-			color: white;
-			padding: 20px;
-			margin: -20px -20px 20px -20px;
-			border-radius: 5px 5px 0 0;
-		}
-		.section {
-			margin-bottom: 20px;
-			padding: 15px;
-			border: 1px solid #ddd;
-			border-radius: 4px;
-		}
-		.info-item {
-			margin: 10px 0;
-		}
-		.status-ok {
-			color: green;
-		}
-		.status-error {
-			color: red;
-		}
-		.random-number {
-			font-size: 1.2em;
-			font-weight: bold;
-			color: #2c3e50;
-		}
-	</style>
-</head>
-<body>
-	<div class="container">
-		<div class="header">
-			<h1>PanelBase 管理面板</h1>
-		</div>
-EOF
-)
-	# 設置緩存
-	set_cache "$cache_key" "$html"
-fi
-
-# 輸出 HTML
-echo "$html"
+case "$ACTION" in
+    "system_info")
+        if ! check_auth; then
+            send_unauthorized
+            exit 1
+        fi
+        send_success "$(get_system_info)"
+        ;;
+        
+    "service")
+        if ! check_auth; then
+            send_unauthorized
+            exit 1
+        fi
+        
+        read -n $CONTENT_LENGTH POST_DATA
+        SERVICE=$(echo "$POST_DATA" | grep -oP 'service=\K[^&]+')
+        ACTION=$(echo "$POST_DATA" | grep -oP 'action=\K[^&]+')
+        
+        RESULT=$(service_action "$SERVICE" "$ACTION")
+        if [ $? -eq 0 ]; then
+            send_success "$RESULT"
+        else
+            send_error 400 "$RESULT"
+        fi
+        ;;
+        
+    "route")
+        PATH_INFO=$(echo "$QUERY_STRING" | grep -oP 'path=\K[^&]+')
+        METHOD=$(echo "$QUERY_STRING" | grep -oP 'method=\K[^&]+')
+        ROUTE_ACTION=$(echo "$QUERY_STRING" | grep -oP 'route_action=\K[^&]+')
+        
+        route_request "$PATH_INFO" "$METHOD" "$ROUTE_ACTION"
+        ;;
+        
+    *)
+        send_error 400 "無效的操作"
+        ;;
+esac
