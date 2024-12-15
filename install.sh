@@ -2,7 +2,7 @@
 
 cd ~ && clear
 echo "================================="
-echo "=  PanelBase 安裝程序 (Beta29)  ="
+echo "=  PanelBase 安裝程序 (Beta30)  ="
 echo "================================="
 
 # 檢查是否為 root 用戶
@@ -132,7 +132,81 @@ if [[ ! $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 fi
 
 # 設置執行權限
-chmod +x $INSTALL_DIR/cgi-bin/*.cgi
+echo "設置 CGI 腳本權限..."
+chmod 755 $INSTALL_DIR/cgi-bin/*.cgi
+chown www-data:www-data $INSTALL_DIR/cgi-bin/*.cgi
+
+# 設置目錄權限
+echo "設置目錄權限..."
+find $INSTALL_DIR -type d -exec chmod 755 {} \;
+find $INSTALL_DIR -type f -exec chmod 644 {} \;
+
+# 設置特殊權限
+echo "設置特殊權限..."
+chmod 755 $INSTALL_DIR/cgi-bin
+chmod 644 $INSTALL_DIR/config/routes.conf
+chmod 600 $INSTALL_DIR/config/users.conf
+chmod 600 $INSTALL_DIR/config/sessions.conf
+chmod 777 $INSTALL_DIR/cache
+chmod 755 $INSTALL_DIR/logs
+
+# 設置所有權
+echo "設置文件所有權..."
+chown -R www-data:www-data $INSTALL_DIR
+chown -R www-data:www-data /etc/lighttpd
+
+# 確保日誌目錄存在且具有正確的權限
+mkdir -p /var/log/lighttpd
+chown -R www-data:www-data /var/log/lighttpd
+chmod 755 /var/log/lighttpd
+
+# 測試 CGI 腳本
+echo "測試 CGI 腳本..."
+for script in $INSTALL_DIR/cgi-bin/*.cgi; do
+    if ! sudo -u www-data bash -n "$script"; then
+        echo "錯誤：CGI 腳本 $script 語法檢查失敗"
+        exit 1
+    fi
+done
+
+# 檢查配置文件
+echo "檢查配置文件..."
+if ! lighttpd -t -f /etc/lighttpd/lighttpd.conf; then
+    echo "錯誤：lighttpd 配置檢查失敗"
+    exit 1
+fi
+
+# 重啟 lighttpd
+echo "重啟 lighttpd 服務..."
+systemctl restart lighttpd
+
+# 等待服務啟動
+echo "等待服務啟動..."
+sleep 2
+
+# 檢查服務狀態
+if ! systemctl is-active --quiet lighttpd; then
+    echo "錯誤：lighttpd 服務未能正常啟動"
+    echo "錯誤日誌："
+    tail -n 20 "$INSTALL_DIR/logs/error.log"
+    exit 1
+fi
+
+# 檢查端口
+if ! netstat -tuln | grep -q ":8080 "; then
+    echo "錯誤：服務未能在 8080 端口啟動"
+    echo "當前監聽的端口："
+    netstat -tuln | grep LISTEN
+    exit 1
+fi
+
+# 測試 CGI 訪問
+echo "測試 CGI 訪問..."
+if ! curl -s "http://localhost:8080/cgi-bin/check_auth.cgi" | grep -q "Content-type"; then
+    echo "錯誤：CGI 訪問測試失敗"
+    echo "請檢查 lighttpd 錯誤日誌：$INSTALL_DIR/logs/error.log"
+    exit 1
+fi
 
 # 如果使用自定義 HTML，解壓縮並複製文件
 if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
