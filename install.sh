@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta47"
+Version="Beta48"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -159,15 +159,15 @@ server.errorlog = "$INSTALL_DIR/logs/error.log"
 server.upload-dirs = ( "/var/cache/lighttpd/uploads" )
 server.follow-symlink = "enable"
 
+cgi.assign = (
+    ".cgi" => ""
+)
+
 include_shell "/usr/share/lighttpd/create-mime.conf.pl"
 include "/etc/lighttpd/conf-enabled/*.conf"
 EOF
 
 cat > /etc/lighttpd/conf-available/10-panelbase.conf << EOL
-cgi.assign = (
-    ".cgi" => ""
-)
-
 url.rewrite-if-not-file = (
     "^/$" => "/index.html"
 )
