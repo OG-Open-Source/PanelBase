@@ -1,42 +1,43 @@
 #!/bin/bash
 
 # 配置文件路徑
-CONFIG_FILE="/opt/panelbase/config/users.conf"
-SESSION_FILE="/opt/panelbase/config/sessions.conf"
+readonly CONFIG_FILE="/opt/panelbase/config/users.conf"
+readonly SESSION_FILE="/opt/panelbase/config/sessions.conf"
 
 # 檢查認證
 check_auth() {
-    local AUTH_TOKEN=$(echo "$HTTP_COOKIE" | grep -oP 'auth_token=\K[^;]+')
-    if [ -z "$AUTH_TOKEN" ]; then
-        return 1
-    fi
+    local auth_token current_ip current_ua current_time result
     
-    # 檢查 session 是否有效
-    local CURRENT_TIME=$(date +%s)
-    if ! grep -q "^$AUTH_TOKEN:" "$SESSION_FILE" || \
-       [ $(awk -F: -v token="$AUTH_TOKEN" -v time="$CURRENT_TIME" \
-           '$1 == token && (time - $3) < 86400 {print 1}' "$SESSION_FILE") != "1" ]; then
-        return 1
-    fi
+    auth_token=$(echo "$HTTP_COOKIE" | grep -oP 'auth_token=\K[^;]+')
+    [ -z "$auth_token" ] && return 1
     
-    return 0
+    current_ip="$REMOTE_ADDR"
+    current_ua="$HTTP_USER_AGENT"
+    current_time=$(date +%s)
+    
+    # 使用單次讀取檢查 session
+    result=$(awk -F: -v token="$auth_token" -v time="$current_time" \
+                  -v ip="$current_ip" -v ua="$current_ua" \
+            'BEGIN { valid=0 }
+             $1 == token && (time - $3) < 86400 && $4 == ip && $5 == ua { valid=1; exit }
+             END { print valid }' "$SESSION_FILE")
+    
+    [ "$result" = "1" ] && return 0 || return 1
 }
 
 # 檢查認證或密碼
 check_auth_or_password() {
-    local USERNAME="$1"
-    local PASSWORD="$2"
+    local username="$1"
+    local password="$2"
+    local stored_hash input_hash
     
-    if [ -n "$USERNAME" ] && [ -n "$PASSWORD" ]; then
-        local STORED_HASH=$(grep "^$USERNAME:" "$CONFIG_FILE" | cut -d: -f2)
-        local INPUT_HASH=$(echo -n "$PASSWORD" | md5sum | cut -d' ' -f1)
-        
-        if [ "$STORED_HASH" = "$INPUT_HASH" ]; then
-            return 0
-        fi
-    fi
+    [ -z "$username" ] || [ -z "$password" ] && return 1
     
-    return 1
+    stored_hash=$(grep "^$username:" "$CONFIG_FILE" | cut -d: -f2)
+    [ -z "$stored_hash" ] && return 1
+    
+    input_hash=$(echo -n "$password" | md5sum | cut -d' ' -f1)
+    [ "$stored_hash" = "$input_hash" ] && return 0 || return 1
 }
 
 # 返回未授權錯誤
@@ -50,14 +51,18 @@ send_unauthorized() {
 
 # 獲取當前用戶名
 get_current_username() {
-    local AUTH_TOKEN="$1"
-    awk -F: -v token="$AUTH_TOKEN" '$1 == token {print $2}' "$SESSION_FILE"
+    local auth_token="$1"
+    awk -F: -v token="$auth_token" '$1 == token {print $2; exit}' "$SESSION_FILE"
+}
+
+# URL 解碼函數
+urldecode() {
+    local encoded="$1"
+    echo -n "$encoded" | sed 's/%40/@/g; s/%2B/+/g; s/%20/ /g'
 }
 
 # 如果是被其他腳本導入，則不執行以下代碼
-if [ "${BASH_SOURCE[0]}" != "$0" ]; then
-    return 0
-fi
+[ "${BASH_SOURCE[0]}" != "$0" ] && return 0
 
 # 處理請求
 ACTION=$(echo "$QUERY_STRING" | grep -oP 'action=\K[^&]+')
@@ -76,15 +81,17 @@ case "$ACTION" in
 
     "login")
         read -n $CONTENT_LENGTH POST_DATA
-        USERNAME=$(echo "$POST_DATA" | grep -oP 'username=\K[^&]+' | sed 's/%40/@/g' | sed 's/%2B/+/g' | sed 's/%20/ /g')
-        PASSWORD=$(echo "$POST_DATA" | grep -oP 'password=\K[^&]+' | sed 's/%40/@/g' | sed 's/%2B/+/g' | sed 's/%20/ /g')
+        local username password token
+        
+        username=$(echo "$POST_DATA" | grep -oP 'username=\K[^&]+' | urldecode)
+        password=$(echo "$POST_DATA" | grep -oP 'password=\K[^&]+' | urldecode)
 
-        if check_auth_or_password "$USERNAME" "$PASSWORD"; then
-            TOKEN=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
-            echo "$TOKEN:$USERNAME:$(date +%s)" >> "$SESSION_FILE"
+        if check_auth_or_password "$username" "$password"; then
+            token=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
+            echo "$token:$username:$(date +%s):$REMOTE_ADDR:$HTTP_USER_AGENT" >> "$SESSION_FILE"
 
             echo "Content-type: application/json"
-            echo "Set-Cookie: auth_token=$TOKEN; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400"
+            echo "Set-Cookie: auth_token=$token; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400"
             echo "Status: 200"
             echo
             echo '0'
@@ -97,9 +104,11 @@ case "$ACTION" in
         ;;
 
     "logout")
-        AUTH_TOKEN=$(echo "$HTTP_COOKIE" | grep -oP 'auth_token=\K[^;]+')
-        if [ -n "$AUTH_TOKEN" ]; then
-            sed -i "/^$AUTH_TOKEN:/d" "$SESSION_FILE"
+        local auth_token
+        auth_token=$(echo "$HTTP_COOKIE" | grep -oP 'auth_token=\K[^;]+')
+        
+        if [ -n "$auth_token" ]; then
+            sed -i "/^$auth_token:/d" "$SESSION_FILE"
         fi
 
         echo "Content-type: text/html"
@@ -111,12 +120,14 @@ case "$ACTION" in
 
     "get_username")
         if check_auth; then
-            AUTH_TOKEN=$(echo "$HTTP_COOKIE" | grep -oP 'auth_token=\K[^;]+')
-            USERNAME=$(get_current_username "$AUTH_TOKEN")
+            local auth_token username
+            auth_token=$(echo "$HTTP_COOKIE" | grep -oP 'auth_token=\K[^;]+')
+            username=$(get_current_username "$auth_token")
+            
             echo "Content-type: application/json"
             echo "Status: 200"
             echo
-            echo "$USERNAME"
+            echo "$username"
         else
             send_unauthorized
         fi
@@ -129,14 +140,16 @@ case "$ACTION" in
         fi
 
         read -n $CONTENT_LENGTH POST_DATA
-        AUTH_TOKEN=$(echo "$HTTP_COOKIE" | grep -oP 'auth_token=\K[^;]+')
-        USERNAME=$(get_current_username "$AUTH_TOKEN")
-        OLD_PASSWORD=$(echo "$POST_DATA" | grep -oP 'old_password=\K[^&]+' | sed 's/%40/@/g' | sed 's/%2B/+/g' | sed 's/%20/ /g')
-        NEW_PASSWORD=$(echo "$POST_DATA" | grep -oP 'new_password=\K[^&]+' | sed 's/%40/@/g' | sed 's/%2B/+/g' | sed 's/%20/ /g')
+        local auth_token username old_password new_password new_hash
+        
+        auth_token=$(echo "$HTTP_COOKIE" | grep -oP 'auth_token=\K[^;]+')
+        username=$(get_current_username "$auth_token")
+        old_password=$(echo "$POST_DATA" | grep -oP 'old_password=\K[^&]+' | urldecode)
+        new_password=$(echo "$POST_DATA" | grep -oP 'new_password=\K[^&]+' | urldecode)
 
-        if check_auth_or_password "$USERNAME" "$OLD_PASSWORD"; then
-            NEW_HASH=$(echo -n "$NEW_PASSWORD" | md5sum | cut -d' ' -f1)
-            sed -i "s/^$USERNAME:.*/$USERNAME:$NEW_HASH/" "$CONFIG_FILE"
+        if check_auth_or_password "$username" "$old_password"; then
+            new_hash=$(echo -n "$new_password" | md5sum | cut -d' ' -f1)
+            sed -i "s/^$username:.*/$username:$new_hash/" "$CONFIG_FILE"
 
             echo "Content-type: application/json"
             echo "Status: 200"
@@ -157,20 +170,22 @@ case "$ACTION" in
         fi
 
         read -n $CONTENT_LENGTH POST_DATA
-        AUTH_TOKEN=$(echo "$HTTP_COOKIE" | grep -oP 'auth_token=\K[^;]+')
-        CURRENT_USERNAME=$(get_current_username "$AUTH_TOKEN")
-        NEW_USERNAME=$(echo "$POST_DATA" | grep -oP 'new_username=\K[^&]+' | sed 's/%40/@/g' | sed 's/%2B/+/g' | sed 's/%20/ /g')
-        PASSWORD=$(echo "$POST_DATA" | grep -oP 'password=\K[^&]+' | sed 's/%40/@/g' | sed 's/%2B/+/g' | sed 's/%20/ /g')
+        local auth_token current_username new_username password
+        
+        auth_token=$(echo "$HTTP_COOKIE" | grep -oP 'auth_token=\K[^;]+')
+        current_username=$(get_current_username "$auth_token")
+        new_username=$(echo "$POST_DATA" | grep -oP 'new_username=\K[^&]+' | urldecode)
+        password=$(echo "$POST_DATA" | grep -oP 'password=\K[^&]+' | urldecode)
 
-        if check_auth_or_password "$CURRENT_USERNAME" "$PASSWORD"; then
-            if grep -q "^$NEW_USERNAME:" "$CONFIG_FILE"; then
+        if check_auth_or_password "$current_username" "$password"; then
+            if grep -q "^$new_username:" "$CONFIG_FILE"; then
                 echo "Content-type: application/json"
                 echo "Status: 409"
                 echo
                 echo '1'
             else
-                sed -i "s/^$CURRENT_USERNAME:/$NEW_USERNAME:/" "$CONFIG_FILE"
-                sed -i "s/:$CURRENT_USERNAME:/:$NEW_USERNAME:/" "$SESSION_FILE"
+                sed -i "s/^$current_username:/$new_username:/" "$CONFIG_FILE"
+                sed -i "s/:$current_username:/:$new_username:/" "$SESSION_FILE"
 
                 echo "Content-type: application/json"
                 echo "Status: 200"

@@ -2,7 +2,7 @@
 
 cd ~ && clear
 echo "================================="
-echo "=  PanelBase 安裝程序 (Beta27)  ="
+echo "=  PanelBase 安裝程序 (Beta28)  ="
 echo "================================="
 
 # 檢查是否為 root 用戶
@@ -103,15 +103,18 @@ mkdir -p $INSTALL_DIR/www
 mkdir -p $INSTALL_DIR/cgi-bin
 mkdir -p $INSTALL_DIR/config
 mkdir -p $INSTALL_DIR/logs
+mkdir -p $INSTALL_DIR/cache
 
 # 下載面板文件
 echo "下載面板文件..."
 BASE_URL="https://raw.githubusercontent.com/OG-Open-Source/PanelBase/main"
 
 # 下載並檢查每個文件
-for FILE in "src/cgi-bin/panel.cgi" "src/cgi-bin/auth.cgi" "src/cgi-bin/check_auth.cgi" "www/index.html"; do
+for FILE in "src/cgi-bin/panel.cgi" "src/cgi-bin/auth.cgi" "src/cgi-bin/check_auth.cgi" "src/cgi-bin/common.cgi" "www/index.html" "config/routes.conf"; do
 	echo "下載 $FILE..."
-	HTTP_CODE=$(curl -s -w "%{http_code}" -o "${FILE##*/}" "$BASE_URL/$FILE")
+	DEST_DIR="$INSTALL_DIR/$(dirname $FILE)"
+	mkdir -p "$DEST_DIR"
+	HTTP_CODE=$(curl -s -w "%{http_code}" -o "$INSTALL_DIR/$FILE" "$BASE_URL/$FILE")
 	if [ "$HTTP_CODE" != "200" ]; then
 		echo "錯誤：無法下載 $FILE (HTTP 代碼: $HTTP_CODE)"
 		exit 1
@@ -121,7 +124,7 @@ done
 # 如果不使用自定義 HTML，則下載默認的面板頁面
 if [[ ! $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	echo "下載 panel.html..."
-	HTTP_CODE=$(curl -s -w "%{http_code}" -o "panel.html" "$BASE_URL/www/panel.html")
+	HTTP_CODE=$(curl -s -w "%{http_code}" -o "$INSTALL_DIR/www/panel.html" "$BASE_URL/www/panel.html")
 	if [ "$HTTP_CODE" != "200" ]; then
 		echo "錯誤：無法下載面板頁面 (HTTP 代碼: $HTTP_CODE)"
 		exit 1
@@ -129,11 +132,7 @@ if [[ ! $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 fi
 
 # 設置執行權限
-chmod +x panel.cgi auth.cgi check_auth.cgi
-
-# 移動文件到正確位置
-mv panel.cgi auth.cgi check_auth.cgi $INSTALL_DIR/cgi-bin/
-mv index.html $INSTALL_DIR/www/
+chmod +x $INSTALL_DIR/cgi-bin/*.cgi
 
 # 如果使用自定義 HTML，解壓縮並複製文件
 if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
@@ -195,8 +194,6 @@ if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	rm -rf "$TMP_DIR"
 	
 	echo "自定義面板文件安裝完成"
-else
-	mv panel.html $INSTALL_DIR/www/
 fi
 
 # 配置 lighttpd
@@ -283,6 +280,7 @@ find $INSTALL_DIR -type f -exec chmod 644 {} \;
 chmod -R 755 $INSTALL_DIR/cgi-bin
 chmod 600 $INSTALL_DIR/config/users.conf
 chmod 600 $INSTALL_DIR/config/sessions.conf
+chmod 777 $INSTALL_DIR/cache
 
 # 設置所有權
 chown -R www-data:www-data $INSTALL_DIR
@@ -299,7 +297,7 @@ systemctl restart lighttpd
 
 # 檢查服務是否正常運行
 if ! systemctl is-active --quiet lighttpd; then
-	echo "警告：lighttpd 服務未���正常啟動"
+	echo "警告：lighttpd 服務未能正常啟動"
 	echo "請檢查日誌文件：$INSTALL_DIR/logs/error.log"
 	exit 1
 fi

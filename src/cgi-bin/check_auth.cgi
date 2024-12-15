@@ -7,7 +7,7 @@ source /opt/panelbase/cgi-bin/auth.cgi
 # 配置
 PANEL_ROOT="/opt/panelbase"
 STATIC_ROOT="$PANEL_ROOT/static"
-HTML_ROOT="$PANEL_ROOT/html"
+HTML_ROOT="$PANEL_ROOT/www"
 
 # 檢查是否為靜態文件請求
 is_static_file() {
@@ -47,7 +47,7 @@ serve_static_file() {
     if [ ! -f "$file_path" ]; then
         send_error 404 "找不到文件"
         return 1
-    }
+    fi
     
     # 設置 MIME 類型
     local mime_type=$(get_mime_type "$file_path")
@@ -72,15 +72,20 @@ serve_html_file() {
         path="/index.html"
     fi
     
+    # 檢查是否需要認證
+    if [ "$path" != "/index.html" ] && ! check_auth; then
+        # 如果未認證且不是訪問登入頁面，重定向到根目錄
+        echo "Status: 302 Found"
+        echo "Location: /"
+        echo
+        return 0
+    fi
+    
     # 檢查文件是否存在
     file_path="$HTML_ROOT$path"
     if [ ! -f "$file_path" ]; then
-        # 如果找不到文件，檢查是否需要認證
-        if ! check_auth; then
-            file_path="$HTML_ROOT/login.html"
-        else
-            file_path="$HTML_ROOT/panel.html"
-        fi
+        send_error 404 "找不到文件"
+        return 1
     fi
     
     # 輸出 HTML 內容
@@ -106,6 +111,10 @@ main() {
         if echo "$QUERY_STRING" | grep -q "action=\(login\|logout\|get_username\|change_password\|change_username\)"; then
             exec /opt/panelbase/cgi-bin/auth.cgi
         else
+            if ! check_auth; then
+                send_unauthorized
+                exit 1
+            fi
             exec /opt/panelbase/cgi-bin/panel.cgi
         fi
         exit $?

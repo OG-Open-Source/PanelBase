@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # 配置
-CACHE_DIR="/opt/panelbase/cache"
-CACHE_TIMEOUT=60  # 緩存過期時間（秒）
+readonly CACHE_DIR="/opt/panelbase/cache"
+readonly CACHE_TIMEOUT=60  # 緩存過期時間（秒）
 
 # 創建緩存目錄
 mkdir -p "$CACHE_DIR"
@@ -18,16 +18,14 @@ get_cache() {
     local key="$1"
     local cache_file="$CACHE_DIR/$(get_cache_key "$key")"
     
-    if [ -f "$cache_file" ]; then
-        local cache_time=$(stat -c %Y "$cache_file")
-        local current_time=$(date +%s)
-        local age=$((current_time - cache_time))
-        
-        if [ $age -lt $CACHE_TIMEOUT ]; then
-            cat "$cache_file"
-            return 0
-        fi
-    fi
+    [ ! -f "$cache_file" ] && return 1
+    
+    local current_time cache_time age
+    current_time=$(date +%s)
+    cache_time=$(stat -c %Y "$cache_file")
+    age=$((current_time - cache_time))
+    
+    [ $age -lt $CACHE_TIMEOUT ] && cat "$cache_file" && return 0
     return 1
 }
 
@@ -55,6 +53,7 @@ validate_param() {
     local param_type="$3"
     local required="$4"
     local extra_param="$5"
+    local error_msg
     
     # 檢查必填參數
     if [ "$required" = "true" ] && [ -z "$param_value" ]; then
@@ -63,49 +62,37 @@ validate_param() {
     fi
     
     # 如果參數為空且非必填，則通過驗證
-    if [ -z "$param_value" ] && [ "$required" != "true" ]; then
-        return 0
-    fi
+    [ -z "$param_value" ] && [ "$required" != "true" ] && return 0
     
     case "$param_type" in
         "int")
-            if ! [[ "$param_value" =~ ^[0-9]+$ ]]; then
-                echo "錯誤：參數 $param_name 必須為整數"
-                return 1
-            fi
+            [[ "$param_value" =~ ^[0-9]+$ ]] && return 0
+            error_msg="必須為整數"
             ;;
         "float")
-            if ! [[ "$param_value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-                echo "錯誤：參數 $param_name 必須為數字"
-                return 1
-            fi
+            [[ "$param_value" =~ ^[0-9]+(\.[0-9]+)?$ ]] && return 0
+            error_msg="必須為數字"
             ;;
         "email")
-            if ! [[ "$param_value" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then
-                echo "錯誤：參數 $param_name 必須為有效的電子郵件地址"
-                return 1
-            fi
+            [[ "$param_value" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] && return 0
+            error_msg="必須為有效的電子郵件地址"
             ;;
         "date")
-            if ! date -d "$param_value" >/dev/null 2>&1; then
-                echo "錯誤：參數 $param_name 必須為有效的日期格式"
-                return 1
-            fi
+            date -d "$param_value" >/dev/null 2>&1 && return 0
+            error_msg="必須為有效的日期格式"
             ;;
         "enum")
-            if ! echo "$extra_param" | grep -q "^$param_value$"; then
-                echo "錯誤：參數 $param_name 必須為以下值之一：$extra_param"
-                return 1
-            fi
+            echo "$extra_param" | grep -q "^$param_value$" && return 0
+            error_msg="必須為以下值之一：$extra_param"
             ;;
         "regex")
-            if ! [[ "$param_value" =~ $extra_param ]]; then
-                echo "錯誤：參數 $param_name 格式不正確"
-                return 1
-            fi
+            [[ "$param_value" =~ $extra_param ]] && return 0
+            error_msg="格式不正確"
             ;;
     esac
-    return 0
+    
+    echo "錯誤：參數 $param_name $error_msg"
+    return 1
 }
 
 # 解析查詢字符串
@@ -114,7 +101,8 @@ parse_query_string() {
     declare -A params
     
     if [ -n "$query" ]; then
-        IFS='&' read -ra pairs <<< "$query"
+        local IFS='&' pairs pair key value
+        read -ra pairs <<< "$query"
         for pair in "${pairs[@]}"; do
             IFS='=' read -r key value <<< "$pair"
             # URL 解碼
@@ -133,12 +121,13 @@ url_encode() {
     local string="$1"
     local length="${#string}"
     local encoded=""
+    local i c
     
-    for (( i=0; i<length; i++ )); do
-        local c="${string:i:1}"
+    for ((i=0; i<length; i++)); do
+        c="${string:i:1}"
         case "$c" in
             [a-zA-Z0-9.~_-]) encoded+="$c" ;;
-            *) encoded+=$(printf '%%%02X' "'$c") ;;
+            *) printf -v encoded '%s%%%02X' "$encoded" "'$c" ;;
         esac
     done
     
@@ -185,9 +174,7 @@ send_success() {
 }
 
 # 如果是被其他腳本導入，則不執行以下代碼
-if [ "${BASH_SOURCE[0]}" != "$0" ]; then
-    return 0
-fi
+[ "${BASH_SOURCE[0]}" != "$0" ] && return 0
 
 # 處理請求
 ACTION=$(echo "$QUERY_STRING" | grep -oP 'action=\K[^&]+')
