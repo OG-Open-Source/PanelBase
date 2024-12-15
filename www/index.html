@@ -6,30 +6,29 @@
 	<title>PanelBase Login</title>
 	<style>
 		:root {
-			--bg-color: #f5f5f5;
-			--card-bg: #ffffff;
-			--text-color: #333333;
-			--border-color: #e0e0e0;
-			--input-bg: #ffffff;
-			--input-border: #cccccc;
-			--button-bg: #2c3e50;
-			--button-hover: #34495e;
+			--gradient-start: #2980b9;
+			--gradient-end: #2c3e50;
+			--card-bg: rgba(255, 255, 255, 0.95);
+			--text-primary: #2c3e50;
+			--text-secondary: #7f8c8d;
+			--accent-color: #3498db;
 			--error-color: #e74c3c;
+			--border-color: rgba(0, 0, 0, 0.1);
 			--shadow-color: rgba(0, 0, 0, 0.1);
+			--input-bg: rgba(255, 255, 255, 0.9);
 		}
 
 		@media (prefers-color-scheme: dark) {
 			:root {
-				--bg-color: #1a1a1a;
-				--card-bg: #2d2d2d;
-				--text-color: #e0e0e0;
-				--border-color: #404040;
-				--input-bg: #3d3d3d;
-				--input-border: #505050;
-				--button-bg: #3498db;
-				--button-hover: #2980b9;
-				--error-color: #e74c3c;
+				--gradient-start: #1a1a2e;
+				--gradient-end: #16213e;
+				--card-bg: rgba(30, 30, 46, 0.95);
+				--text-primary: #ecf0f1;
+				--text-secondary: #bdc3c7;
+				--accent-color: #3498db;
+				--border-color: rgba(255, 255, 255, 0.1);
 				--shadow-color: rgba(0, 0, 0, 0.3);
+				--input-bg: rgba(45, 45, 61, 0.9);
 			}
 		}
 
@@ -37,39 +36,98 @@
 			margin: 0;
 			padding: 0;
 			box-sizing: border-box;
-			transition: background-color 0.3s, color 0.3s;
+			transition: all 0.3s ease;
 		}
 
 		body {
 			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-			background-color: var(--bg-color);
-			color: var(--text-color);
+			background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+			color: var(--text-primary);
 			min-height: 100vh;
 			display: flex;
 			justify-content: center;
 			align-items: center;
 			padding: 20px;
+			position: relative;
+			overflow: hidden;
+		}
+
+		.background-animation {
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			z-index: 0;
+			opacity: 0.5;
+		}
+
+		.circle {
+			position: absolute;
+			border-radius: 50%;
+			background: radial-gradient(circle at center, var(--accent-color), transparent);
+			animation: float 20s infinite linear;
+			opacity: 0.1;
+		}
+
+		.circle:nth-child(1) {
+			width: 300px;
+			height: 300px;
+			top: -150px;
+			left: -150px;
+			animation-delay: 0s;
+		}
+
+		.circle:nth-child(2) {
+			width: 400px;
+			height: 400px;
+			bottom: -200px;
+			right: -200px;
+			animation-delay: -5s;
+		}
+
+		.circle:nth-child(3) {
+			width: 200px;
+			height: 200px;
+			top: 50%;
+			left: 50%;
+			animation-delay: -10s;
+		}
+
+		@keyframes float {
+			0% {
+				transform: translate(0, 0) rotate(0deg);
+			}
+			50% {
+				transform: translate(100px, 100px) rotate(180deg);
+			}
+			100% {
+				transform: translate(0, 0) rotate(360deg);
+			}
 		}
 
 		.login-container {
-			background-color: var(--card-bg);
-			padding: 2rem;
-			border-radius: 12px;
-			box-shadow: 0 8px 24px var(--shadow-color);
+			background: var(--card-bg);
+			padding: 2.5rem;
+			border-radius: 20px;
+			box-shadow: 0 8px 32px var(--shadow-color);
 			width: 100%;
 			max-width: 400px;
-			animation: fadeIn 0.5s ease-out;
 			position: relative;
+			z-index: 1;
+			backdrop-filter: blur(10px);
+			border: 1px solid var(--border-color);
+			animation: fadeIn 0.5s ease-out;
 		}
 
 		@keyframes fadeIn {
 			from {
 				opacity: 0;
-				transform: translateY(-20px);
+				transform: translateY(-20px) scale(0.95);
 			}
 			to {
 				opacity: 1;
-				transform: translateY(0);
+				transform: translateY(0) scale(1);
 			}
 		}
 
@@ -79,42 +137,56 @@
 		}
 
 		.login-header h1 {
-			font-size: 2rem;
-			font-weight: 600;
+			font-size: 2.5rem;
+			font-weight: 700;
 			margin-bottom: 0.5rem;
-			color: var(--text-color);
+			background: linear-gradient(45deg, #3498db, #2ecc71);
+			-webkit-background-clip: text;
+			background-clip: text;
+			-webkit-text-fill-color: transparent;
+			text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
 		}
 
 		.login-header p {
-			color: var(--text-color);
-			opacity: 0.8;
+			color: var(--text-secondary);
+			font-size: 1.1rem;
 		}
 
 		.form-group {
 			margin-bottom: 1.5rem;
+			position: relative;
 		}
 
 		.form-group label {
 			display: block;
 			margin-bottom: 0.5rem;
-			color: var(--text-color);
+			color: var(--text-primary);
 			font-weight: 500;
+			font-size: 0.95rem;
 		}
 
 		.form-group input {
 			width: 100%;
 			padding: 0.75rem 1rem;
-			border: 1px solid var(--input-border);
-			border-radius: 6px;
-			background-color: var(--input-bg);
-			color: var(--text-color);
+			padding-left: 2.5rem;
+			border: 1px solid var(--border-color);
+			border-radius: 12px;
+			background: var(--input-bg);
+			color: var(--text-primary);
 			font-size: 1rem;
 			transition: all 0.3s ease;
 		}
 
+		.form-group i {
+			position: absolute;
+			left: 1rem;
+			top: 2.4rem;
+			color: var(--text-secondary);
+		}
+
 		.form-group input:focus {
 			outline: none;
-			border-color: var(--button-bg);
+			border-color: var(--accent-color);
 			box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
 		}
 
@@ -123,28 +195,47 @@
 			font-size: 0.9rem;
 			margin-top: 0.5rem;
 			display: none;
+			padding: 0.5rem;
+			border-radius: 8px;
+			background: rgba(231, 76, 60, 0.1);
+			text-align: center;
 		}
 
 		.submit-button {
 			width: 100%;
 			padding: 0.75rem;
-			background-color: var(--button-bg);
+			background: var(--accent-color);
 			color: white;
 			border: none;
-			border-radius: 6px;
+			border-radius: 12px;
 			font-size: 1rem;
-			font-weight: 500;
+			font-weight: 600;
 			cursor: pointer;
 			transition: all 0.3s ease;
+			position: relative;
+			overflow: hidden;
 		}
 
-		.submit-button:hover {
-			background-color: var(--button-hover);
-			transform: translateY(-1px);
+		.submit-button::before {
+			content: '';
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			width: 0;
+			height: 0;
+			background: rgba(255, 255, 255, 0.2);
+			border-radius: 50%;
+			transform: translate(-50%, -50%);
+			transition: width 0.6s ease, height 0.6s ease;
+		}
+
+		.submit-button:hover::before {
+			width: 300px;
+			height: 300px;
 		}
 
 		.submit-button:active {
-			transform: translateY(0);
+			transform: scale(0.98);
 		}
 
 		.language-selector {
@@ -153,38 +244,41 @@
 			right: 1rem;
 			display: flex;
 			gap: 0.5rem;
+			z-index: 2;
 		}
 
 		.language-button {
 			background: none;
 			border: 1px solid var(--border-color);
-			color: var(--text-color);
-			padding: 0.25rem 0.5rem;
-			border-radius: 4px;
+			color: var(--text-primary);
+			padding: 0.5rem 1rem;
+			border-radius: 8px;
 			cursor: pointer;
-			font-size: 0.8rem;
+			font-size: 0.9rem;
 			transition: all 0.3s ease;
+			backdrop-filter: blur(5px);
 		}
 
 		.language-button:hover {
-			background-color: var(--button-bg);
+			background: var(--accent-color);
 			color: white;
-			border-color: var(--button-bg);
+			border-color: var(--accent-color);
+			transform: translateY(-2px);
 		}
 
 		.language-button.active {
-			background-color: var(--button-bg);
+			background: var(--accent-color);
 			color: white;
-			border-color: var(--button-bg);
+			border-color: var(--accent-color);
 		}
 
 		@media (max-width: 480px) {
 			.login-container {
-				padding: 1.5rem;
+				padding: 2rem;
 			}
 
 			.login-header h1 {
-				font-size: 1.75rem;
+				font-size: 2rem;
 			}
 
 			.language-selector {
@@ -192,12 +286,44 @@
 				top: 0;
 				right: 0;
 				justify-content: center;
-				margin-bottom: 1rem;
+				margin-bottom: 1.5rem;
 			}
+
+			.language-button {
+				padding: 0.4rem 0.8rem;
+			}
+		}
+
+		@keyframes spin {
+			0% { transform: rotate(0deg); }
+			100% { transform: rotate(360deg); }
+		}
+
+		.loading {
+			display: inline-block;
+			width: 1.5rem;
+			height: 1.5rem;
+			border: 3px solid rgba(255, 255, 255, 0.3);
+			border-radius: 50%;
+			border-top-color: white;
+			animation: spin 1s ease-in-out infinite;
+			margin-right: 0.5rem;
+			vertical-align: middle;
+			display: none;
+		}
+
+		.submit-button.loading .loading {
+			display: inline-block;
 		}
 	</style>
 </head>
 <body>
+	<div class="background-animation">
+		<div class="circle"></div>
+		<div class="circle"></div>
+		<div class="circle"></div>
+	</div>
+
 	<div class="login-container">
 		<div class="language-selector">
 			<button class="language-button" onclick="changeLanguage('en')" data-lang="en">EN</button>
@@ -211,16 +337,23 @@
 		<form id="loginForm" onsubmit="handleLogin(event)">
 			<div class="form-group">
 				<label for="username" data-i18n="username">用戶名</label>
+				<i class="fas fa-user"></i>
 				<input type="text" id="username" name="username" required autocomplete="username">
 			</div>
 			<div class="form-group">
 				<label for="password" data-i18n="password">密碼</label>
+				<i class="fas fa-lock"></i>
 				<input type="password" id="password" name="password" required autocomplete="current-password">
 				<div id="errorMessage" class="error-message"></div>
 			</div>
-			<button type="submit" class="submit-button" data-i18n="login-button">登入</button>
+			<button type="submit" class="submit-button">
+				<span class="loading"></span>
+				<span data-i18n="login-button">登入</span>
+			</button>
 		</form>
 	</div>
+
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
 	<script>
 		const i18n = {
@@ -288,7 +421,8 @@
 			
 			try {
 				submitButton.disabled = true;
-				submitButton.textContent = i18n[currentLanguage]['logging-in'];
+				submitButton.classList.add('loading');
+				submitButton.querySelector('[data-i18n="login-button"]').textContent = i18n[currentLanguage]['logging-in'];
 				
 				const username = document.getElementById('username').value;
 				const password = document.getElementById('password').value;
@@ -304,14 +438,17 @@
 				const data = await response.json();
 				
 				if (response.ok && data === 0) {
-					window.location.href = '/panel.html';
+					submitButton.style.background = '#27ae60';
+					setTimeout(() => {
+						window.location.href = '/panel.html';
+					}, 500);
 				} else {
 					errorMessage.textContent = i18n[currentLanguage]['error-invalid'];
 					errorMessage.style.display = 'block';
 					submitButton.disabled = false;
-					submitButton.textContent = i18n[currentLanguage]['login-button'];
+					submitButton.classList.remove('loading');
+					submitButton.querySelector('[data-i18n="login-button"]').textContent = i18n[currentLanguage]['login-button'];
 					
-					// 輕微震動效果
 					const form = document.getElementById('loginForm');
 					form.style.animation = 'shake 0.5s';
 					setTimeout(() => form.style.animation = '', 500);
@@ -321,7 +458,8 @@
 				errorMessage.textContent = i18n[currentLanguage]['error-server'];
 				errorMessage.style.display = 'block';
 				submitButton.disabled = false;
-				submitButton.textContent = i18n[currentLanguage]['login-button'];
+				submitButton.classList.remove('loading');
+				submitButton.querySelector('[data-i18n="login-button"]').textContent = i18n[currentLanguage]['login-button'];
 			}
 		}
 
@@ -329,8 +467,8 @@
 		style.textContent = `
 			@keyframes shake {
 				0%, 100% { transform: translateX(0); }
-				25% { transform: translateX(-5px); }
-				75% { transform: translateX(5px); }
+				25% { transform: translateX(-10px); }
+				75% { transform: translateX(10px); }
 			}
 		`;
 		document.head.appendChild(style);

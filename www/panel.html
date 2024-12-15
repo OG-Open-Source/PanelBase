@@ -5,23 +5,65 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<title>PanelBase 管理面板</title>
 		<style>
-			body {
-				font-family: Arial, sans-serif;
+			:root {
+				--gradient-start: #2980b9;
+				--gradient-end: #2c3e50;
+				--card-bg: rgba(255, 255, 255, 0.95);
+				--text-primary: #2c3e50;
+				--text-secondary: #7f8c8d;
+				--accent-color: #3498db;
+				--success-color: #27ae60;
+				--warning-color: #f39c12;
+				--error-color: #e74c3c;
+				--border-color: rgba(0, 0, 0, 0.1);
+				--shadow-color: rgba(0, 0, 0, 0.1);
+				--chart-bg: rgba(52, 152, 219, 0.2);
+				--chart-line: #3498db;
+			}
+
+			@media (prefers-color-scheme: dark) {
+				:root {
+					--gradient-start: #1a1a2e;
+					--gradient-end: #16213e;
+					--card-bg: rgba(30, 30, 46, 0.95);
+					--text-primary: #ecf0f1;
+					--text-secondary: #bdc3c7;
+					--accent-color: #3498db;
+					--border-color: rgba(255, 255, 255, 0.1);
+					--shadow-color: rgba(0, 0, 0, 0.3);
+					--chart-bg: rgba(52, 152, 219, 0.1);
+				}
+			}
+
+			* {
 				margin: 0;
 				padding: 0;
-				background-color: #f5f5f5;
+				box-sizing: border-box;
+				transition: all 0.3s ease;
 			}
+
+			body {
+				font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+				background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+				color: var(--text-primary);
+				min-height: 100vh;
+				line-height: 1.6;
+			}
+
 			.container {
 				max-width: 1200px;
 				margin: 0 auto;
 				padding: 20px;
 			}
+
 			.header {
-				background-color: #2c3e50;
-				color: white;
+				background: rgba(0, 0, 0, 0.2);
+				backdrop-filter: blur(10px);
 				padding: 1rem;
-				margin-bottom: 20px;
+				margin-bottom: 30px;
+				border-bottom: 1px solid var(--border-color);
 			}
+
 			.header-content {
 				display: flex;
 				justify-content: space-between;
@@ -29,87 +71,164 @@
 				max-width: 1200px;
 				margin: 0 auto;
 			}
-			.user-info {
+
+			.header h1 {
+				font-size: 1.8rem;
+				font-weight: 600;
+				background: linear-gradient(45deg, #3498db, #2ecc71);
+				-webkit-background-clip: text;
+				background-clip: text;
+				-webkit-text-fill-color: transparent;
+				text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+			}
+
+			.user-controls {
+				display: flex;
+				gap: 10px;
+				align-items: center;
+			}
+
+			.button {
+				background: var(--accent-color);
+				color: white;
+				border: none;
+				padding: 8px 16px;
+				border-radius: 8px;
+				cursor: pointer;
 				font-size: 0.9rem;
 				display: flex;
 				align-items: center;
-				gap: 10px;
+				gap: 5px;
+				transition: transform 0.2s ease, box-shadow 0.2s ease;
 			}
-			.button {
-				background: #34495e;
-				border: none;
-				color: white;
-				padding: 5px 15px;
-				cursor: pointer;
-				border-radius: 4px;
-				font-size: 0.9rem;
-			}
+
 			.button:hover {
-				background: #2c3e50;
+				transform: translateY(-2px);
+				box-shadow: 0 4px 12px var(--shadow-color);
 			}
+
+			.button:active {
+				transform: translateY(0);
+			}
+
 			.logout-btn {
-				background: none;
-				border: 1px solid white;
-				color: white;
-				padding: 5px 15px;
-				border-radius: 4px;
-				cursor: pointer;
+				background: transparent;
+				border: 1px solid var(--accent-color);
+				color: var(--accent-color);
 			}
+
 			.logout-btn:hover {
-				background: rgba(255,255,255,0.1);
+				background: var(--accent-color);
+				color: white;
 			}
+
 			.panel-grid {
 				display: grid;
 				grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 				gap: 20px;
 				margin-top: 20px;
 			}
+
 			.panel-item {
-				background: white;
-				padding: 20px;
-				border-radius: 8px;
-				box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+				background: var(--card-bg);
+				padding: 25px;
+				border-radius: 16px;
+				box-shadow: 0 8px 32px var(--shadow-color);
+				backdrop-filter: blur(10px);
+				border: 1px solid var(--border-color);
+				position: relative;
+				overflow: hidden;
 			}
+
+			.panel-item::before {
+				content: '';
+				position: absolute;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 4px;
+				background: linear-gradient(90deg, var(--accent-color), transparent);
+			}
+
 			.panel-item h3 {
-				margin-top: 0;
-				color: #2c3e50;
+				color: var(--text-primary);
+				font-size: 1.2rem;
+				margin-bottom: 20px;
+				display: flex;
+				align-items: center;
+				gap: 8px;
 			}
+
 			.info-grid {
 				display: grid;
 				grid-template-columns: auto 1fr;
-				gap: 10px;
-				margin-top: 10px;
+				gap: 15px;
+				align-items: center;
 			}
+
 			.info-label {
-				font-weight: bold;
-				color: #666;
+				color: var(--text-secondary);
+				font-weight: 500;
 			}
+
 			.info-value {
-				color: #333;
+				color: var(--text-primary);
+				font-weight: 600;
+				text-align: right;
 			}
+
+			.chart-container {
+				margin-top: 20px;
+				height: 60px;
+				background: var(--chart-bg);
+				border-radius: 8px;
+				overflow: hidden;
+				position: relative;
+			}
+
+			.chart-line {
+				position: absolute;
+				bottom: 0;
+				left: 0;
+				width: 100%;
+				height: 2px;
+				background: var(--chart-line);
+			}
+
+			.chart-point {
+				position: absolute;
+				width: 6px;
+				height: 6px;
+				background: var(--chart-line);
+				border-radius: 50%;
+				transform: translate(-50%, -50%);
+			}
+
+			.status-indicator {
+				display: inline-flex;
+				align-items: center;
+				gap: 5px;
+				padding: 4px 12px;
+				border-radius: 12px;
+				font-size: 0.9rem;
+				font-weight: 500;
+			}
+
 			.status-ok {
-				color: #27ae60;
+				background: rgba(39, 174, 96, 0.1);
+				color: var(--success-color);
 			}
+
 			.status-warning {
-				color: #f39c12;
+				background: rgba(243, 156, 18, 0.1);
+				color: var(--warning-color);
 			}
+
 			.status-error {
-				color: #c0392b;
+				background: rgba(231, 76, 60, 0.1);
+				color: var(--error-color);
 			}
-			.error-message {
-				color: #c0392b;
-				text-align: center;
-				padding: 10px;
-				background: #fde8e8;
-				border-radius: 4px;
-				margin-bottom: 10px;
-				display: none;
-			}
-			.random-number {
-				font-size: 1.2em;
-				font-weight: bold;
-				color: #2c3e50;
-			}
+
 			.modal {
 				display: none;
 				position: fixed;
@@ -117,76 +236,149 @@
 				left: 0;
 				width: 100%;
 				height: 100%;
-				background: rgba(0,0,0,0);
+				background: rgba(0, 0, 0, 0);
+				backdrop-filter: blur(5px);
 				z-index: 1000;
-				transition: background-color 0.3s ease;
-				pointer-events: none;
+				transition: all 0.3s ease;
+				opacity: 0;
 			}
+
 			.modal.show {
 				display: block;
-				background: rgba(0,0,0,0.5);
-				pointer-events: auto;
+				opacity: 1;
+				background: rgba(0, 0, 0, 0.5);
 			}
+
 			.modal-content {
-				background: white;
-				padding: 20px;
-				border-radius: 8px;
+				background: var(--card-bg);
+				padding: 30px;
+				border-radius: 16px;
 				max-width: 400px;
 				margin: 100px auto;
-				box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+				box-shadow: 0 8px 32px var(--shadow-color);
 				transform: translateY(-20px);
 				opacity: 0;
 				transition: all 0.3s ease;
+				border: 1px solid var(--border-color);
 			}
+
 			.modal.show .modal-content {
 				transform: translateY(0);
 				opacity: 1;
 			}
+
 			.form-group {
-				margin-bottom: 15px;
+				margin-bottom: 20px;
 			}
+
 			.form-group label {
 				display: block;
-				margin-bottom: 5px;
-				color: #2c3e50;
+				margin-bottom: 8px;
+				color: var(--text-primary);
+				font-weight: 500;
 			}
+
 			.form-group input {
 				width: 100%;
-				padding: 8px;
-				border: 1px solid #ddd;
-				border-radius: 4px;
-				box-sizing: border-box;
+				padding: 10px;
+				border: 1px solid var(--border-color);
+				border-radius: 8px;
+				background: var(--card-bg);
+				color: var(--text-primary);
+				font-size: 1rem;
 			}
+
 			.form-group input:focus {
-				border-color: #3498db;
 				outline: none;
+				border-color: var(--accent-color);
+				box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
 			}
+
+			.error-message {
+				color: var(--error-color);
+				background: rgba(231, 76, 60, 0.1);
+				padding: 10px;
+				border-radius: 8px;
+				margin-bottom: 15px;
+				display: none;
+			}
+
 			.modal-buttons {
 				display: flex;
 				justify-content: flex-end;
 				gap: 10px;
-				margin-top: 20px;
+				margin-top: 25px;
 			}
+
 			.toast {
 				position: fixed;
 				top: 20px;
 				right: 20px;
 				padding: 15px 25px;
-				border-radius: 4px;
+				border-radius: 12px;
 				color: white;
 				font-size: 0.9rem;
 				z-index: 2000;
 				opacity: 0;
-				transition: opacity 0.3s ease-in-out;
+				transform: translateX(100%);
+				transition: all 0.3s ease;
+				backdrop-filter: blur(10px);
 			}
+
 			.toast.success {
-				background-color: #27ae60;
+				background: rgba(39, 174, 96, 0.9);
 			}
+
 			.toast.error {
-				background-color: #c0392b;
+				background: rgba(231, 76, 60, 0.9);
 			}
+
 			.toast.show {
 				opacity: 1;
+				transform: translateX(0);
+			}
+
+			@media (max-width: 768px) {
+				.header-content {
+					flex-direction: column;
+					gap: 15px;
+					text-align: center;
+				}
+
+				.user-controls {
+					flex-wrap: wrap;
+					justify-content: center;
+				}
+
+				.panel-grid {
+					grid-template-columns: 1fr;
+				}
+
+				.modal-content {
+					margin: 20px;
+					padding: 20px;
+				}
+			}
+
+			/* 動畫效果 */
+			@keyframes pulse {
+				0% { transform: scale(1); }
+				50% { transform: scale(1.05); }
+				100% { transform: scale(1); }
+			}
+
+			@keyframes float {
+				0% { transform: translateY(0px); }
+				50% { transform: translateY(-10px); }
+				100% { transform: translateY(0px); }
+			}
+
+			.pulse {
+				animation: pulse 2s infinite;
+			}
+
+			.float {
+				animation: float 3s ease-in-out infinite;
 			}
 		</style>
 	</head>
@@ -194,39 +386,52 @@
 		<div class="header">
 			<div class="header-content">
 				<h1>PanelBase</h1>
-				<div class="user-info">
-					<button class="button" onclick="showChangeUsername()">修改用戶名</button>
-					<button class="button" onclick="showChangePassword()">修改密碼</button>
-					<button class="logout-btn" onclick="handleLogout()">登出</button>
+				<div class="user-controls">
+					<button class="button" onclick="showChangeUsername()">
+						<i class="fas fa-user"></i>修改用戶名
+					</button>
+					<button class="button" onclick="showChangePassword()">
+						<i class="fas fa-key"></i>修改密碼
+					</button>
+					<button class="button logout-btn" onclick="handleLogout()">
+						<i class="fas fa-sign-out-alt"></i>登出
+					</button>
 				</div>
 			</div>
 		</div>
 
 		<div class="container">
-			<div id="errorMessage" class="error-message"></div>
 			<div class="panel-grid">
 				<div class="panel-item">
-					<h3>系統資訊</h3>
+					<h3><i class="fas fa-microchip"></i>系統資源</h3>
 					<div class="info-grid">
-						<span class="info-label">CPU 使用率：</span>
+						<span class="info-label">CPU 使用率</span>
 						<span class="info-value" id="cpu-usage">載入中...</span>
+						<div class="chart-container" id="cpu-chart"></div>
 
-						<span class="info-label">記憶體使用：</span>
+						<span class="info-label">記憶體使用</span>
 						<span class="info-value" id="memory-usage">載入中...</span>
 
-						<span class="info-label">磁碟使用：</span>
+						<span class="info-label">磁碟使用</span>
 						<span class="info-value" id="disk-usage">載入中...</span>
-
-						<span class="info-label">隨機數：</span>
-						<span class="info-value random-number" id="random-number">載入中...</span>
 					</div>
 				</div>
 
 				<div class="panel-item">
-					<h3>服務狀態</h3>
+					<h3><i class="fas fa-server"></i>服務狀態</h3>
 					<div class="info-grid">
-						<span class="info-label">Lighttpd：</span>
-						<span class="info-value" id="lighttpd-status">載入中...</span>
+						<span class="info-label">Lighttpd</span>
+						<span class="info-value">
+							<span class="status-indicator" id="lighttpd-status">載入中...</span>
+						</span>
+					</div>
+				</div>
+
+				<div class="panel-item float">
+					<h3><i class="fas fa-random"></i>系統隨機數</h3>
+					<div class="info-grid">
+						<span class="info-label">當前值</span>
+						<span class="info-value random-number pulse" id="random-number">載入中...</span>
 					</div>
 				</div>
 			</div>
@@ -237,14 +442,14 @@
 			<div class="modal-content">
 				<h2>修改用戶名</h2>
 				<div class="form-group">
-					<label>新用戶名：</label>
-					<input type="text" id="newUsername">
+					<label>新用戶名</label>
+					<input type="text" id="newUsername" placeholder="請輸入新用戶名">
 				</div>
 				<div class="form-group">
-					<label>確認密碼：</label>
-					<input type="password" id="usernamePassword">
+					<label>確認密碼</label>
+					<input type="password" id="usernamePassword" placeholder="請輸入當前密碼">
 				</div>
-				<div id="usernameError" class="error"></div>
+				<div id="usernameError" class="error-message"></div>
 				<div class="modal-buttons">
 					<button class="button" onclick="closeModal('usernameModal')">取消</button>
 					<button class="button" onclick="changeUsername()">確認</button>
@@ -257,14 +462,14 @@
 			<div class="modal-content">
 				<h2>修改密碼</h2>
 				<div class="form-group">
-					<label>舊密碼：</label>
-					<input type="password" id="oldPassword">
+					<label>當前密碼</label>
+					<input type="password" id="oldPassword" placeholder="請輸入當前密碼">
 				</div>
 				<div class="form-group">
-					<label>新密碼：</label>
-					<input type="password" id="newPassword">
+					<label>新密碼</label>
+					<input type="password" id="newPassword" placeholder="請輸入新密碼">
 				</div>
-				<div id="passwordError" class="error"></div>
+				<div id="passwordError" class="error-message"></div>
 				<div class="modal-buttons">
 					<button class="button" onclick="closeModal('passwordModal')">取消</button>
 					<button class="button" onclick="changePassword()">確認</button>
@@ -272,7 +477,33 @@
 			</div>
 		</div>
 
+		<!-- Font Awesome -->
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
 		<script>
+			// CPU 使用率歷史數據
+			let cpuHistory = Array(20).fill(0);
+			
+			// 更新 CPU 圖表
+			function updateCPUChart(value) {
+				cpuHistory.push(parseFloat(value));
+				cpuHistory.shift();
+				
+				const chartContainer = document.getElementById('cpu-chart');
+				chartContainer.innerHTML = '';
+				
+				const max = Math.max(...cpuHistory);
+				const min = Math.min(...cpuHistory);
+				
+				cpuHistory.forEach((val, index) => {
+					const point = document.createElement('div');
+					point.className = 'chart-point';
+					point.style.left = `${(index / (cpuHistory.length - 1)) * 100}%`;
+					point.style.bottom = `${((val - min) / (max - min || 1)) * 100}%`;
+					chartContainer.appendChild(point);
+				});
+			}
+
 			// 顯示提示訊息
 			function showToast(message, type = 'success') {
 				const toast = document.createElement('div');
@@ -280,13 +511,10 @@
 				toast.textContent = message;
 				document.body.appendChild(toast);
 
-				// 強制重繪
-				toast.offsetHeight;
+				requestAnimationFrame(() => {
+					toast.classList.add('show');
+				});
 
-				// 顯示
-				toast.classList.add('show');
-
-				// 3秒後移除
 				setTimeout(() => {
 					toast.classList.remove('show');
 					setTimeout(() => {
@@ -295,49 +523,23 @@
 				}, 3000);
 			}
 
-			// 顯示錯誤訊息
-			function showError(message) {
-				const errorElement = document.getElementById('errorMessage');
-				errorElement.textContent = message;
-				errorElement.style.display = 'block';
-				setTimeout(() => {
-					errorElement.style.display = 'none';
-				}, 5000);
-			}
-
-			// 獲取用戶名
-			async function fetchUsername() {
-				try {
-					const response = await fetch('/cgi-bin/auth.cgi?action=get_username', {
-						cache: 'no-store'
-					});
-					if (response.ok) {
-						const data = await response.text();
-						document.getElementById('username').textContent = data;
-					} else {
-						throw new Error('Failed to fetch username');
-					}
-				} catch (error) {
-					console.error('Error fetching username:', error);
-					showError('無法獲取用戶名');
-				}
-			}
-
 			// 更新系統資訊
 			async function updateSystemInfo() {
 				try {
 					const response = await fetch('/cgi-bin/panel.cgi?action=get_system_info', {
 						cache: 'no-store'
 					});
-					if (!response.ok) {
-						throw new Error('Failed to fetch system info');
-					}
+					
+					if (!response.ok) throw new Error('Failed to fetch system info');
+					
 					const data = await response.json();
 					
 					// 更新 CPU 使用率
-					document.getElementById('cpu-usage').textContent = data.cpu + '%';
+					const cpuValue = parseFloat(data.cpu);
+					document.getElementById('cpu-usage').textContent = `${cpuValue.toFixed(1)}%`;
+					updateCPUChart(cpuValue);
 					
-					// 更新記憶體使用情況
+					// 更新記���體使用情況
 					document.getElementById('memory-usage').textContent = data.memory;
 					
 					// 更新磁碟使用情況
@@ -347,13 +549,13 @@
 					document.getElementById('random-number').textContent = data.random;
 					
 					// 更新服務狀態
-					const lighttpdStatus = document.getElementById('lighttpd-status');
-					lighttpdStatus.textContent = data.lighttpd_status;
-					lighttpdStatus.className = data.lighttpd_status === '運行中' ? 'status-ok' : 'status-error';
+					const statusElement = document.getElementById('lighttpd-status');
+					statusElement.textContent = data.lighttpd_status;
+					statusElement.className = `status-indicator ${data.lighttpd_status === '運行中' ? 'status-ok' : 'status-error'}`;
 					
 				} catch (error) {
 					console.error('Error updating system info:', error);
-					showError('無法更新系統資訊');
+					showToast('無法更新系統資訊', 'error');
 				}
 			}
 
@@ -490,18 +692,9 @@
 
 			// 初始化
 			updateSystemInfo();
-			
-			// 定期更新系統資訊
 			setInterval(updateSystemInfo, 1000);
 
-			// 點擊對話框外部時關閉對話框
-			window.onclick = function(event) {
-				if (event.target.classList.contains('modal')) {
-					closeModal(event.target.id);
-				}
-			}
-
-			// 按 ESC 鍵關閉對話框
+			// 事件監聽器
 			document.addEventListener('keydown', function(event) {
 				if (event.key === 'Escape') {
 					document.querySelectorAll('.modal').forEach(modal => {
@@ -511,6 +704,12 @@
 					});
 				}
 			});
+
+			window.onclick = function(event) {
+				if (event.target.classList.contains('modal')) {
+					closeModal(event.target.id);
+				}
+			};
 		</script>
 	</body>
 </html>
