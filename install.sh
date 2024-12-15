@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta37"
+Version="Beta38"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -25,19 +25,19 @@ text "${CLR3}=================================${CLR0}"
 
 CHECK_ROOT
 
-INPUT "請輸入管理員用戶名：" username
-username=${username:-admin}
+INPUT "請輸入管理員用戶名：" ADMIN_NAME
+ADMIN_NAME=${ADMIN_NAME:-admin}
 
 while true; do
-	read -s -p "請輸入管理員密碼：" password
-	password=${password:-1917159}
+	read -s -p "請輸入管理員密碼：" ADMIN_PASS
+	ADMIN_PASS=${ADMIN_PASS:-1917159}
 	text
-	read -s -p "請再次輸入密碼：" password2
-	password2=${password2:-1917159}
+	read -s -p "請再次輸入密碼：" ADMIN_PASS2
+	ADMIN_PASS2=${ADMIN_PASS2:-1917159}
 	text
 
-	if [ "$password" = "$password2" ]; then
-		[ ${#password} -lt 6 ] && error "密碼長度必須至少為 6 個字符" || break
+	if [ "$ADMIN_PASS" = "$ADMIN_PASS2" ]; then
+		[ ${#ADMIN_PASS} -lt 6 ] && error "密碼長度必須至少為 6 個字符" || break
 	else
 		error "兩次輸入的密碼不一致，請重新輸入"
 	fi
@@ -50,7 +50,7 @@ if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	INPUT "請輸入自定義面板壓縮檔的路徑：" CUSTOM_ARCHIVE_PATH
 	[ ! -f "$CUSTOM_ARCHIVE_PATH" ] && { error "找不到指定的壓縮檔"; exit 1; }
 	FILE_EXT="${CUSTOM_ARCHIVE_PATH##*.}"
-	deps=(unzip tar gz tgz)
+	deps=(unzip tar)
 	CHECK_DEPS -a
 fi
 
@@ -83,17 +83,54 @@ mv index.html $INSTALL_DIR/www/
 if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	text "正在處理自定義面板文件..."
 	TMP_DIR=$(mktemp -d)
+	text "臨時目錄：$TMP_DIR"
 	
 	case "$FILE_EXT" in
-		"zip") unzip -q "$CUSTOM_ARCHIVE_PATH" -d "$TMP_DIR" ;;
-		"tar") tar xf "$CUSTOM_ARCHIVE_PATH" -C "$TMP_DIR" ;;
-		"gz"|"tgz") tar xzf "$CUSTOM_ARCHIVE_PATH" -C "$TMP_DIR" ;;
+		"zip")
+			text "解壓縮 ZIP 文件..."
+			unzip -q "$CUSTOM_ARCHIVE_PATH" -d "$TMP_DIR"
+			;;
+		"tar")
+			text "解壓縮 TAR 文件..."
+			tar xf "$CUSTOM_ARCHIVE_PATH" -C "$TMP_DIR"
+			;;
+		"gz"|"tgz")
+			text "解壓縮 GZIP 文件..."
+			tar xzf "$CUSTOM_ARCHIVE_PATH" -C "$TMP_DIR"
+			;;
 	esac
-
-	[ ! -f "$TMP_DIR/panel.html" ] && { DEL -d "$TMP_DIR"; error "壓縮檔中缺少 panel.html 文件"; exit 1; }
-	[ -f "$TMP_DIR/index.html" ] && { text "${CLR3}注意：忽略壓縮檔中的 index.html${CLR0}"; rm "$TMP_DIR/index.html"; }
-	cp -r "$TMP_DIR"/* "$INSTALL_DIR/www/"
+	
+	text "解壓縮後的文件列表："
+	ls -la "$TMP_DIR"
+	
+	PANEL_HTML=$(find "$TMP_DIR" -name "panel.html" -type f)
+	
+	if [ -z "$PANEL_HTML" ]; then
+		text "${CLR3}錯誤：在壓縮檔中找不到 panel.html 文件${CLR0}"
+		text "${CLR3}請確保文件名稱正確（區分大小寫）${CLR0}"
+		rm -rf "$TMP_DIR"
+		exit 1
+	else
+		text "找到 panel.html：$PANEL_HTML"
+		if [ "$(dirname "$PANEL_HTML")" != "$TMP_DIR" ]; then
+			text "移動 panel.html 到頂層目錄..."
+			mv "$PANEL_HTML" "$TMP_DIR/"
+		fi
+	fi
+	
+	if [ -f "$TMP_DIR/index.html" ]; then
+		text "${CLR3}注意：忽略壓縮檔中的 index.html${CLR0}"
+		rm "$TMP_DIR/index.html"
+	fi
+	
+	text "複製文件到安裝目錄..."
+	cp -rv "$TMP_DIR"/* "$INSTALL_DIR/www/"
+	
+	text "安裝目錄文件列表："
+	ls -la "$INSTALL_DIR/www/"
+	
 	rm -rf "$TMP_DIR"
+	
 	text "${CLR2}自定義面板文件安裝完成${CLR0}"
 else
 	mv panel.html $INSTALL_DIR/www/
@@ -154,7 +191,7 @@ static-file.exclude-extensions = ( ".cgi" )
 EOF
 
 text "創建用戶配置..."
-text "${username}:$(echo -n "${password}" | md5sum | cut -d' ' -f1)" > $INSTALL_DIR/config/users.conf
+text "${ADMIN_NAME}:$(echo -n "${ADMIN_PASS}" | md5sum | cut -d' ' -f1)" > $INSTALL_DIR/config/users.conf
 touch $INSTALL_DIR/config/sessions.conf
 
 text "設置權限..."
@@ -197,7 +234,7 @@ SERVER_IP=$(hostname -I | awk '{print $1}')
 text "================================="
 text "安裝完成！"
 text "請訪問 http://${SERVER_IP}:8080"
-text "用戶：$username"
-text "密碼：$password"
+text "用戶：$ADMIN_NAME"
+text "密碼：$ADMIN_PASS"
 [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]] && text "已使用自定義面板頁面"
 text "================================="
