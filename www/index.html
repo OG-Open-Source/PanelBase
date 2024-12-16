@@ -60,7 +60,6 @@
 				top: 0;
 				left: 0;
 				right: 0;
-
 				bottom: 0;
 				background:
 					linear-gradient(45deg, transparent 45%, rgba(var(--primary-rgb), 0.03) 50%, transparent 55%),
@@ -655,17 +654,19 @@
 					element.textContent = i18n[currentLanguage][key];
 				});
 				document.documentElement.lang = currentLanguage;
+
+				document.querySelectorAll('[data-lang]').forEach(button => {
+					button.setAttribute('data-active', button.getAttribute('data-lang') === currentLanguage);
+				});
 			}
 
 			function changeLanguage(lang) {
 				currentLanguage = lang;
 				localStorage.setItem('panelbase-language', lang);
 				updateTexts();
-
-				document.querySelectorAll('[data-lang]').forEach(button => {
-					button.style.fontWeight = button.getAttribute('data-lang') === lang ? 'bold' : 'normal';
-				});
 			}
+
+			updateTexts();
 
 			async function handleLogin(event) {
 				event.preventDefault();
@@ -716,8 +717,6 @@
 					submitButton.querySelector('[data-i18n="login-button"]').textContent = i18n[currentLanguage]['login-button'];
 				}
 			}
-
-			changeLanguage(currentLanguage);
 
 			function toggleTheme() {
 				const html = document.documentElement;

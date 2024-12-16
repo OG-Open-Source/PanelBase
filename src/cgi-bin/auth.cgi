@@ -3,7 +3,7 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-readonly CONFIG_DIR="/opt/panelbase/src/config"
+readonly CONFIG_DIR="/opt/panelbase/config"
 readonly CONFIG_FILE="${CONFIG_DIR}/users.conf"
 readonly SESSION_FILE="${CONFIG_DIR}/sessions.conf"
 readonly SESSION_TIMEOUT=86400
