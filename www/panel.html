@@ -103,10 +103,60 @@
 				margin-left: 10px;
 				color: var(--primary-color);
 			}
+
+			.header {
+				background: var(--primary-color);
+				color: white;
+				padding: 20px;
+				border-radius: var(--border-radius);
+				margin-bottom: 20px;
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+			}
+
+			.system-info {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+				gap: 15px;
+				margin-bottom: 20px;
+			}
+
+			.info-item {
+				background: var(--card-bg);
+				padding: 15px;
+				border-radius: var(--border-radius);
+				box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+			}
+
+			.info-item strong {
+				display: block;
+				margin-bottom: 5px;
+				color: var(--primary-color);
+			}
+
+			.status-ok {
+				color: var(--success-color);
+			}
+
+			.status-error {
+				color: var(--error-color);
+			}
 		</style>
 	</head>
 	<body>
 		<div class="container">
+			<div class="header">
+				<h1>系統管理面板</h1>
+				<div id="username">載入中...</div>
+			</div>
+
+			<!-- 系統資訊區塊 -->
+			<div class="card">
+				<h2>系統資訊</h2>
+				<div id="systemInfo" class="system-info">載入中...</div>
+			</div>
+
 			<!-- 修改密碼區塊 -->
 			<div class="card">
 				<h2>修改用戶密碼</h2>
@@ -163,6 +213,9 @@
 						}
 
 						const response = await fetch(path, options);
+						if (!response.ok) {
+							throw new Error(`HTTP error! status: ${response.status}`);
+						}
 						const result = await response.json();
 						return result;
 					} catch (error) {
@@ -171,9 +224,20 @@
 					}
 				}
 
+				// 獲取用戶名
+				static async getUsername() {
+					return await this.request('/api/panel/username');
+				}
+
+				// 獲取系統資訊
+				static async getSystemInfo() {
+					return await this.request('/api/panel/system_info');
+				}
+
 				// 修改密碼
 				static async changePassword(username, oldPassword, newPassword) {
-					return await this.request('/api/user/modify-password-verbose/' + username, 'POST', {
+					return await this.request('/api/user/password', 'POST', {
+						username,
 						oldPassword,
 						newPassword
 					});
@@ -184,6 +248,47 @@
 					return await this.request('/api/custom/shell', 'POST', {
 						command
 					});
+				}
+			}
+
+			// 更新用戶名顯示
+			async function updateUsername() {
+				try {
+					const username = await PanelAPI.getUsername();
+					document.getElementById('username').textContent = `歡迎，${username}`;
+				} catch (error) {
+					console.error('Error fetching username:', error);
+					document.getElementById('username').textContent = '未登入';
+				}
+			}
+
+			// 更新系統資訊
+			async function updateSystemInfo() {
+				try {
+					const data = await PanelAPI.getSystemInfo();
+					document.getElementById('systemInfo').innerHTML = `
+						<div class="info-item">
+							<strong>CPU 使用率</strong>
+							<span>${data.cpu}%</span>
+						</div>
+						<div class="info-item">
+							<strong>記憶體</strong>
+							<span>${data.memory}</span>
+						</div>
+						<div class="info-item">
+							<strong>磁碟空間</strong>
+							<span>${data.disk}</span>
+						</div>
+						<div class="info-item">
+							<strong>Lighttpd 狀態</strong>
+							<span class="${data.lighttpd_status === '運行中' ? 'status-ok' : 'status-error'}">
+								${data.lighttpd_status}
+							</span>
+						</div>
+					`;
+				} catch (error) {
+					console.error('Error fetching system info:', error);
+					document.getElementById('systemInfo').innerHTML = '<div class="error">無法載入系統資訊</div>';
 				}
 			}
 
@@ -244,6 +349,13 @@
 					loading.style.display = 'none';
 				}
 			};
+
+			// 初始化
+			updateUsername();
+			updateSystemInfo();
+
+			// 定期更新系統資訊
+			setInterval(updateSystemInfo, 1000);
 		</script>
 	</body>
 </html>
