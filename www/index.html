@@ -82,6 +82,7 @@
 				position: relative;
 				z-index: 1;
 				transition: box-shadow 0.3s ease;
+				margin: 20px;
 			}
 
 			.container:hover {
@@ -287,9 +288,40 @@
 			}
 
 			@media (max-width: 480px) {
+				body {
+					padding: 0;
+					background: var(--container-bg);
+				}
+
 				.container {
-					padding: 24px;
-					margin: 16px;
+					max-width: 100%;
+					margin: 0;
+					padding: 20px;
+					min-height: 100vh;
+					border-radius: 0;
+					box-shadow: none;
+				}
+
+				.background-shapes {
+					display: none;
+				}
+
+				.footer {
+					position: relative;
+					margin-top: 20px;
+					transform: none;
+					left: 0;
+					bottom: 0;
+				}
+
+				body::before,
+				body::after {
+					display: none;
+				}
+
+				.theme-switcher {
+					top: 10px;
+					right: 10px;
 				}
 			}
 
@@ -427,13 +459,10 @@
 			}
 
 			.background-shapes {
-				position: fixed;
+				position: absolute;
 				width: 100%;
 				height: 100%;
-				top: 0;
-				left: 0;
-				z-index: 0;
-				overflow: hidden;
+				pointer-events: none;
 			}
 
 			.shape {
