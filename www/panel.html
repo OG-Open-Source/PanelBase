@@ -3,764 +3,245 @@
 	<head>
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<title>PanelBase 管理面板</title>
+		<title>系統管理面板</title>
 		<style>
 			:root {
-				--gradient-start: #2980b9;
-				--gradient-end: #2c3e50;
-				--card-bg: rgba(255, 255, 255, 0.95);
-				--text-primary: #2c3e50;
-				--text-secondary: #7f8c8d;
-				--accent-color: #3498db;
-				--success-color: #27ae60;
-				--warning-color: #f39c12;
-				--error-color: #e74c3c;
-				--border-color: rgba(0, 0, 0, 0.1);
-				--shadow-color: rgba(0, 0, 0, 0.1);
-				--chart-bg: rgba(52, 152, 219, 0.2);
-				--chart-line: #3498db;
-			}
-
-			@media (prefers-color-scheme: dark) {
-				:root {
-					--gradient-start: #1a1a2e;
-					--gradient-end: #16213e;
-					--card-bg: rgba(30, 30, 46, 0.95);
-					--text-primary: #ecf0f1;
-					--text-secondary: #bdc3c7;
-					--accent-color: #3498db;
-					--border-color: rgba(255, 255, 255, 0.1);
-					--shadow-color: rgba(0, 0, 0, 0.3);
-					--chart-bg: rgba(52, 152, 219, 0.1);
-				}
+				--primary-color: #007AFF;
+				--error-color: #FF3B30;
+				--success-color: #34C759;
+				--bg-color: #F2F2F7;
+				--card-bg: #FFFFFF;
+				--text-color: #1C1C1E;
+				--border-radius: 8px;
 			}
 
 			* {
 				margin: 0;
 				padding: 0;
 				box-sizing: border-box;
-				transition: all 0.3s ease;
+				font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 			}
 
 			body {
-				font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-				background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
-				color: var(--text-primary);
-				min-height: 100vh;
-				line-height: 1.6;
-			}
-
-			.container {
-				max-width: 1200px;
-				margin: 0 auto;
+				background: var(--bg-color);
+				color: var(--text-color);
 				padding: 20px;
 			}
 
-			.header {
-				background: rgba(0, 0, 0, 0.2);
-				backdrop-filter: blur(10px);
-				padding: 1rem;
-				margin-bottom: 30px;
-				border-bottom: 1px solid var(--border-color);
-			}
-
-			.header-content {
-				display: flex;
-				justify-content: space-between;
-				align-items: center;
-				max-width: 1200px;
+			.container {
+				max-width: 800px;
 				margin: 0 auto;
 			}
 
-			.header h1 {
-				font-size: 1.8rem;
-				font-weight: 600;
-			}
-
-			.title-link {
-				background: linear-gradient(45deg, #3498db, #2ecc71);
-				-webkit-background-clip: text;
-				background-clip: text;
-				-webkit-text-fill-color: transparent;
-				text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
-				text-decoration: none;
-				transition: opacity 0.3s ease;
-			}
-
-			.title-link:hover {
-				opacity: 0.8;
-			}
-
-			.user-controls {
-				display: flex;
-				gap: 10px;
-				align-items: center;
-			}
-
-			.button {
-				background: var(--accent-color);
-				color: white;
-				border: none;
-				padding: 8px 16px;
-				border-radius: 8px;
-				cursor: pointer;
-				font-size: 0.9rem;
-				display: flex;
-				align-items: center;
-				gap: 5px;
-				transition: transform 0.2s ease, box-shadow 0.2s ease;
-			}
-
-			.button:hover {
-				transform: translateY(-2px);
-				box-shadow: 0 4px 12px var(--shadow-color);
-			}
-
-			.button:active {
-				transform: translateY(0);
-			}
-
-			.logout-btn {
-				background: transparent;
-				border: 1px solid var(--accent-color);
-				color: var(--accent-color);
-			}
-
-			.logout-btn:hover {
-				background: var(--accent-color);
-				color: white;
-			}
-
-			.panel-grid {
-				display: grid;
-				grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-				gap: 20px;
-				margin-top: 20px;
-			}
-
-			.panel-item {
+			.card {
 				background: var(--card-bg);
-				padding: 25px;
-				border-radius: 16px;
-				box-shadow: 0 8px 32px var(--shadow-color);
-				backdrop-filter: blur(10px);
-				border: 1px solid var(--border-color);
-				position: relative;
-				overflow: hidden;
-			}
-
-			.panel-item::before {
-				content: '';
-				position: absolute;
-				top: 0;
-				left: 0;
-				width: 100%;
-				height: 4px;
-				background: linear-gradient(90deg, var(--accent-color), transparent);
-			}
-
-			.panel-item h3 {
-				color: var(--text-primary);
-				font-size: 1.2rem;
+				padding: 20px;
+				border-radius: var(--border-radius);
+				box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 				margin-bottom: 20px;
-				display: flex;
-				align-items: center;
-				gap: 8px;
 			}
 
-			.info-grid {
-				display: grid;
-				grid-template-columns: auto 1fr;
-				gap: 15px;
-				align-items: center;
-			}
-
-			.info-label {
-				color: var(--text-secondary);
-				font-weight: 500;
-			}
-
-			.info-value {
-				color: var(--text-primary);
-				font-weight: 600;
-				text-align: right;
-			}
-
-			.chart-container {
-				margin-top: 20px;
-				height: 60px;
-				background: var(--chart-bg);
-				border-radius: 8px;
-				overflow: hidden;
-				position: relative;
-			}
-
-			.chart-line {
-				position: absolute;
-				bottom: 0;
-				left: 0;
-				width: 100%;
-				height: 2px;
-				background: var(--chart-line);
-			}
-
-			.chart-point {
-				position: absolute;
-				width: 6px;
-				height: 6px;
-				background: var(--chart-line);
-				border-radius: 50%;
-				transform: translate(-50%, -50%);
-			}
-
-			.status-indicator {
-				display: inline-flex;
-				align-items: center;
-				gap: 5px;
-				padding: 4px 12px;
-				border-radius: 12px;
-				font-size: 0.9rem;
-				font-weight: 500;
-			}
-
-			.status-ok {
-				background: rgba(39, 174, 96, 0.1);
-				color: var(--success-color);
-			}
-
-			.status-warning {
-				background: rgba(243, 156, 18, 0.1);
-				color: var(--warning-color);
-			}
-
-			.status-error {
-				background: rgba(231, 76, 60, 0.1);
-				color: var(--error-color);
-			}
-
-			.modal {
-				display: none;
-				position: fixed;
-				top: 0;
-				left: 0;
-				width: 100%;
-				height: 100%;
-				background: rgba(0, 0, 0, 0);
-				backdrop-filter: blur(5px);
-				z-index: 1000;
-				transition: all 0.3s ease;
-				opacity: 0;
-			}
-
-			.modal.show {
-				display: block;
-				opacity: 1;
-				background: rgba(0, 0, 0, 0.5);
-			}
-
-			.modal-content {
-				background: var(--card-bg);
-				padding: 30px;
-				border-radius: 16px;
-				max-width: 400px;
-				margin: 100px auto;
-				box-shadow: 0 8px 32px var(--shadow-color);
-				transform: translateY(-20px);
-				opacity: 0;
-				transition: all 0.3s ease;
-				border: 1px solid var(--border-color);
-			}
-
-			.modal.show .modal-content {
-				transform: translateY(0);
-				opacity: 1;
+			h2 {
+				margin-bottom: 20px;
+				color: var(--primary-color);
 			}
 
 			.form-group {
-				margin-bottom: 20px;
+				margin-bottom: 15px;
 			}
 
-			.form-group label {
+			label {
 				display: block;
-				margin-bottom: 8px;
-				color: var(--text-primary);
+				margin-bottom: 5px;
 				font-weight: 500;
 			}
 
-			.form-group input {
+			input, textarea {
 				width: 100%;
-				padding: 10px;
-				border: 1px solid var(--border-color);
-				border-radius: 8px;
-				background: var(--card-bg);
-				color: var(--text-primary);
-				font-size: 1rem;
+				padding: 8px 12px;
+				border: 1px solid #ddd;
+				border-radius: 4px;
+				font-size: 14px;
 			}
 
-			.form-group input:focus {
-				outline: none;
-				border-color: var(--accent-color);
-				box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
-			}
-
-			.error-message {
-				color: var(--error-color);
-				background: rgba(231, 76, 60, 0.1);
-				padding: 10px;
-				border-radius: 8px;
-				margin-bottom: 15px;
-				display: none;
-			}
-
-			.modal-buttons {
-				display: flex;
-				justify-content: flex-end;
-				gap: 10px;
-				margin-top: 25px;
-			}
-
-			.toast {
-				position: fixed;
-				top: 20px;
-				right: 20px;
-				padding: 15px 25px;
-				border-radius: 12px;
+			button {
+				background: var(--primary-color);
 				color: white;
-				font-size: 0.9rem;
-				z-index: 2000;
-				opacity: 0;
-				transform: translateX(100%);
-				transition: all 0.3s ease;
-				backdrop-filter: blur(10px);
+				border: none;
+				padding: 8px 16px;
+				border-radius: 4px;
+				cursor: pointer;
+				font-weight: 500;
 			}
 
-			.toast.success {
-				background: rgba(39, 174, 96, 0.9);
+			button:hover {
+				opacity: 0.9;
 			}
 
-			.toast.error {
-				background: rgba(231, 76, 60, 0.9);
+			.output {
+				background: #1e1e1e;
+				color: #fff;
+				padding: 15px;
+				border-radius: 4px;
+				font-family: monospace;
+				white-space: pre-wrap;
+				margin-top: 10px;
+				max-height: 300px;
+				overflow-y: auto;
 			}
 
-			.toast.show {
-				opacity: 1;
-				transform: translateX(0);
+			.output.success {
+				border-left: 4px solid var(--success-color);
 			}
 
-			@media (max-width: 768px) {
-				.header-content {
-					flex-direction: column;
-					gap: 15px;
-					text-align: center;
-				}
-
-				.user-controls {
-					flex-wrap: wrap;
-					justify-content: center;
-				}
-
-				.panel-grid {
-					grid-template-columns: 1fr;
-				}
-
-				.modal-content {
-					margin: 20px;
-					padding: 20px;
-				}
+			.output.error {
+				border-left: 4px solid var(--error-color);
 			}
 
-			/* 動畫效果 */
-			@keyframes pulse {
-				0% { transform: scale(1); }
-				50% { transform: scale(1.05); }
-				100% { transform: scale(1); }
-			}
-
-			@keyframes float {
-				0% { transform: translateY(0px); }
-				50% { transform: translateY(-10px); }
-				100% { transform: translateY(0px); }
-			}
-
-			.pulse {
-				animation: pulse 2s infinite;
-			}
-
-			.float {
-				animation: float 3s ease-in-out infinite;
+			.loading {
+				display: none;
+				margin-left: 10px;
+				color: var(--primary-color);
 			}
 		</style>
 	</head>
 	<body>
-		<div class="header">
-			<div class="header-content">
-				<h1><a href="/panel.html" class="title-link">PanelBase</a></h1>
-				<div class="user-controls">
-					<button class="button" onclick="showChangeUsername()">
-						<i class="fas fa-user"></i>修改用戶名
-					</button>
-					<button class="button" onclick="showChangePassword()">
-						<i class="fas fa-key"></i>修改密碼
-					</button>
-					<button class="button logout-btn" onclick="handleLogout()">
-						<i class="fas fa-sign-out-alt"></i>登出
-					</button>
-				</div>
-			</div>
-		</div>
-
 		<div class="container">
-			<div class="panel-grid">
-				<div class="panel-item">
-					<h3><i class="fas fa-microchip"></i>系統資源</h3>
-					<div class="info-grid">
-						<span class="info-label">CPU 使用率</span>
-						<span class="info-value" id="cpu-usage">載入中...</span>
-						<div class="chart-container" id="cpu-chart"></div>
-
-						<span class="info-label">記憶體使用</span>
-						<span class="info-value" id="memory-usage">載入中...</span>
-
-						<span class="info-label">磁碟使用</span>
-						<span class="info-value" id="disk-usage">載入中...</span>
+			<!-- 修改密碼區塊 -->
+			<div class="card">
+				<h2>修改用戶密碼</h2>
+				<form id="passwordForm">
+					<div class="form-group">
+						<label>用戶名</label>
+						<input type="text" id="username" required>
 					</div>
-				</div>
-
-				<div class="panel-item">
-					<h3><i class="fas fa-server"></i>服務狀態</h3>
-					<div class="info-grid">
-						<span class="info-label">Lighttpd</span>
-						<span class="info-value">
-							<span class="status-indicator" id="lighttpd-status">載入中...</span>
-						</span>
+					<div class="form-group">
+						<label>舊密碼</label>
+						<input type="password" id="oldPassword" required>
 					</div>
-				</div>
-
-				<div class="panel-item float">
-					<h3><i class="fas fa-random"></i>系統隨機數</h3>
-					<div class="info-grid">
-						<span class="info-label">當前值</span>
-						<span class="info-value random-number pulse" id="random-number">載入中...</span>
+					<div class="form-group">
+						<label>新密碼</label>
+						<input type="password" id="newPassword" required>
 					</div>
-				</div>
+					<button type="submit">修改密碼</button>
+					<span id="passwordLoading" class="loading">處理中...</span>
+				</form>
+				<div id="passwordOutput" class="output" style="display: none;"></div>
+			</div>
+
+			<!-- 執行指令區塊 -->
+			<div class="card">
+				<h2>執行系統指令</h2>
+				<form id="commandForm">
+					<div class="form-group">
+						<label>指令</label>
+						<textarea id="command" rows="3" required></textarea>
+					</div>
+					<button type="submit">執行</button>
+					<span id="commandLoading" class="loading">執行中...</span>
+				</form>
+				<div id="commandOutput" class="output" style="display: none;"></div>
 			</div>
 		</div>
-
-		<!-- 修改用戶名對話框 -->
-		<div id="usernameModal" class="modal">
-			<div class="modal-content">
-				<h2>修改用戶名</h2>
-				<div class="form-group">
-					<label>新用戶名（僅允許英文字母和數字）</label>
-					<input type="text" id="newUsername" 
-						placeholder="請輸入新用戶名"
-						pattern="[A-Za-z0-9]+"
-						title="只允許英文字母和數字"
-						onkeypress="return /[A-Za-z0-9]/.test(event.key)">
-				</div>
-				<div class="form-group">
-					<label>確認密碼</label>
-					<input type="password" id="usernamePassword" 
-						placeholder="請輸入當前密碼"
-						pattern="[A-Za-z0-9!@$]+"
-						title="只允許英文字母、數字和特殊符號 !@$"
-						onkeypress="return /[A-Za-z0-9!@$]/.test(event.key)">
-				</div>
-				<div id="usernameError" class="error-message"></div>
-				<div class="modal-buttons">
-					<button class="button" onclick="closeModal('usernameModal')">取消</button>
-					<button class="button" onclick="changeUsername()">確認</button>
-				</div>
-			</div>
-		</div>
-
-		<!-- 修改密碼對話框 -->
-		<div id="passwordModal" class="modal">
-			<div class="modal-content">
-				<h2>修改密碼</h2>
-				<div class="form-group">
-					<label>當前密碼</label>
-					<input type="password" id="oldPassword" 
-						placeholder="請輸入當前密碼"
-						pattern="[A-Za-z0-9!@$]+"
-						title="只允許英文字母、數字和特殊符號 !@$"
-						onkeypress="return /[A-Za-z0-9!@$]/.test(event.key)">
-				</div>
-				<div class="form-group">
-					<label>新密碼（僅允許 A-Z、a-z、0-9、!@$）</label>
-					<input type="password" id="newPassword" 
-						placeholder="請輸入新密碼"
-						pattern="[A-Za-z0-9!@$]+"
-						title="只允許英文字母、數字和特殊符號 !@$"
-						onkeypress="return /[A-Za-z0-9!@$]/.test(event.key)">
-				</div>
-				<div id="passwordError" class="error-message"></div>
-				<div class="modal-buttons">
-					<button class="button" onclick="closeModal('passwordModal')">取消</button>
-					<button class="button" onclick="changePassword()">確認</button>
-				</div>
-			</div>
-		</div>
-
-		<!-- Font Awesome -->
-		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
 		<script>
-			// CPU 使用率歷史數據
-			let cpuHistory = Array(20).fill(0);
-			
-			// 更新 CPU 圖表
-			function updateCPUChart(value) {
-				cpuHistory.push(parseFloat(value));
-				cpuHistory.shift();
-				
-				const chartContainer = document.getElementById('cpu-chart');
-				chartContainer.innerHTML = '';
-				
-				const max = Math.max(...cpuHistory);
-				const min = Math.min(...cpuHistory);
-				
-				cpuHistory.forEach((val, index) => {
-					const point = document.createElement('div');
-					point.className = 'chart-point';
-					point.style.left = `${(index / (cpuHistory.length - 1)) * 100}%`;
-					point.style.bottom = `${((val - min) / (max - min || 1)) * 100}%`;
-					chartContainer.appendChild(point);
-				});
-			}
+			// API 客戶端
+			class PanelAPI {
+				static async request(path, method = 'GET', data = null) {
+					try {
+						const options = {
+							method,
+							headers: {
+								'Content-Type': 'application/x-www-form-urlencoded'
+							}
+						};
 
-			// 顯示提示訊息
-			function showToast(message, type = 'success') {
-				const toast = document.createElement('div');
-				toast.className = `toast ${type}`;
-				toast.textContent = message;
-				document.body.appendChild(toast);
-
-				requestAnimationFrame(() => {
-					toast.classList.add('show');
-				});
-
-				setTimeout(() => {
-					toast.classList.remove('show');
-					setTimeout(() => {
-						document.body.removeChild(toast);
-					}, 300);
-				}, 3000);
-			}
-
-			// 更新系統資訊
-			async function updateSystemInfo() {
-				try {
-					const response = await fetch('/cgi-bin/panel.cgi?action=get_system_info', {
-						cache: 'no-store'
-					});
-					
-					if (!response.ok) throw new Error('Failed to fetch system info');
-					
-					const data = await response.json();
-					
-					// 更新 CPU 使用率
-					const cpuValue = parseFloat(data.cpu);
-					document.getElementById('cpu-usage').textContent = `${cpuValue.toFixed(1)}%`;
-					updateCPUChart(cpuValue);
-					
-					// 更新記憶體使用情況
-					document.getElementById('memory-usage').textContent = data.memory;
-					
-					// 更新磁碟使用情況
-					document.getElementById('disk-usage').textContent = data.disk;
-					
-					// 更新隨機數
-					document.getElementById('random-number').textContent = data.random;
-					
-					// 更新服務狀態
-					const statusElement = document.getElementById('lighttpd-status');
-					statusElement.textContent = data.lighttpd_status;
-					statusElement.className = `status-indicator ${data.lighttpd_status === '運行中' ? 'status-ok' : 'status-error'}`;
-					
-				} catch (error) {
-					console.error('Error updating system info:', error);
-					showToast('無法更新系統資訊', 'error');
-				}
-			}
-
-			// 處理登出
-			function handleLogout() {
-				window.location.href = '/cgi-bin/auth.cgi?action=logout';
-			}
-
-			// 顯示修改用戶名對話框
-			function showChangeUsername() {
-				const modal = document.getElementById('usernameModal');
-				modal.style.display = 'block';
-				// 強制重繪
-				modal.offsetHeight;
-				modal.classList.add('show');
-				document.getElementById('usernameError').style.display = 'none';
-				document.getElementById('newUsername').value = '';
-				document.getElementById('usernamePassword').value = '';
-			}
-
-			// 顯示修改密碼對話框
-			function showChangePassword() {
-				const modal = document.getElementById('passwordModal');
-				modal.style.display = 'block';
-				// 強制重繪
-				modal.offsetHeight;
-				modal.classList.add('show');
-				document.getElementById('passwordError').style.display = 'none';
-				document.getElementById('oldPassword').value = '';
-				document.getElementById('newPassword').value = '';
-			}
-
-			// 關閉對話框
-			function closeModal(modalId) {
-				const modal = document.getElementById(modalId);
-				modal.classList.remove('show');
-				setTimeout(() => {
-					modal.style.display = 'none';
-				}, 300);
-			}
-
-			// 修改用戶名
-			async function changeUsername() {
-				const newUsername = document.getElementById('newUsername').value;
-				const password = document.getElementById('usernamePassword').value;
-				const errorElement = document.getElementById('usernameError');
-
-				// 驗證用戶名格式
-				if (!/^[A-Za-z0-9]+$/.test(newUsername)) {
-					errorElement.textContent = '用戶名只能包含英文字母和數字';
-					errorElement.style.display = 'block';
-					return;
-				}
-
-				// 驗證密碼格式
-				if (!/^[A-Za-z0-9!@$]+$/.test(password)) {
-					errorElement.textContent = '密碼格式不正確';
-					errorElement.style.display = 'block';
-					return;
-				}
-
-				try {
-					const response = await fetch('/cgi-bin/auth.cgi?action=change_username', {
-						method: 'POST',
-						headers: {
-							'Content-Type': 'application/x-www-form-urlencoded',
-						},
-						body: `new_username=${encodeURIComponent(newUsername)}&password=${encodeURIComponent(password)}`
-					});
-
-					const data = await response.json();
-					if (response.ok && data === 0) {
-						closeModal('usernameModal');
-						showToast('用戶名修改成功，即將重新登入...', 'success');
-						setTimeout(() => {
-							handleLogout();
-						}, 1500);
-					} else {
-						let message = '發生錯誤';
-						switch (data) {
-							case 1:
-								message = '用戶名已存在';
-								break;
-							case 2:
-								message = '密碼錯誤';
-								break;
-							case 3:
-								message = '未授權訪問';
-								break;
+						if (data) {
+							options.body = Object.entries(data)
+								.map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+								.join('&');
 						}
-						errorElement.textContent = message;
-						errorElement.style.display = 'block';
+
+						const response = await fetch(path, options);
+						const result = await response.json();
+						return result;
+					} catch (error) {
+						console.error(`API 請求失敗 (${path}):`, error);
+						throw error;
 					}
-				} catch (error) {
-					console.error('Error:', error);
-					errorElement.textContent = '發生錯誤';
-					errorElement.style.display = 'block';
+				}
+
+				// 修改密碼
+				static async changePassword(username, oldPassword, newPassword) {
+					return await this.request('/api/user/modify-password-verbose/' + username, 'POST', {
+						oldPassword,
+						newPassword
+					});
+				}
+
+				// 執行指令
+				static async executeCommand(command) {
+					return await this.request('/api/custom/shell', 'POST', {
+						command
+					});
 				}
 			}
 
-			// 修改密碼
-			async function changePassword() {
+			// 修改密碼表單處理
+			document.getElementById('passwordForm').onsubmit = async (e) => {
+				e.preventDefault();
+				const username = document.getElementById('username').value;
 				const oldPassword = document.getElementById('oldPassword').value;
 				const newPassword = document.getElementById('newPassword').value;
-				const errorElement = document.getElementById('passwordError');
+				const loading = document.getElementById('passwordLoading');
+				const output = document.getElementById('passwordOutput');
 
-				// 驗證舊密碼格式
-				if (!/^[A-Za-z0-9!@$]+$/.test(oldPassword)) {
-					errorElement.textContent = '當前密碼格式不正確';
-					errorElement.style.display = 'block';
-					return;
-				}
-
-				// 驗證新密碼格式
-				if (!/^[A-Za-z0-9!@$]+$/.test(newPassword)) {
-					errorElement.textContent = '新密碼格式不正確';
-					errorElement.style.display = 'block';
-					return;
-				}
-
-				if (newPassword.length < 6) {
-					errorElement.textContent = '新密碼長度必須至少為 6 個字符';
-					errorElement.style.display = 'block';
-					return;
-				}
+				loading.style.display = 'inline';
+				output.style.display = 'none';
 
 				try {
-					const response = await fetch('/cgi-bin/auth.cgi?action=change_password', {
-						method: 'POST',
-						headers: {
-							'Content-Type': 'application/x-www-form-urlencoded',
-						},
-						body: `old_password=${encodeURIComponent(oldPassword)}&new_password=${encodeURIComponent(newPassword)}`
-					});
+					const result = await PanelAPI.changePassword(username, oldPassword, newPassword);
+					output.textContent = result.data || result.error;
+					output.className = 'output ' + (result.success ? 'success' : 'error');
+					output.style.display = 'block';
 
-					const data = await response.json();
-					if (response.ok && data === 0) {
-						closeModal('passwordModal');
-						showToast('密碼修改成功，即將重新登入...', 'success');
-						setTimeout(() => {
-							handleLogout();
-						}, 1500);
-					} else {
-						let message = '發生錯誤';
-						switch (data) {
-							case 1:
-								message = '舊密碼錯誤';
-								break;
-							case 2:
-								message = '未授權訪問';
-								break;
-						}
-						errorElement.textContent = message;
-						errorElement.style.display = 'block';
+					if (result.success) {
+						document.getElementById('passwordForm').reset();
 					}
 				} catch (error) {
-					console.error('Error:', error);
-					errorElement.textContent = '發生錯誤';
-					errorElement.style.display = 'block';
+					output.textContent = '操作失敗: ' + error.message;
+					output.className = 'output error';
+					output.style.display = 'block';
+				} finally {
+					loading.style.display = 'none';
 				}
-			}
+			};
 
-			// 初始化
-			updateSystemInfo();
-			setInterval(updateSystemInfo, 1000);
+			// 執行指令表單處理
+			document.getElementById('commandForm').onsubmit = async (e) => {
+				e.preventDefault();
+				const command = document.getElementById('command').value;
+				const loading = document.getElementById('commandLoading');
+				const output = document.getElementById('commandOutput');
 
-			// 事件監聽器
-			document.addEventListener('keydown', function(event) {
-				if (event.key === 'Escape') {
-					document.querySelectorAll('.modal').forEach(modal => {
-						if (modal.classList.contains('show')) {
-							closeModal(modal.id);
-						}
-					});
-				}
-			});
+				loading.style.display = 'inline';
+				output.style.display = 'none';
 
-			window.onclick = function(event) {
-				if (event.target.classList.contains('modal')) {
-					closeModal(event.target.id);
+				try {
+					const result = await PanelAPI.executeCommand(command);
+					output.textContent = result.data || result.error;
+					output.className = 'output ' + (result.success ? 'success' : 'error');
+					output.style.display = 'block';
+
+					if (result.success) {
+						document.getElementById('commandForm').reset();
+					}
+				} catch (error) {
+					output.textContent = '執行失敗: ' + error.message;
+					output.className = 'output error';
+					output.style.display = 'block';
+				} finally {
+					loading.style.display = 'none';
 				}
 			};
 		</script>
