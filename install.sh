@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta65"
+Version="Beta66"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -78,7 +78,7 @@ TASK "創建必要的目錄" "ADD -d $INSTALL_DIR/{www,cgi-bin,config,logs}" tru
 
 text "下載面板文件..."
 BASE_URL="https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main"
-for FILE in "src/cgi-bin/panel.cgi" "src/cgi-bin/auth.cgi" "src/cgi-bin/check_auth.cgi" "www/index.html"; do
+for FILE in "src/cgi-bin/panel.cgi" "src/cgi-bin/auth.cgi" "src/cgi-bin/check_auth.cgi" "src/cgi-bin/api.cgi" "src/cgi-bin/static.cgi" "config/routes.conf" "www/index.html"; do
 	text "下載 $FILE..."
 	HTTP_CODE=$(curl -s -w "%{http_code}" -o "${FILE##*/}" "$BASE_URL/$FILE")
 	[ "$HTTP_CODE" != "200" ] && { error "無法下載 $FILE (HTTP 代碼: $HTTP_CODE)"; exit 1; }
@@ -90,9 +90,10 @@ if [[ ! $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	[ "$HTTP_CODE" != "200" ] && { error "無法下載面板頁面 (HTTP 代碼: $HTTP_CODE)"; exit 1; }
 fi
 
-chmod +x panel.cgi auth.cgi check_auth.cgi
+chmod +x panel.cgi auth.cgi check_auth.cgi api.cgi static.cgi
 
-mv panel.cgi auth.cgi check_auth.cgi $INSTALL_DIR/cgi-bin/
+mv panel.cgi auth.cgi check_auth.cgi api.cgi static.cgi $INSTALL_DIR/cgi-bin/
+mv routes.conf $INSTALL_DIR/config/
 mv index.html $INSTALL_DIR/www/
 
 if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
