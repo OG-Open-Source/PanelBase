@@ -47,13 +47,13 @@ case "$ACTION" in
 
 		if [ "$STORED_HASH" = "$INPUT_HASH" ]; then
 			sed -i "/^.*:$USERNAME:/d" "$SESSION_FILE"
-			
+
 			TOKEN=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
-			
+
 			echo "$TOKEN:$USERNAME:$(date +%s)" >> "$SESSION_FILE"
 
 			EXPIRY=$(($(date +%s) + 86400))
-			
+
 			echo "Content-type: application/json"
 			echo "Set-Cookie: auth_token=$TOKEN; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400; Expires=$(date -u -d "@$EXPIRY" "+%a, %d %b %Y %H:%M:%S GMT")"
 			echo "Status: 200"
@@ -99,11 +99,11 @@ case "$ACTION" in
 		if [ -n "$AUTH_TOKEN" ]; then
 			USERNAME=$(awk -F: -v token="$AUTH_TOKEN" '$1 == token {print $2}' "$SESSION_FILE")
 			THEME=$(echo "$POST_DATA" | grep -oP 'theme=\K[^&]+')
-			
+
 			if [ "$THEME" = "dark" ] || [ "$THEME" = "light" ]; then
 				sed -i "/^$USERNAME:/d" "$THEME_FILE"
 				echo "$USERNAME:$THEME" >> "$THEME_FILE"
-				
+
 				echo "Content-type: application/json"
 				echo "Status: 200"
 				echo
@@ -126,7 +126,7 @@ case "$ACTION" in
 		if [ -n "$AUTH_TOKEN" ]; then
 			USERNAME=$(awk -F: -v token="$AUTH_TOKEN" '$1 == token {print $2}' "$SESSION_FILE")
 			THEME=$(grep "^$USERNAME:" "$THEME_FILE" | cut -d: -f2)
-			
+
 			echo "Content-type: application/json"
 			echo "Status: 200"
 			echo

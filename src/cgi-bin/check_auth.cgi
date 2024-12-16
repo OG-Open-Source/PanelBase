@@ -6,7 +6,6 @@ ORIGINAL_URL="$REQUEST_URI"
 DOCUMENT_ROOT="/opt/panelbase/www"
 
 if [ -z "$AUTH_TOKEN" ]; then
-	# 沒有 token，重定向到登入頁面
 	echo "Status: 302"
 	echo "Location: /"
 	echo
@@ -33,7 +32,6 @@ if [ -z "$VALID_SESSION" ]; then
 fi
 
 if echo "$ORIGINAL_URL" | grep -q "^/cgi-bin/panel\.cgi"; then
-	# 執行 panel.cgi 並傳遞所有環境變數
 	exec /opt/panelbase/cgi-bin/panel.cgi
 	exit 0
 fi
