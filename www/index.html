@@ -649,15 +649,6 @@
 					const data = await response.json();
 
 					if (response.ok && data === 0) {
-						const themeResponse = await fetch('/cgi-bin/auth.cgi?action=get_theme');
-						if (themeResponse.ok) {
-							const themeData = await themeResponse.json();
-							if (themeData && (themeData === 'dark' || themeData === 'light')) {
-								localStorage.setItem('theme-preference', themeData);
-								document.documentElement.classList.remove('dark-mode', 'light-mode');
-								document.documentElement.classList.add(`${themeData}-mode`);
-							}
-						}
 						window.location.href = '/panel.html';
 					} else {
 						errorMessage.textContent = i18n[currentLanguage]['error-invalid'];
@@ -676,35 +667,21 @@
 
 			changeLanguage(currentLanguage);
 
-			async function toggleTheme() {
+			function toggleTheme() {
 				const html = document.documentElement;
 				const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 				const isDark = html.classList.contains('dark-mode') || (!html.classList.contains('light-mode') && prefersDark);
-				const newTheme = isDark ? 'light' : 'dark';
 
-				try {
-					const response = await fetch('/cgi-bin/auth.cgi?action=set_theme', {
-						method: 'POST',
-						headers: {
-							'Content-Type': 'application/x-www-form-urlencoded',
-						},
-						body: `theme=${newTheme}`
-					});
-
-					if (response.ok) {
-						if (isDark) {
-							html.classList.remove('dark-mode');
-							html.classList.add('light-mode');
-							document.querySelector('#themeToggle i').className = 'fas fa-moon';
-						} else {
-							html.classList.remove('light-mode');
-							html.classList.add('dark-mode');
-							document.querySelector('#themeToggle i').className = 'fas fa-sun';
-						}
-						localStorage.setItem('theme-preference', newTheme);
-					}
-				} catch (error) {
-					console.error('Error saving theme preference:', error);
+				if (isDark) {
+					html.classList.remove('dark-mode');
+					html.classList.add('light-mode');
+					document.querySelector('#themeToggle i').className = 'fas fa-moon';
+					localStorage.setItem('theme-preference', 'light');
+				} else {
+					html.classList.remove('light-mode');
+					html.classList.add('dark-mode');
+					document.querySelector('#themeToggle i').className = 'fas fa-sun';
+					localStorage.setItem('theme-preference', 'dark');
 				}
 			}
 
