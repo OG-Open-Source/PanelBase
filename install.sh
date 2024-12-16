@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta56"
+Version="Beta57"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -42,7 +42,10 @@ while true; do
 	text
 
 	if [ "$ADMIN_PASS" = "$ADMIN_PASS2" ]; then
-		[ ${#ADMIN_PASS} -lt 6 ] && { error "密碼長度必須至少為 6 個字符"; continue; }
+		if [ ${#ADMIN_PASS} -lt 6 ]; then
+			error "密碼長度必須至少為 6 個字符"
+			continue
+		fi
 		
 		if ! [[ $ADMIN_PASS =~ ^[A-Za-z0-9!@$]+$ ]]; then
 			error "密碼只能包含英文字母、數字和特殊符號 !@$"
