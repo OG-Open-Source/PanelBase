@@ -7,6 +7,7 @@ readonly CONFIG_DIR="/opt/panelbase/config"
 readonly ROUTES_CONF="${CONFIG_DIR}/routes.conf"
 readonly SESSION_FILE="${CONFIG_DIR}/sessions.conf"
 readonly SESSION_TIMEOUT=86400
+readonly DOCUMENT_ROOT="/opt/panelbase/www"
 
 check_required_files() {
 	local files=("$ROUTES_CONF" "$SESSION_FILE")
@@ -68,41 +69,89 @@ handle_api_request() {
 		fi
 	fi
 
-	echo "Content-type: text/plain"
-	echo "Status: 404"
-	echo
-	echo "404 Not Found"
+	return 1
+}
+
+show_404_page() {
+	if echo "${HTTP_USER_AGENT:-}" | grep -qi "curl\|wget\|postman\|insomnia"; then
+		echo "Content-type: text/plain"
+		echo "Status: 404"
+		echo
+		echo "404 Not Found"
+	else
+		echo "Content-type: text/html"
+		echo "Status: 404"
+		echo
+		cat "$DOCUMENT_ROOT/404.html"
+	fi
+}
+
+handle_static_file() {
+	local request_path=$1
+	local file_path
+
+	request_path=$(echo "$request_path" | cut -d'?' -f1)
+	request_path=$(echo -e "${request_path//%/\\x}")
+	file_path="${DOCUMENT_ROOT}${request_path}"
+
+	if [ -f "$file_path" ]; then
+		exec /opt/panelbase/cgi-bin/static.cgi
+		return 0
+	fi
+
+	show_404_page
 	return 1
 }
 
 main() {
 	check_required_files
 
-	local auth_token
-	auth_token=$(echo "${HTTP_COOKIE:-}" | grep -oP 'auth_token=\K[^;]+' || echo "")
-
-	if [ -z "$auth_token" ]; then
-		echo "Status: 302"
-		echo "Location: /"
-		echo
-		exit 0
-	fi
-
-	local username
-	username=$(validate_session "$auth_token")
-	if [ -z "$username" ]; then
-		echo "Status: 302"
-		echo "Location: /"
-		echo
-		exit 0
-	fi
-
 	if echo "$REQUEST_URI" | grep -q "^/api/"; then
+		local auth_token
+		auth_token=$(echo "${HTTP_COOKIE:-}" | grep -oP 'auth_token=\K[^;]+' || echo "")
+
+		if [ -z "$auth_token" ]; then
+			echo "Status: 401"
+			echo "Content-type: application/json"
+			echo
+			echo '{"error": "unauthorized"}'
+			exit 0
+		fi
+
+		local username
+		username=$(validate_session "$auth_token")
+		if [ -z "$username" ]; then
+			echo "Status: 401"
+			echo "Content-type: application/json"
+			echo
+			echo '{"error": "session_expired"}'
+			exit 0
+		fi
+
 		handle_api_request "$REQUEST_URI"
 	elif echo "$REQUEST_URI" | grep -q "^/cgi-bin/panel\.cgi"; then
+		local auth_token
+		auth_token=$(echo "${HTTP_COOKIE:-}" | grep -oP 'auth_token=\K[^;]+' || echo "")
+
+		if [ -z "$auth_token" ]; then
+			echo "Status: 302"
+			echo "Location: /"
+			echo
+			exit 0
+		fi
+
+		local username
+		username=$(validate_session "$auth_token")
+		if [ -z "$username" ]; then
+			echo "Status: 302"
+			echo "Location: /"
+			echo
+			exit 0
+		fi
+
 		exec /opt/panelbase/cgi-bin/panel.cgi
 	else
-		exec /opt/panelbase/cgi-bin/static.cgi
+		handle_static_file "$REQUEST_URI"
 	fi
 }
 
