@@ -8,6 +8,11 @@ readonly CONFIG_FILE="${CONFIG_DIR}/users.conf"
 readonly SESSION_FILE="${CONFIG_DIR}/sessions.conf"
 readonly SESSION_TIMEOUT=86400
 
+urldecode() {
+    local url_encoded="${1//+/ }"
+    printf '%b' "${url_encoded//%/\\x}"
+}
+
 init_files() {
 	local files=("$CONFIG_FILE" "$SESSION_FILE")
 	for file in "${files[@]}"; do
@@ -69,16 +74,31 @@ clear_auth_cookie() {
 handle_login() {
 	local username password stored_hash input_hash token
 
-	username=$(echo "$POST_DATA" | grep -oP 'username=\K[^&]+' | sed 's/%40/@/g;s/%2B/+/g;s/%20/ /g')
-	password=$(echo "$POST_DATA" | grep -oP 'password=\K[^&]+' | sed 's/%40/@/g;s/%2B/+/g;s/%20/ /g')
+	username=$(echo "$POST_DATA" | grep -oP 'username=\K[^&]+' | urldecode)
+	password=$(echo "$POST_DATA" | grep -oP 'password=\K[^&]+' | urldecode)
 
 	validate_username "$username"
 	validate_password "$password"
+
+	if [ ! -f "$CONFIG_FILE" ]; then
+		send_json_response 500 '{"status": "error", "code": "config_not_found", "message": "User configuration file not found"}'
+		exit 1
+	fi
+
+	if [ ! -r "$CONFIG_FILE" ]; then
+		send_json_response 500 '{"status": "error", "code": "config_not_readable", "message": "User configuration file not readable"}'
+		exit 1
+	fi
 
 	stored_hash=$(grep "^$username:" "$CONFIG_FILE" | cut -d: -f2)
 	input_hash=$(echo -n "$password" | md5sum | cut -d' ' -f1)
 
 	if [ "$stored_hash" = "$input_hash" ]; then
+		if [ ! -w "$SESSION_FILE" ]; then
+			send_json_response 500 '{"status": "error", "code": "session_not_writable", "message": "Session file not writable"}'
+			exit 1
+		fi
+
 		sed -i "/^.*:$username:/d" "$SESSION_FILE"
 
 		token=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)

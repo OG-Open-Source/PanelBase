@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta68"
+Version="Beta69"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -196,7 +196,7 @@ mimetype.assign = (
 	".eot"  => "application/vnd.ms-fontobject"
 )
 
-\$HTTP["url"] !~ "^(/\$|/cgi-bin/auth\.cgi)" {
+\$HTTP["url"] !~ "^(/\$|/index\.html\$|/cgi-bin/auth\.cgi|/cgi-bin/check_auth\.cgi|/css/|/js/|/img/|/fonts/)" {
 	url.rewrite-once = (
 		"^/.*" => "/cgi-bin/check_auth.cgi"
 	)
