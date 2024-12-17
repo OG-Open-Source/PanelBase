@@ -539,7 +539,7 @@
 			(function() {
 				const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 				const savedTheme = localStorage.getItem('theme-preference');
-				
+
 				if (savedTheme) {
 					document.documentElement.classList.add(`${savedTheme}-mode`);
 				} else if (prefersDark) {
@@ -739,7 +739,7 @@
 			document.addEventListener('DOMContentLoaded', function() {
 				const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 				const savedTheme = localStorage.getItem('theme-preference');
-				
+
 				if (savedTheme) {
 					document.documentElement.classList.add(`${savedTheme}-mode`);
 					document.querySelector('#themeToggle i').className = `fas fa-${savedTheme === 'dark' ? 'sun' : 'moon'}`;
