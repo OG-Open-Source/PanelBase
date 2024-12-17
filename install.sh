@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta67"
+Version="Beta68"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -171,11 +171,9 @@ server.username = "www-data"
 server.groupname = "www-data"
 
 server.errorlog = "$INSTALL_DIR/logs/error.log"
-accesslog.filename = "$INSTALL_DIR/logs/access.log"
+server.breakagelog = "$INSTALL_DIR/logs/access.log"
 
-\$HTTP["url"] =~ "^/" {
-	dir-listing.activate = "disable"
-}
+server.dir-listing.activate = "disable"
 
 cgi.assign = ( ".cgi" => "" )
 alias.url = ( "/cgi-bin/" => "$INSTALL_DIR/cgi-bin/" )
@@ -198,12 +196,10 @@ mimetype.assign = (
 	".eot"  => "application/vnd.ms-fontobject"
 )
 
-\$HTTP["url"] !~ "^/\$" {
-	\$HTTP["url"] !~ "^/cgi-bin/(auth|panel)\.cgi" {
-		url.rewrite-once = (
-			"^/.*" => "/cgi-bin/check_auth.cgi"
-		)
-	}
+\$HTTP["url"] !~ "^(/\$|/cgi-bin/auth\.cgi)" {
+	url.rewrite-once = (
+		"^/.*" => "/cgi-bin/check_auth.cgi"
+	)
 }
 
 index-file.names = ( "index.html" )

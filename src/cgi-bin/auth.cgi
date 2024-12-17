@@ -22,7 +22,7 @@ init_files() {
 validate_username() {
 	local username=$1
 	if ! [[ "$username" =~ ^[A-Za-z0-9]+$ ]]; then
-		send_json_response 400 '{"error": "invalid_username_format"}'
+		send_json_response 400 '{"status": "error", "code": "invalid_username", "message": "Invalid username format"}'
 		exit 0
 	fi
 }
@@ -30,7 +30,7 @@ validate_username() {
 validate_password() {
 	local password=$1
 	if ! [[ "$password" =~ ^[A-Za-z0-9!@$]+$ ]]; then
-		send_json_response 400 '{"error": "invalid_password_format"}'
+		send_json_response 400 '{"status": "error", "code": "invalid_password", "message": "Invalid password format"}'
 		exit 0
 	fi
 }
@@ -40,6 +40,8 @@ send_json_response() {
 	local content=$2
 	echo "Content-type: application/json"
 	echo "Status: $status"
+	echo "Cache-Control: no-store, no-cache, must-revalidate"
+	echo "Pragma: no-cache"
 	echo
 	echo "$content"
 }
@@ -49,6 +51,8 @@ send_redirect_response() {
 	echo "Content-type: text/html"
 	echo "Status: 302"
 	echo "Location: $location"
+	echo "Cache-Control: no-store, no-cache, must-revalidate"
+	echo "Pragma: no-cache"
 	echo
 }
 
@@ -82,12 +86,14 @@ handle_login() {
 
 		echo "Content-type: application/json"
 		set_auth_cookie "$token"
+		echo "Cache-Control: no-store, no-cache, must-revalidate"
+		echo "Pragma: no-cache"
 		echo "Status: 200"
 		echo
-		echo '0'
+		echo '{"status": "success", "code": "login_success", "message": "Login successful"}'
 	else
 		sleep 1
-		send_json_response 401 '1'
+		send_json_response 401 '{"status": "error", "code": "invalid_credentials", "message": "Invalid username or password"}'
 	fi
 }
 
@@ -98,6 +104,8 @@ handle_logout() {
 
 	echo "Content-type: text/html"
 	clear_auth_cookie
+	echo "Cache-Control: no-store, no-cache, must-revalidate"
+	echo "Pragma: no-cache"
 	send_redirect_response "/"
 }
 
@@ -105,9 +113,9 @@ handle_get_username() {
 	if [ -n "$AUTH_TOKEN" ]; then
 		local username
 		username=$(awk -F: -v token="$AUTH_TOKEN" '$1 == token {print $2}' "$SESSION_FILE")
-		send_json_response 200 "\"$username\""
+		send_json_response 200 "{\"status\": \"success\", \"code\": \"username_found\", \"data\": \"$username\"}"
 	else
-		send_json_response 401 '1'
+		send_json_response 401 '{"status": "error", "code": "unauthorized", "message": "Not logged in"}'
 	fi
 }
 
@@ -123,7 +131,7 @@ handle_change_password() {
 		validate_password "$new_password"
 
 		if [ ${#new_password} -lt 6 ]; then
-			send_json_response 400 '{"error": "password_too_short"}'
+			send_json_response 400 '{"status": "error", "code": "password_too_short", "message": "Password must be at least 6 characters"}'
 			exit 0
 		fi
 
@@ -133,13 +141,13 @@ handle_change_password() {
 		if [ "$stored_hash" = "$old_hash" ]; then
 			new_hash=$(echo -n "$new_password" | md5sum | cut -d' ' -f1)
 			sed -i "s/^$username:.*/$username:$new_hash/" "$CONFIG_FILE"
-			send_json_response 200 '0'
+			send_json_response 200 '{"status": "success", "code": "password_changed", "message": "Password changed successfully"}'
 		else
 			sleep 1
-			send_json_response 401 '1'
+			send_json_response 401 '{"status": "error", "code": "invalid_password", "message": "Invalid current password"}'
 		fi
 	else
-		send_json_response 401 '2'
+		send_json_response 401 '{"status": "error", "code": "unauthorized", "message": "Not logged in"}'
 	fi
 }
 
@@ -158,18 +166,18 @@ handle_change_username() {
 
 		if [ "$stored_hash" = "$input_hash" ]; then
 			if grep -q "^$new_username:" "$CONFIG_FILE"; then
-				send_json_response 409 '1'
+				send_json_response 409 '{"status": "error", "code": "username_exists", "message": "Username already exists"}'
 			else
 				sed -i "s/^$current_username:/$new_username:/" "$CONFIG_FILE"
 				sed -i "s/:$current_username:/:$new_username:/" "$SESSION_FILE"
-				send_json_response 200 '0'
+				send_json_response 200 '{"status": "success", "code": "username_changed", "message": "Username changed successfully"}'
 			fi
 		else
 			sleep 1
-			send_json_response 401 '2'
+			send_json_response 401 '{"status": "error", "code": "invalid_password", "message": "Invalid password"}'
 		fi
 	else
-		send_json_response 401 '3'
+		send_json_response 401 '{"status": "error", "code": "unauthorized", "message": "Not logged in"}'
 	fi
 }
 
@@ -190,7 +198,7 @@ main() {
 		"get_username") handle_get_username ;;
 		"change_password") handle_change_password ;;
 		"change_username") handle_change_username ;;
-		*) send_json_response 400 '1' ;;
+		*) send_json_response 400 '{"status": "error", "code": "invalid_action", "message": "Invalid action"}' ;;
 	esac
 }
 
