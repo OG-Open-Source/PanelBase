@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta70"
+Version="Beta71"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -162,7 +162,8 @@ server.modules = (
 	"mod_redirect",
 	"mod_rewrite",
 	"mod_cgi",
-	"mod_accesslog"
+	"mod_accesslog",
+	"mod_setenv"
 )
 
 server.document-root = "$INSTALL_DIR/www"
@@ -177,9 +178,17 @@ accesslog.filename = "$INSTALL_DIR/logs/access.log"
 # Debug logging
 debug.log-request-handling = "enable"
 debug.log-condition-handling = "enable"
+debug.log-file-not-found = "enable"
+debug.log-request-header = "enable"
+debug.log-response-header = "enable"
+debug.log-condition-cache = "enable"
 
 # Directory listing
-dir-listing.activate = "disable"
+dir-listing.encoding = "utf-8"
+dir-listing.show-readme = "disable"
+dir-listing.hide-dotfiles = "enable"
+dir-listing.hide-header-file = "enable"
+dir-listing.exclude = ( "~$" )
 
 # CGI configuration
 cgi.assign = ( ".cgi" => "" )
@@ -187,6 +196,10 @@ alias.url = ( "/cgi-bin/" => "$INSTALL_DIR/cgi-bin/" )
 
 \$HTTP["url"] =~ "^/cgi-bin/" {
 	cgi.assign = ( "" => "" )
+	setenv.add-environment = (
+		"CONFIG_DIR" => "$INSTALL_DIR/config",
+		"DOCUMENT_ROOT" => "$INSTALL_DIR/www"
+	)
 }
 
 # MIME types
@@ -216,12 +229,6 @@ index-file.names = ( "index.html" )
 
 # Exclude CGI files from static serving
 static-file.exclude-extensions = ( ".cgi" )
-
-# Set environment for CGI scripts
-setenv.add-environment = (
-	"CONFIG_DIR" => "$INSTALL_DIR/config",
-	"DOCUMENT_ROOT" => "$INSTALL_DIR/www"
-)
 EOF
 
 text "創建用戶配置..."
@@ -252,6 +259,16 @@ chown -R www-data:www-data /etc/lighttpd
 chown -R www-data:www-data /var/log/lighttpd
 
 chmod +x $INSTALL_DIR/cgi-bin/*.cgi
+
+find $INSTALL_DIR/cgi-bin -type f -name "*.cgi" -exec chmod 755 {} \;
+
+chmod 755 $INSTALL_DIR/config
+chmod 644 $INSTALL_DIR/config/*.conf
+
+chmod 755 $INSTALL_DIR/logs
+touch $INSTALL_DIR/logs/error.log $INSTALL_DIR/logs/access.log
+chmod 644 $INSTALL_DIR/logs/*.log
+chown www-data:www-data $INSTALL_DIR/logs/*.log
 
 TASK "重啟 lighttpd 服務" "systemctl restart lighttpd" true
 
