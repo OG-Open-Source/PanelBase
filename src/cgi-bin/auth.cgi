@@ -1,243 +1,264 @@
 #!/bin/bash
 
-set -euo pipefail
-IFS=$'\n\t'
+if [ "$REQUEST_METHOD" = "POST" ]; then
+	read -n $CONTENT_LENGTH POST_DATA
+fi
 
-exec 2>>/opt/panelbase/logs/auth.log
+CONFIG_FILE="/opt/panelbase/config/users.conf"
+SESSION_FILE="/opt/panelbase/config/sessions.conf"
+THEME_FILE="/opt/panelbase/config/themes.conf"
 
-readonly CONFIG_DIR="/opt/panelbase/config"
-readonly CONFIG_FILE="${CONFIG_DIR}/users.conf"
-readonly SESSION_FILE="${CONFIG_DIR}/sessions.conf"
-readonly SESSION_TIMEOUT=86400
 
-urldecode() {
-    local url_encoded="${1//+/ }"
-    printf '%b' "${url_encoded//%/\\x}"
-}
-
-init_files() {
-	local files=("$CONFIG_FILE" "$SESSION_FILE")
-	for file in "${files[@]}"; do
-		if [ ! -f "$file" ]; then
-			echo "[$(date)] Creating file: $file" >&2
-			touch "$file"
-			chmod 600 "$file"
-			chown www-data:www-data "$file"
-		fi
-	done
-}
-
-validate_username() {
-	local username=$1
-	echo "[$(date)] Validating username: $username" >&2
-	if ! [[ "$username" =~ ^[A-Za-z0-9]+$ ]]; then
-		send_json_response 400 '{"status": "error", "code": "invalid_username", "message": "Invalid username format"}'
-		exit 0
+for FILE in "$CONFIG_FILE" "$SESSION_FILE" "$THEME_FILE"; do
+	if [ ! -f "$FILE" ]; then
+		touch "$FILE"
+		chmod 600 "$FILE"
+		chown www-data:www-data "$FILE"
 	fi
-}
+done
 
-validate_password() {
-	local password=$1
-	echo "[$(date)] Validating password" >&2
-	if ! [[ "$password" =~ ^[A-Za-z0-9!@$]+$ ]]; then
-		send_json_response 400 '{"status": "error", "code": "invalid_password", "message": "Invalid password format"}'
-		exit 0
-	fi
-}
+AUTH_TOKEN=$(echo "$HTTP_COOKIE" | grep -oP 'auth_token=\K[^;]+')
 
-send_json_response() {
-	local status=$1
-	local content=$2
-	echo "[$(date)] Sending response: status=$status" >&2
-	echo "Content-type: application/json"
-	echo "Status: $status"
-	echo "Cache-Control: no-store, no-cache, must-revalidate"
-	echo "Pragma: no-cache"
-	echo
-	echo "$content"
-}
+ACTION=$(echo "$QUERY_STRING" | grep -oP 'action=\K[^&]+')
 
-send_redirect_response() {
-	local location=$1
-	echo "Content-type: text/html"
-	echo "Status: 302"
-	echo "Location: $location"
-	echo "Cache-Control: no-store, no-cache, must-revalidate"
-	echo "Pragma: no-cache"
-	echo
-}
+case "$ACTION" in
+	"login")
+		USERNAME=$(echo "$POST_DATA" | grep -oP 'username=\K[^&]+' | sed 's/%40/@/g' | sed 's/%2B/+/g' | sed 's/%20/ /g')
+		PASSWORD=$(echo "$POST_DATA" | grep -oP 'password=\K[^&]+' | sed 's/%40/@/g' | sed 's/%2B/+/g' | sed 's/%20/ /g')
 
-set_auth_cookie() {
-	local token=$1
-	local expiry=$(($(date +%s) + SESSION_TIMEOUT))
-	echo "Set-Cookie: auth_token=$token; Path=/; HttpOnly; SameSite=Strict; Max-Age=$SESSION_TIMEOUT; Expires=$(date -u -d "@$expiry" "+%a, %d %b %Y %H:%M:%S GMT")"
-}
-
-clear_auth_cookie() {
-	echo "Set-Cookie: auth_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
-}
-
-handle_login() {
-	local username password stored_hash input_hash token
-
-	echo "[$(date)] Handling login request" >&2
-	echo "[$(date)] POST_DATA: $POST_DATA" >&2
-
-	username=$(echo "$POST_DATA" | grep -oP 'username=\K[^&]+' | urldecode)
-	password=$(echo "$POST_DATA" | grep -oP 'password=\K[^&]+' | urldecode)
-
-	echo "[$(date)] Username: $username" >&2
-
-	validate_username "$username"
-	validate_password "$password"
-
-	if [ ! -f "$CONFIG_FILE" ]; then
-		echo "[$(date)] Error: Config file not found: $CONFIG_FILE" >&2
-		send_json_response 500 '{"status": "error", "code": "config_not_found", "message": "User configuration file not found"}'
-		exit 1
-	fi
-
-	if [ ! -r "$CONFIG_FILE" ]; then
-		echo "[$(date)] Error: Config file not readable: $CONFIG_FILE" >&2
-		send_json_response 500 '{"status": "error", "code": "config_not_readable", "message": "User configuration file not readable"}'
-		exit 1
-	fi
-
-	stored_hash=$(grep "^$username:" "$CONFIG_FILE" | cut -d: -f2)
-	input_hash=$(echo -n "$password" | md5sum | cut -d' ' -f1)
-
-	echo "[$(date)] Stored hash found: ${stored_hash:-(none)}" >&2
-
-	if [ "$stored_hash" = "$input_hash" ]; then
-		if [ ! -w "$SESSION_FILE" ]; then
-			echo "[$(date)] Error: Session file not writable: $SESSION_FILE" >&2
-			send_json_response 500 '{"status": "error", "code": "session_not_writable", "message": "Session file not writable"}'
-			exit 1
-		fi
-
-		sed -i "/^.*:$username:/d" "$SESSION_FILE"
-
-		token=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
-		echo "$token:$username:$(date +%s)" >> "$SESSION_FILE"
-
-		echo "[$(date)] Login successful for user: $username" >&2
-		echo "Content-type: application/json"
-		set_auth_cookie "$token"
-		echo "Cache-Control: no-store, no-cache, must-revalidate"
-		echo "Pragma: no-cache"
-		echo "Status: 200"
-		echo
-		echo '{"status": "success", "code": "login_success", "message": "Login successful"}'
-	else
-		echo "[$(date)] Login failed for user: $username" >&2
-		sleep 1
-		send_json_response 401 '{"status": "error", "code": "invalid_credentials", "message": "Invalid username or password"}'
-	fi
-}
-
-handle_logout() {
-	if [ -n "$AUTH_TOKEN" ]; then
-		sed -i "/^$AUTH_TOKEN:/d" "$SESSION_FILE"
-	fi
-
-	echo "Content-type: text/html"
-	clear_auth_cookie
-	echo "Cache-Control: no-store, no-cache, must-revalidate"
-	echo "Pragma: no-cache"
-	send_redirect_response "/"
-}
-
-handle_get_username() {
-	if [ -n "$AUTH_TOKEN" ]; then
-		local username
-		username=$(awk -F: -v token="$AUTH_TOKEN" '$1 == token {print $2}' "$SESSION_FILE")
-		send_json_response 200 "{\"status\": \"success\", \"code\": \"username_found\", \"data\": \"$username\"}"
-	else
-		send_json_response 401 '{"status": "error", "code": "unauthorized", "message": "Not logged in"}'
-	fi
-}
-
-handle_change_password() {
-	if [ -n "$AUTH_TOKEN" ]; then
-		local username old_password new_password stored_hash old_hash new_hash
-		
-		username=$(awk -F: -v token="$AUTH_TOKEN" '$1 == token {print $2}' "$SESSION_FILE")
-		old_password=$(echo "$POST_DATA" | grep -oP 'old_password=\K[^&]+' | sed 's/%40/@/g;s/%2B/+/g;s/%20/ /g')
-		new_password=$(echo "$POST_DATA" | grep -oP 'new_password=\K[^&]+' | sed 's/%40/@/g;s/%2B/+/g;s/%20/ /g')
-
-		validate_password "$old_password"
-		validate_password "$new_password"
-
-		if [ ${#new_password} -lt 6 ]; then
-			send_json_response 400 '{"status": "error", "code": "password_too_short", "message": "Password must be at least 6 characters"}'
+		if ! [[ "$USERNAME" =~ ^[A-Za-z0-9]+$ ]]; then
+			echo "Content-type: application/json"
+			echo "Status: 400"
+			echo
+			echo '{"error": "invalid_username_format"}'
 			exit 0
 		fi
 
-		stored_hash=$(grep "^$username:" "$CONFIG_FILE" | cut -d: -f2)
-		old_hash=$(echo -n "$old_password" | md5sum | cut -d' ' -f1)
+		if ! [[ "$PASSWORD" =~ ^[A-Za-z0-9!@$]+$ ]]; then
+			echo "Content-type: application/json"
+			echo "Status: 400"
+			echo
+			echo '{"error": "invalid_password_format"}'
+			exit 0
+		fi
 
-		if [ "$stored_hash" = "$old_hash" ]; then
-			new_hash=$(echo -n "$new_password" | md5sum | cut -d' ' -f1)
-			sed -i "s/^$username:.*/$username:$new_hash/" "$CONFIG_FILE"
-			send_json_response 200 '{"status": "success", "code": "password_changed", "message": "Password changed successfully"}'
+		STORED_HASH=$(grep "^$USERNAME:" "$CONFIG_FILE" | cut -d: -f2)
+		INPUT_HASH=$(echo -n "$PASSWORD" | md5sum | cut -d' ' -f1)
+
+		if [ "$STORED_HASH" = "$INPUT_HASH" ]; then
+			sed -i "/^.*:$USERNAME:/d" "$SESSION_FILE"
+
+			TOKEN=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
+
+			echo "$TOKEN:$USERNAME:$(date +%s)" >> "$SESSION_FILE"
+
+			EXPIRY=$(($(date +%s) + 86400))
+
+			echo "Content-type: application/json"
+			echo "Set-Cookie: auth_token=$TOKEN; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400; Expires=$(date -u -d "@$EXPIRY" "+%a, %d %b %Y %H:%M:%S GMT")"
+			echo "Status: 200"
+			echo
+			echo '0'
 		else
 			sleep 1
-			send_json_response 401 '{"status": "error", "code": "invalid_password", "message": "Invalid current password"}'
+			echo "Content-type: application/json"
+			echo "Status: 401"
+			echo
+			echo '1'
 		fi
-	else
-		send_json_response 401 '{"status": "error", "code": "unauthorized", "message": "Not logged in"}'
-	fi
-}
+		;;
 
-handle_change_username() {
-	if [ -n "$AUTH_TOKEN" ]; then
-		local current_username new_username password stored_hash input_hash
-		current_username=$(awk -F: -v token="$AUTH_TOKEN" '$1 == token {print $2}' "$SESSION_FILE")
-		new_username=$(echo "$POST_DATA" | grep -oP 'new_username=\K[^&]+' | sed 's/%40/@/g;s/%2B/+/g;s/%20/ /g')
-		password=$(echo "$POST_DATA" | grep -oP 'password=\K[^&]+' | sed 's/%40/@/g;s/%2B/+/g;s/%20/ /g')
+	"logout")
+		if [ -n "$AUTH_TOKEN" ]; then
+			sed -i "/^$AUTH_TOKEN:/d" "$SESSION_FILE"
+		fi
 
-		validate_username "$new_username"
-		validate_password "$password"
+		echo "Content-type: text/html"
+		echo "Set-Cookie: auth_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
+		echo "Status: 302"
+		echo "Location: /"
+		echo
+		;;
 
-		stored_hash=$(grep "^$current_username:" "$CONFIG_FILE" | cut -d: -f2)
-		input_hash=$(echo -n "$password" | md5sum | cut -d' ' -f1)
+	"get_username")
+		if [ -n "$AUTH_TOKEN" ]; then
+			USERNAME=$(awk -F: -v token="$AUTH_TOKEN" '$1 == token {print $2}' "$SESSION_FILE")
+			echo "Content-type: application/json"
+			echo "Status: 200"
+			echo
+			echo "$USERNAME"
+		else
+			echo "Content-type: application/json"
+			echo "Status: 401"
+			echo
+			echo '1'
+		fi
+		;;
 
-		if [ "$stored_hash" = "$input_hash" ]; then
-			if grep -q "^$new_username:" "$CONFIG_FILE"; then
-				send_json_response 409 '{"status": "error", "code": "username_exists", "message": "Username already exists"}'
+	"set_theme")
+		if [ -n "$AUTH_TOKEN" ]; then
+			USERNAME=$(awk -F: -v token="$AUTH_TOKEN" '$1 == token {print $2}' "$SESSION_FILE")
+			THEME=$(echo "$POST_DATA" | grep -oP 'theme=\K[^&]+')
+
+			if [ "$THEME" = "dark" ] || [ "$THEME" = "light" ]; then
+				sed -i "/^$USERNAME:/d" "$THEME_FILE"
+				echo "$USERNAME:$THEME" >> "$THEME_FILE"
+
+				echo "Content-type: application/json"
+				echo "Status: 200"
+				echo
+				echo '0'
 			else
-				sed -i "s/^$current_username:/$new_username:/" "$CONFIG_FILE"
-				sed -i "s/:$current_username:/:$new_username:/" "$SESSION_FILE"
-				send_json_response 200 '{"status": "success", "code": "username_changed", "message": "Username changed successfully"}'
+				echo "Content-type: application/json"
+				echo "Status: 400"
+				echo
+				echo '1'
 			fi
 		else
-			sleep 1
-			send_json_response 401 '{"status": "error", "code": "invalid_password", "message": "Invalid password"}'
+			echo "Content-type: application/json"
+			echo "Status: 401"
+			echo
+			echo '2'
 		fi
-	else
-		send_json_response 401 '{"status": "error", "code": "unauthorized", "message": "Not logged in"}'
-	fi
-}
+		;;
 
-main() {
-	init_files
+	"get_theme")
+		if [ -n "$AUTH_TOKEN" ]; then
+			USERNAME=$(awk -F: -v token="$AUTH_TOKEN" '$1 == token {print $2}' "$SESSION_FILE")
+			THEME=$(grep "^$USERNAME:" "$THEME_FILE" | cut -d: -f2)
 
-	if [ "$REQUEST_METHOD" = "POST" ]; then
-		read -n "$CONTENT_LENGTH" POST_DATA
-	fi
+			echo "Content-type: application/json"
+			echo "Status: 200"
+			echo
+			if [ -n "$THEME" ]; then
+				echo "\"$THEME\""
+			else
+				echo "null"
+			fi
+		else
+			echo "Content-type: application/json"
+			echo "Status: 401"
+			echo
+			echo '1'
+		fi
+		;;
 
-	AUTH_TOKEN=$(echo "${HTTP_COOKIE:-}" | grep -oP 'auth_token=\K[^;]+' || echo "")
+	"change_password")
+		if [ -n "$AUTH_TOKEN" ]; then
+			USERNAME=$(awk -F: -v token="$AUTH_TOKEN" '$1 == token {print $2}' "$SESSION_FILE")
+			OLD_PASSWORD=$(echo "$POST_DATA" | grep -oP 'old_password=\K[^&]+' | sed 's/%40/@/g' | sed 's/%2B/+/g' | sed 's/%20/ /g')
+			NEW_PASSWORD=$(echo "$POST_DATA" | grep -oP 'new_password=\K[^&]+' | sed 's/%40/@/g' | sed 's/%2B/+/g' | sed 's/%20/ /g')
 
-	ACTION=$(echo "$QUERY_STRING" | grep -oP 'action=\K[^&]+')
+			if ! [[ $OLD_PASSWORD =~ ^[A-Za-z0-9!@$]+$ ]]; then
+				echo "Content-type: application/json"
+				echo "Status: 400"
+				echo
+				echo '{"error": "invalid_old_password_format"}'
+				exit 0
+			fi
 
-	case "$ACTION" in
-		"login") handle_login ;;
-		"logout") handle_logout ;;
-		"get_username") handle_get_username ;;
-		"change_password") handle_change_password ;;
-		"change_username") handle_change_username ;;
-		*) send_json_response 400 '{"status": "error", "code": "invalid_action", "message": "Invalid action"}' ;;
-	esac
-}
+			if ! [[ $NEW_PASSWORD =~ ^[A-Za-z0-9!@$]+$ ]]; then
+				echo "Content-type: application/json"
+				echo "Status: 400"
+				echo
+				echo '{"error": "invalid_new_password_format"}'
+				exit 0
+			fi
 
-main
+			if [ ${#NEW_PASSWORD} -lt 6 ]; then
+				echo "Content-type: application/json"
+				echo "Status: 400"
+				echo
+				echo '{"error": "password_too_short"}'
+				exit 0
+			fi
+
+			STORED_HASH=$(grep "^$USERNAME:" "$CONFIG_FILE" | cut -d: -f2)
+			OLD_HASH=$(echo -n "$OLD_PASSWORD" | md5sum | cut -d' ' -f1)
+
+			if [ "$STORED_HASH" = "$OLD_HASH" ]; then
+				NEW_HASH=$(echo -n "$NEW_PASSWORD" | md5sum | cut -d' ' -f1)
+				sed -i "s/^$USERNAME:.*/$USERNAME:$NEW_HASH/" "$CONFIG_FILE"
+
+				echo "Content-type: application/json"
+				echo "Status: 200"
+				echo
+				echo '0'
+			else
+				sleep 1
+				echo "Content-type: application/json"
+				echo "Status: 401"
+				echo
+				echo '1'
+			fi
+		else
+			echo "Content-type: application/json"
+			echo "Status: 401"
+			echo
+			echo '2'
+		fi
+		;;
+
+	"change_username")
+		if [ -n "$AUTH_TOKEN" ]; then
+			CURRENT_USERNAME=$(awk -F: -v token="$AUTH_TOKEN" '$1 == token {print $2}' "$SESSION_FILE")
+			NEW_USERNAME=$(echo "$POST_DATA" | grep -oP 'new_username=\K[^&]+' | sed 's/%40/@/g' | sed 's/%2B/+/g' | sed 's/%20/ /g')
+			PASSWORD=$(echo "$POST_DATA" | grep -oP 'password=\K[^&]+' | sed 's/%40/@/g' | sed 's/%2B/+/g' | sed 's/%20/ /g')
+
+			if ! [[ $NEW_USERNAME =~ ^[A-Za-z0-9]+$ ]]; then
+				echo "Content-type: application/json"
+				echo "Status: 400"
+				echo
+				echo '{"error": "invalid_username_format"}'
+				exit 0
+			fi
+
+			if ! [[ $PASSWORD =~ ^[A-Za-z0-9!@$]+$ ]]; then
+				echo "Content-type: application/json"
+				echo "Status: 400"
+				echo
+				echo '{"error": "invalid_password_format"}'
+				exit 0
+			fi
+
+			STORED_HASH=$(grep "^$CURRENT_USERNAME:" "$CONFIG_FILE" | cut -d: -f2)
+			INPUT_HASH=$(echo -n "$PASSWORD" | md5sum | cut -d' ' -f1)
+
+			if [ "$STORED_HASH" = "$INPUT_HASH" ]; then
+				if grep -q "^$NEW_USERNAME:" "$CONFIG_FILE"; then
+					echo "Content-type: application/json"
+					echo "Status: 409"
+					echo
+					echo '1'
+				else
+					sed -i "s/^$CURRENT_USERNAME:/$NEW_USERNAME:/" "$CONFIG_FILE"
+					sed -i "s/:$CURRENT_USERNAME:/:$NEW_USERNAME:/" "$SESSION_FILE"
+					sed -i "s/^$CURRENT_USERNAME:/$NEW_USERNAME:/" "$THEME_FILE"
+
+					echo "Content-type: application/json"
+					echo "Status: 200"
+					echo
+					echo '0'
+				fi
+			else
+				sleep 1
+				echo "Content-type: application/json"
+				echo "Status: 401"
+				echo
+				echo '2'
+			fi
+		else
+			echo "Content-type: application/json"
+			echo "Status: 401"
+			echo
+			echo '3'
+		fi
+		;;
+
+	*)
+		echo "Content-type: application/json"
+		echo "Status: 400"
+		echo
+		echo '1'
+		;;
+esac
