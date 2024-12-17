@@ -1,27 +1,37 @@
 #!/bin/bash
 
 AUTH_TOKEN=$(echo "$HTTP_COOKIE" | grep -oP 'auth_token=\K[^;]+')
-
 ORIGINAL_URL="$REQUEST_URI"
 DOCUMENT_ROOT="/opt/panelbase/www"
 
-if [ -z "$AUTH_TOKEN" ]; then
+SECURITY_HEADERS() {
 	echo "Content-type: text/html"
 	echo "X-Content-Type-Options: nosniff"
 	echo "X-Frame-Options: SAMEORIGIN"
-	echo "Content-Security-Policy: default-src 'self' https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https:; font-src 'self' https://cdnjs.cloudflare.com;"
+	echo "X-XSS-Protection: 1; mode=block"
+	echo "Referrer-Policy: strict-origin-when-cross-origin"
+	echo "Permissions-Policy: geolocation=(), microphone=(), camera=()"
+	echo "Content-Security-Policy: default-src 'self' https://cdnjs.cloudflare.com; \
+script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com; \
+style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; \
+img-src 'self' data: https:; \
+font-src 'self' https://cdnjs.cloudflare.com; \
+frame-ancestors 'none'; \
+form-action 'self'; \
+base-uri 'self';"
+	[ -n "$1" ] && echo "Status: $1"
 	echo
+}
+
+if [ -z "$AUTH_TOKEN" ]; then
+	SECURITY_HEADERS
 	cat "$DOCUMENT_ROOT/index.html"
 	exit 0
 fi
 
 SESSION_FILE="/opt/panelbase/config/sessions.conf"
 if [ ! -f "$SESSION_FILE" ]; then
-	echo "Content-type: text/html"
-	echo "X-Content-Type-Options: nosniff"
-	echo "X-Frame-Options: SAMEORIGIN"
-	echo "Content-Security-Policy: default-src 'self' https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https:; font-src 'self' https://cdnjs.cloudflare.com;"
-	echo
+	SECURITY_HEADERS
 	cat "$DOCUMENT_ROOT/index.html"
 	exit 0
 fi
@@ -31,11 +41,7 @@ VALID_SESSION=$(awk -F: -v token="$AUTH_TOKEN" -v time="$CURRENT_TIME" \
 	'$1 == token && (time - $3) < 86400 {print $2}' "$SESSION_FILE")
 
 if [ -z "$VALID_SESSION" ]; then
-	echo "Content-type: text/html"
-	echo "X-Content-Type-Options: nosniff"
-	echo "X-Frame-Options: SAMEORIGIN"
-	echo "Content-Security-Policy: default-src 'self' https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https:; font-src 'self' https://cdnjs.cloudflare.com;"
-	echo
+	SECURITY_HEADERS
 	cat "$DOCUMENT_ROOT/index.html"
 	exit 0
 fi
@@ -49,17 +55,10 @@ REQUESTED_FILE="${DOCUMENT_ROOT}${ORIGINAL_URL}"
 
 if [ ! -f "$REQUESTED_FILE" ]; then
 	if [ -f "$DOCUMENT_ROOT/404.html" ]; then
-		echo "Content-type: text/html"
-		echo "Status: 404"
-		echo "X-Content-Type-Options: nosniff"
-		echo "X-Frame-Options: SAMEORIGIN"
-		echo "Content-Security-Policy: default-src 'self' https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https:; font-src 'self' https://cdnjs.cloudflare.com;"
-		echo
+		SECURITY_HEADERS "404"
 		cat "$DOCUMENT_ROOT/404.html"
 	else
-		echo "Content-type: text/html"
-		echo "Status: 404"
-		echo
+		SECURITY_HEADERS "404"
 		echo "<!DOCTYPE html>"
 		echo "<html><head><title>404 Not Found</title></head>"
 		echo "<body><h1>404 Not Found</h1>"
@@ -72,22 +71,37 @@ fi
 EXTENSION="${REQUESTED_FILE##*.}"
 case "$EXTENSION" in
 	"html") 
-		CONTENT_TYPE="text/html"
-		echo "Content-type: $CONTENT_TYPE"
-		echo "X-Content-Type-Options: nosniff"
-		echo "X-Frame-Options: SAMEORIGIN"
-		echo "Content-Security-Policy: default-src 'self' https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https:; font-src 'self' https://cdnjs.cloudflare.com;"
+		SECURITY_HEADERS
 		;;
-	"css") CONTENT_TYPE="text/css" ;;
-	"js") CONTENT_TYPE="application/javascript" ;;
-	"png") CONTENT_TYPE="image/png" ;;
-	"jpg"|"jpeg") CONTENT_TYPE="image/jpeg" ;;
-	"gif") CONTENT_TYPE="image/gif" ;;
-	"svg") CONTENT_TYPE="image/svg+xml" ;;
-	*) CONTENT_TYPE="application/octet-stream" ;;
+	"css") 
+		echo "Content-type: text/css"
+		echo "Cache-Control: public, max-age=31536000"
+		echo
+		;;
+	"js") 
+		echo "Content-type: application/javascript"
+		echo "Cache-Control: public, max-age=31536000"
+		echo
+		;;
+	"png"|"jpg"|"jpeg"|"gif") 
+		echo "Content-type: image/${EXTENSION}"
+		echo "Cache-Control: public, max-age=31536000"
+		echo
+		;;
+	"svg") 
+		echo "Content-type: image/svg+xml"
+		echo "Cache-Control: public, max-age=31536000"
+		echo
+		;;
+	"woff"|"woff2"|"ttf"|"eot")
+		echo "Content-type: font/${EXTENSION}"
+		echo "Cache-Control: public, max-age=31536000"
+		echo
+		;;
+	*) 
+		echo "Content-type: application/octet-stream"
+		echo
+		;;
 esac
-
-[ "$EXTENSION" != "html" ] && echo "Content-type: $CONTENT_TYPE"
-echo
 
 cat "$REQUESTED_FILE"
