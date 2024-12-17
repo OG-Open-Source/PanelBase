@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta69"
+Version="Beta70"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -161,7 +161,8 @@ server.modules = (
 	"mod_compress",
 	"mod_redirect",
 	"mod_rewrite",
-	"mod_cgi"
+	"mod_cgi",
+	"mod_accesslog"
 )
 
 server.document-root = "$INSTALL_DIR/www"
@@ -171,10 +172,16 @@ server.username = "www-data"
 server.groupname = "www-data"
 
 server.errorlog = "$INSTALL_DIR/logs/error.log"
-server.breakagelog = "$INSTALL_DIR/logs/access.log"
+accesslog.filename = "$INSTALL_DIR/logs/access.log"
 
-server.dir-listing.activate = "disable"
+# Debug logging
+debug.log-request-handling = "enable"
+debug.log-condition-handling = "enable"
 
+# Directory listing
+dir-listing.activate = "disable"
+
+# CGI configuration
 cgi.assign = ( ".cgi" => "" )
 alias.url = ( "/cgi-bin/" => "$INSTALL_DIR/cgi-bin/" )
 
@@ -182,6 +189,7 @@ alias.url = ( "/cgi-bin/" => "$INSTALL_DIR/cgi-bin/" )
 	cgi.assign = ( "" => "" )
 }
 
+# MIME types
 mimetype.assign = (
 	".html" => "text/html",
 	".css"  => "text/css",
@@ -196,15 +204,24 @@ mimetype.assign = (
 	".eot"  => "application/vnd.ms-fontobject"
 )
 
-\$HTTP["url"] !~ "^(/\$|/index\.html\$|/cgi-bin/auth\.cgi|/cgi-bin/check_auth\.cgi|/css/|/js/|/img/|/fonts/)" {
+# URL rewriting
+\$HTTP["url"] !~ "^(/\$|/index\.html\$|/cgi-bin/auth\.cgi|/css/|/js/|/img/|/fonts/)" {
 	url.rewrite-once = (
 		"^/.*" => "/cgi-bin/check_auth.cgi"
 	)
 }
 
+# Default index file
 index-file.names = ( "index.html" )
 
+# Exclude CGI files from static serving
 static-file.exclude-extensions = ( ".cgi" )
+
+# Set environment for CGI scripts
+setenv.add-environment = (
+	"CONFIG_DIR" => "$INSTALL_DIR/config",
+	"DOCUMENT_ROOT" => "$INSTALL_DIR/www"
+)
 EOF
 
 text "創建用戶配置..."
@@ -216,19 +233,25 @@ if ! id -u www-data >/dev/null 2>&1; then
 	useradd -r -s /usr/sbin/nologin www-data
 fi
 
+mkdir -p $INSTALL_DIR/{www,cgi-bin,config,logs}
+mkdir -p /var/log/lighttpd
+
 find $INSTALL_DIR -type d -exec chmod 755 {} \;
 find $INSTALL_DIR -type f -exec chmod 644 {} \;
 
 chmod -R 755 $INSTALL_DIR/cgi-bin
 chmod 600 $INSTALL_DIR/config/users.conf
 chmod 600 $INSTALL_DIR/config/sessions.conf
+chmod 644 $INSTALL_DIR/config/routes.conf
+
+chmod 755 $INSTALL_DIR/logs
+chmod 644 $INSTALL_DIR/logs/*.log 2>/dev/null || true
 
 chown -R www-data:www-data $INSTALL_DIR
 chown -R www-data:www-data /etc/lighttpd
-
-mkdir -p /var/log/lighttpd
 chown -R www-data:www-data /var/log/lighttpd
-chmod 755 /var/log/lighttpd
+
+chmod +x $INSTALL_DIR/cgi-bin/*.cgi
 
 TASK "重啟 lighttpd 服務" "systemctl restart lighttpd" true
 
