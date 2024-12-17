@@ -21,9 +21,11 @@ if [ "$ORIGINAL_URL" = "/" ] || [ "$ORIGINAL_URL" = "/index.html" ]; then
 			exit 0
 		fi
 	fi
-	echo "Status: 302"
-	echo "Location: /"
+	echo "Content-type: text/html"
+	echo "Cache-Control: no-store, no-cache, must-revalidate"
+	echo "Pragma: no-cache"
 	echo
+	cat "$DOCUMENT_ROOT/index.html"
 	exit 0
 fi
 

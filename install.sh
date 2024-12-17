@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta77"
+Version="Beta78"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -197,8 +197,7 @@ mimetype.assign = (
 	".eot"  => "application/vnd.ms-fontobject"
 )
 
-# 允許直接訪問的文件
-\$HTTP["url"] !~ "^(/index\.html|/cgi-bin/auth\.cgi|/css/|/js/|/img/|/fonts/)" {
+\$HTTP["url"] !~ "^(/|/cgi-bin/auth\.cgi|/css/|/js/|/img/|/fonts/)" {
 	url.rewrite-once = (
 		"^/.*" => "/cgi-bin/check_auth.cgi"
 	)
