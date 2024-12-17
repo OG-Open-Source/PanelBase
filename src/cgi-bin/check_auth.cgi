@@ -22,7 +22,7 @@ if [ "$ORIGINAL_URL" = "/" ] || [ "$ORIGINAL_URL" = "/index.html" ]; then
 		fi
 	fi
 	echo "Status: 302"
-	echo "Location: /index.html"
+	echo "Location: /"
 	echo
 	exit 0
 fi
