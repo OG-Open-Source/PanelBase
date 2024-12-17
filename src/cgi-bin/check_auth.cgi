@@ -48,13 +48,24 @@ fi
 REQUESTED_FILE="${DOCUMENT_ROOT}${ORIGINAL_URL}"
 
 if [ ! -f "$REQUESTED_FILE" ]; then
-	echo "Content-type: text/html"
-	echo "Status: 404"
-	echo "X-Content-Type-Options: nosniff"
-	echo "X-Frame-Options: SAMEORIGIN"
-	echo "Content-Security-Policy: default-src 'self' https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https:; font-src 'self' https://cdnjs.cloudflare.com;"
-	echo
-	cat "$DOCUMENT_ROOT/404.html"
+	if [ -f "$DOCUMENT_ROOT/404.html" ]; then
+		echo "Content-type: text/html"
+		echo "Status: 404"
+		echo "X-Content-Type-Options: nosniff"
+		echo "X-Frame-Options: SAMEORIGIN"
+		echo "Content-Security-Policy: default-src 'self' https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https:; font-src 'self' https://cdnjs.cloudflare.com;"
+		echo
+		cat "$DOCUMENT_ROOT/404.html"
+	else
+		echo "Content-type: text/html"
+		echo "Status: 404"
+		echo
+		echo "<!DOCTYPE html>"
+		echo "<html><head><title>404 Not Found</title></head>"
+		echo "<body><h1>404 Not Found</h1>"
+		echo "<p>The requested URL $ORIGINAL_URL was not found on this server.</p>"
+		echo "</body></html>"
+	fi
 	exit 0
 fi
 

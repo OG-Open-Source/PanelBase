@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta84"
+Version="Beta85"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -78,7 +78,7 @@ TASK "創建必要的目錄" "ADD -d $INSTALL_DIR/{www,cgi-bin,config,logs}" tru
 
 text "下載面板文件..."
 BASE_URL="https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main"
-for FILE in "src/cgi-bin/panel.cgi" "src/cgi-bin/auth.cgi" "src/cgi-bin/check_auth.cgi" "www/index.html"; do
+for FILE in "src/cgi-bin/panel.cgi" "src/cgi-bin/auth.cgi" "src/cgi-bin/check_auth.cgi" "www/index.html" "www/404.html"; do
 	text "下載 $FILE..."
 	HTTP_CODE=$(curl -s -w "%{http_code}" -o "${FILE##*/}" "$BASE_URL/$FILE")
 	[ "$HTTP_CODE" != "200" ] && { error "無法下載 $FILE (HTTP 代碼: $HTTP_CODE)"; exit 1; }
