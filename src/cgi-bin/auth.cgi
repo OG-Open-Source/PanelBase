@@ -3,6 +3,8 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+exec 2>>/opt/panelbase/logs/auth.log
+
 readonly CONFIG_DIR="/opt/panelbase/config"
 readonly CONFIG_FILE="${CONFIG_DIR}/users.conf"
 readonly SESSION_FILE="${CONFIG_DIR}/sessions.conf"
@@ -17,6 +19,7 @@ init_files() {
 	local files=("$CONFIG_FILE" "$SESSION_FILE")
 	for file in "${files[@]}"; do
 		if [ ! -f "$file" ]; then
+			echo "[$(date)] Creating file: $file" >&2
 			touch "$file"
 			chmod 600 "$file"
 			chown www-data:www-data "$file"
@@ -26,6 +29,7 @@ init_files() {
 
 validate_username() {
 	local username=$1
+	echo "[$(date)] Validating username: $username" >&2
 	if ! [[ "$username" =~ ^[A-Za-z0-9]+$ ]]; then
 		send_json_response 400 '{"status": "error", "code": "invalid_username", "message": "Invalid username format"}'
 		exit 0
@@ -34,6 +38,7 @@ validate_username() {
 
 validate_password() {
 	local password=$1
+	echo "[$(date)] Validating password" >&2
 	if ! [[ "$password" =~ ^[A-Za-z0-9!@$]+$ ]]; then
 		send_json_response 400 '{"status": "error", "code": "invalid_password", "message": "Invalid password format"}'
 		exit 0
@@ -43,6 +48,7 @@ validate_password() {
 send_json_response() {
 	local status=$1
 	local content=$2
+	echo "[$(date)] Sending response: status=$status" >&2
 	echo "Content-type: application/json"
 	echo "Status: $status"
 	echo "Cache-Control: no-store, no-cache, must-revalidate"
@@ -74,18 +80,25 @@ clear_auth_cookie() {
 handle_login() {
 	local username password stored_hash input_hash token
 
+	echo "[$(date)] Handling login request" >&2
+	echo "[$(date)] POST_DATA: $POST_DATA" >&2
+
 	username=$(echo "$POST_DATA" | grep -oP 'username=\K[^&]+' | urldecode)
 	password=$(echo "$POST_DATA" | grep -oP 'password=\K[^&]+' | urldecode)
+
+	echo "[$(date)] Username: $username" >&2
 
 	validate_username "$username"
 	validate_password "$password"
 
 	if [ ! -f "$CONFIG_FILE" ]; then
+		echo "[$(date)] Error: Config file not found: $CONFIG_FILE" >&2
 		send_json_response 500 '{"status": "error", "code": "config_not_found", "message": "User configuration file not found"}'
 		exit 1
 	fi
 
 	if [ ! -r "$CONFIG_FILE" ]; then
+		echo "[$(date)] Error: Config file not readable: $CONFIG_FILE" >&2
 		send_json_response 500 '{"status": "error", "code": "config_not_readable", "message": "User configuration file not readable"}'
 		exit 1
 	fi
@@ -93,8 +106,11 @@ handle_login() {
 	stored_hash=$(grep "^$username:" "$CONFIG_FILE" | cut -d: -f2)
 	input_hash=$(echo -n "$password" | md5sum | cut -d' ' -f1)
 
+	echo "[$(date)] Stored hash found: ${stored_hash:-(none)}" >&2
+
 	if [ "$stored_hash" = "$input_hash" ]; then
 		if [ ! -w "$SESSION_FILE" ]; then
+			echo "[$(date)] Error: Session file not writable: $SESSION_FILE" >&2
 			send_json_response 500 '{"status": "error", "code": "session_not_writable", "message": "Session file not writable"}'
 			exit 1
 		fi
@@ -104,6 +120,7 @@ handle_login() {
 		token=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
 		echo "$token:$username:$(date +%s)" >> "$SESSION_FILE"
 
+		echo "[$(date)] Login successful for user: $username" >&2
 		echo "Content-type: application/json"
 		set_auth_cookie "$token"
 		echo "Cache-Control: no-store, no-cache, must-revalidate"
@@ -112,6 +129,7 @@ handle_login() {
 		echo
 		echo '{"status": "success", "code": "login_success", "message": "Login successful"}'
 	else
+		echo "[$(date)] Login failed for user: $username" >&2
 		sleep 1
 		send_json_response 401 '{"status": "error", "code": "invalid_credentials", "message": "Invalid username or password"}'
 	fi

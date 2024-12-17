@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta71"
+Version="Beta72"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -266,7 +266,7 @@ chmod 755 $INSTALL_DIR/config
 chmod 644 $INSTALL_DIR/config/*.conf
 
 chmod 755 $INSTALL_DIR/logs
-touch $INSTALL_DIR/logs/error.log $INSTALL_DIR/logs/access.log
+touch $INSTALL_DIR/logs/error.log $INSTALL_DIR/logs/access.log $INSTALL_DIR/logs/auth.log
 chmod 644 $INSTALL_DIR/logs/*.log
 chown www-data:www-data $INSTALL_DIR/logs/*.log
 
