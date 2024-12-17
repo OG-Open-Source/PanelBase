@@ -4,9 +4,28 @@ set -euo pipefail
 IFS=$'\n\t'
 
 AUTH_TOKEN=$(echo "${HTTP_COOKIE:-}" | grep -oP 'auth_token=\K[^;]+' || echo "")
-
 ORIGINAL_URL="$REQUEST_URI"
 DOCUMENT_ROOT="/opt/panelbase/www"
+SESSION_FILE="/opt/panelbase/config/sessions.conf"
+
+if [ "$ORIGINAL_URL" = "/" ] || [ "$ORIGINAL_URL" = "/index.html" ]; then
+	if [ -n "$AUTH_TOKEN" ] && [ -f "$SESSION_FILE" ]; then
+		CURRENT_TIME=$(date +%s)
+		VALID_SESSION=$(awk -F: -v token="$AUTH_TOKEN" -v time="$CURRENT_TIME" \
+			'$1 == token && (time - $3) < 86400 {print $2}' "$SESSION_FILE")
+
+		if [ -n "$VALID_SESSION" ]; then
+			echo "Status: 302"
+			echo "Location: /panel.html"
+			echo
+			exit 0
+		fi
+	fi
+	echo "Status: 302"
+	echo "Location: /index.html"
+	echo
+	exit 0
+fi
 
 if [ -z "$AUTH_TOKEN" ]; then
 	echo "Status: 302"

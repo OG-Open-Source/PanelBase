@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta75"
+Version="Beta76"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -29,8 +29,8 @@ INPUT "請輸入管理員用戶名：" ADMIN_NAME
 ADMIN_NAME=${ADMIN_NAME:-admin}
 
 if ! [[ $ADMIN_NAME =~ ^[A-Za-z0-9]+$ ]]; then
-    error "用戶名只能包含英文字母和數字"
-    exit 1
+	error "用戶名只能包含英文字母和數字"
+	exit 1
 fi
 
 while true; do
@@ -46,12 +46,12 @@ while true; do
 			error "密碼長度必須至少為 6 個字符"
 			continue
 		fi
-		
+
 		if ! [[ $ADMIN_PASS =~ ^[A-Za-z0-9!@$]+$ ]]; then
 			error "密碼只能包含英文字母、數字和特殊符號 !@$"
 			continue
 		fi
-		
+
 		break
 	else
 		error "兩次輸入的密碼不一致，請重新輸入"
@@ -99,7 +99,7 @@ if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	text "正在處理自定義面板文件..."
 	TMP_DIR=$(mktemp -d)
 	text "臨時目錄：$TMP_DIR"
-	
+
 	case "$FILE_EXT" in
 		"zip")
 			text "解壓縮 ZIP 文件..."
@@ -114,12 +114,12 @@ if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 			tar xzf "$CUSTOM_ARCHIVE_PATH" -C "$TMP_DIR"
 			;;
 	esac
-	
+
 	text "解壓縮後的文件列表："
 	ls -la "$TMP_DIR"
-	
+
 	PANEL_HTML=$(find "$TMP_DIR" -name "panel.html" -type f)
-	
+
 	if [ -z "$PANEL_HTML" ]; then
 		text "${CLR3}錯誤：在壓縮檔中找不到 panel.html 文件${CLR0}"
 		text "${CLR3}請確保文件名稱正確（區分大小寫）${CLR0}"
@@ -128,25 +128,25 @@ if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	else
 		text "找到 panel.html：$PANEL_HTML"
 		cp -f "$PANEL_HTML" "$INSTALL_DIR/www/panel.html"
-		
+
 		PANEL_DIR=$(dirname "$PANEL_HTML")
-		
+
 		for file in "$PANEL_DIR"/*; do
 			if [ -f "$file" ] && [ "$(basename "$file")" != "index.html" ] && [ "$(basename "$file")" != "panel.html" ]; then
 				cp -f "$file" "$INSTALL_DIR/www/"
 			fi
 		done
-		
+
 		for dir in "$PANEL_DIR"/*; do
 			[ -d "$dir" ] && cp -rf "$dir" "$INSTALL_DIR/www/"
 		done
 	fi
-	
+
 	text "安裝目錄文件列表："
 	ls -la "$INSTALL_DIR/www/"
-	
+
 	rm -rf "$TMP_DIR"
-	
+
 	text "${CLR2}自定義面板文件安裝完成${CLR0}"
 else
 	mv panel.html $INSTALL_DIR/www/
@@ -197,12 +197,11 @@ mimetype.assign = (
 	".eot"  => "application/vnd.ms-fontobject"
 )
 
-\$HTTP["url"] !~ "^/\$" {
-	\$HTTP["url"] !~ "^/cgi-bin/(auth|panel)\.cgi" {
-		url.rewrite-once = (
-			"^/.*" => "/cgi-bin/check_auth.cgi"
-		)
-	}
+# 允許直接訪問的文件
+\$HTTP["url"] !~ "^(/index\.html|/cgi-bin/auth\.cgi|/css/|/js/|/img/|/fonts/)" {
+	url.rewrite-once = (
+		"^/.*" => "/cgi-bin/check_auth.cgi"
+	)
 }
 
 index-file.names = ( "index.html" )
