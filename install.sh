@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta85"
+Version="Beta86"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -93,7 +93,7 @@ fi
 chmod +x panel.cgi auth.cgi check_auth.cgi
 
 mv panel.cgi auth.cgi check_auth.cgi $INSTALL_DIR/cgi-bin/
-mv index.html $INSTALL_DIR/www/
+mv index.html 404.html $INSTALL_DIR/www/
 
 if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	text "正在處理自定義面板文件..."
