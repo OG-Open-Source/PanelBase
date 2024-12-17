@@ -1,6 +1,9 @@
 #!/bin/bash
 
-AUTH_TOKEN=$(echo "$HTTP_COOKIE" | grep -oP 'auth_token=\K[^;]+')
+set -euo pipefail
+IFS=$'\n\t'
+
+AUTH_TOKEN=$(echo "${HTTP_COOKIE:-}" | grep -oP 'auth_token=\K[^;]+' || echo "")
 
 ORIGINAL_URL="$REQUEST_URI"
 DOCUMENT_ROOT="/opt/panelbase/www"
@@ -39,10 +42,21 @@ fi
 REQUESTED_FILE="${DOCUMENT_ROOT}${ORIGINAL_URL}"
 
 if [ ! -f "$REQUESTED_FILE" ]; then
-	echo "Content-type: text/html"
-	echo "Status: 404"
-	echo
-	cat $DOCUMENT_ROOT/404.html
+	if [ -f "$DOCUMENT_ROOT/404.html" ]; then
+		echo "Content-type: text/html"
+		echo "Status: 404"
+		echo "Cache-Control: no-store, no-cache, must-revalidate"
+		echo "Pragma: no-cache"
+		echo
+		cat "$DOCUMENT_ROOT/404.html"
+	else
+		echo "Content-type: text/plain"
+		echo "Status: 404"
+		echo "Cache-Control: no-store, no-cache, must-revalidate"
+		echo "Pragma: no-cache"
+		echo
+		echo "404 Not Found"
+	fi
 	exit 0
 fi
 
@@ -59,6 +73,8 @@ case "$EXTENSION" in
 esac
 
 echo "Content-type: $CONTENT_TYPE"
+echo "Cache-Control: no-store, no-cache, must-revalidate"
+echo "Pragma: no-cache"
 echo
 
 cat "$REQUESTED_FILE"
