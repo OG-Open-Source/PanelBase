@@ -7,19 +7,34 @@ AUTH_TOKEN=$(echo "${HTTP_COOKIE:-}" | grep -oP 'auth_token=\K[^;]+' || echo "")
 ORIGINAL_URL="$REQUEST_URI"
 DOCUMENT_ROOT="/opt/panelbase/www"
 SESSION_FILE="/opt/panelbase/config/sessions.conf"
+SESSION_TIMEOUT=86400
+
+validate_session() {
+	local token=$1
+	local current_time
+	current_time=$(date +%s)
+
+	if [ ! -f "$SESSION_FILE" ]; then
+		return 1
+	fi
+
+	local username
+	username=$(awk -F: -v token="$token" -v time="$current_time" -v timeout="$SESSION_TIMEOUT" \
+		'$1 == token && (time - $3) < timeout {print $2}' "$SESSION_FILE")
+
+	if [ -n "$username" ]; then
+		return 0
+	else
+		return 1
+	fi
+}
 
 if [ "$ORIGINAL_URL" = "/" ] || [ "$ORIGINAL_URL" = "/index.html" ]; then
-	if [ -n "$AUTH_TOKEN" ] && [ -f "$SESSION_FILE" ]; then
-		CURRENT_TIME=$(date +%s)
-		VALID_SESSION=$(awk -F: -v token="$AUTH_TOKEN" -v time="$CURRENT_TIME" \
-			'$1 == token && (time - $3) < 86400 {print $2}' "$SESSION_FILE")
-
-		if [ -n "$VALID_SESSION" ]; then
-			echo "Status: 302"
-			echo "Location: /panel.html"
-			echo
-			exit 0
-		fi
+	if [ -n "$AUTH_TOKEN" ] && validate_session "$AUTH_TOKEN"; then
+		echo "Status: 302"
+		echo "Location: /panel.html"
+		echo
+		exit 0
 	fi
 	echo "Content-type: text/html"
 	echo "Cache-Control: no-store, no-cache, must-revalidate"
@@ -29,26 +44,7 @@ if [ "$ORIGINAL_URL" = "/" ] || [ "$ORIGINAL_URL" = "/index.html" ]; then
 	exit 0
 fi
 
-if [ -z "$AUTH_TOKEN" ]; then
-	echo "Status: 302"
-	echo "Location: /"
-	echo
-	exit 0
-fi
-
-SESSION_FILE="/opt/panelbase/config/sessions.conf"
-if [ ! -f "$SESSION_FILE" ]; then
-	echo "Status: 302"
-	echo "Location: /"
-	echo
-	exit 0
-fi
-
-CURRENT_TIME=$(date +%s)
-VALID_SESSION=$(awk -F: -v token="$AUTH_TOKEN" -v time="$CURRENT_TIME" \
-	'$1 == token && (time - $3) < 86400 {print $2}' "$SESSION_FILE")
-
-if [ -z "$VALID_SESSION" ]; then
+if [ -z "$AUTH_TOKEN" ] || ! validate_session "$AUTH_TOKEN"; then
 	echo "Status: 302"
 	echo "Location: /"
 	echo
