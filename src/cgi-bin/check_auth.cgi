@@ -42,46 +42,7 @@ if [ ! -f "$REQUESTED_FILE" ]; then
 	echo "Content-type: text/html"
 	echo "Status: 404"
 	echo
-	cat << EOF
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-	<meta charset="UTF-8">
-	<title>404 - 頁面未找到</title>
-	<style>
-		body {
-			font-family: Arial, sans-serif;
-			text-align: center;
-			padding: 50px;
-			background: #f5f5f5;
-		}
-		.error-container {
-			background: white;
-			padding: 30px;
-			border-radius: 8px;
-			box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-			display: inline-block;
-		}
-		h1 { color: #e74c3c; }
-		.back-link {
-			margin-top: 20px;
-			color: #3498db;
-			text-decoration: none;
-		}
-		.back-link:hover {
-			text-decoration: underline;
-		}
-	</style>
-</head>
-<body>
-	<div class="error-container">
-		<h1>404 - 頁面未找到</h1>
-		<p>抱歉，您請求的頁面不存在。</p>
-		<a href="/panel.html" class="back-link">返回主頁</a>
-	</div>
-</body>
-</html>
-EOF
+	cat $DOCUMENT_ROOT/404.html
 	exit 0
 fi
 
