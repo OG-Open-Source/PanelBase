@@ -4,6 +4,24 @@ AUTH_TOKEN=$(echo "$HTTP_COOKIE" | grep -oP 'auth_token=\K[^;]+')
 ORIGINAL_URL="$REQUEST_URI"
 DOCUMENT_ROOT="/opt/panelbase/www"
 
+SESSION_ROTATION() {
+	local token="$1"
+	local session_file="$2"
+	local current_time="$3"
+	local rotation_interval=3600
+
+	local session_time=$(awk -F: -v token="$token" '$1 == token {print $3}' "$session_file")
+	if [ -n "$session_time" ] && [ $((current_time - session_time)) -gt $rotation_interval ]; then
+		local new_token=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
+		local username=$(awk -F: -v token="$token" '$1 == token {print $2}' "$session_file")
+		
+		sed -i "/^$token:/d" "$session_file"
+		echo "$new_token:$username:$current_time" >> "$session_file"
+		
+		echo "Set-Cookie: auth_token=$new_token; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400"
+	fi
+}
+
 SECURITY_HEADERS() {
 	echo "Content-type: text/html"
 	echo "X-Content-Type-Options: nosniff"
@@ -45,6 +63,8 @@ if [ -z "$VALID_SESSION" ]; then
 	cat "$DOCUMENT_ROOT/index.html"
 	exit 0
 fi
+
+SESSION_ROTATION "$AUTH_TOKEN" "$SESSION_FILE" "$CURRENT_TIME"
 
 if echo "$ORIGINAL_URL" | grep -q "^/cgi-bin/panel\.cgi"; then
 	exec /opt/panelbase/cgi-bin/panel.cgi

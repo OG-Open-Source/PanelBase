@@ -8,18 +8,40 @@ CONFIG_FILE="/opt/panelbase/config/users.conf"
 SESSION_FILE="/opt/panelbase/config/sessions.conf"
 THEME_FILE="/opt/panelbase/config/themes.conf"
 
-
 for FILE in "$CONFIG_FILE" "$SESSION_FILE" "$THEME_FILE"; do
 	if [ ! -f "$FILE" ]; then
 		touch "$FILE"
+		
 		chmod 600 "$FILE"
 		chown www-data:www-data "$FILE"
 	fi
 done
 
 AUTH_TOKEN=$(echo "$HTTP_COOKIE" | grep -oP 'auth_token=\K[^;]+')
-
 ACTION=$(echo "$QUERY_STRING" | grep -oP 'action=\K[^&]+')
+
+create_session() {
+	local username="$1"
+	local current_time=$(date +%s)
+	
+	sed -i "/:[^:]*$username:/d" "$SESSION_FILE"
+	
+	local token=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
+	
+	echo "$token:$username:$current_time" >> "$SESSION_FILE"
+	
+	local expiry=$((current_time + 86400))
+	echo "Set-Cookie: auth_token=$token; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400; Expires=$(date -u -d "@$expiry" "+%a, %d %b %Y %H:%M:%S GMT")"
+}
+
+cleanup_sessions() {
+	local current_time=$(date +%s)
+	local temp_file=$(mktemp)
+	
+	awk -F: -v time="$current_time" '(time - $3) < 86400 {print $0}' "$SESSION_FILE" > "$temp_file"
+	mv "$temp_file" "$SESSION_FILE"
+	chmod 600 "$SESSION_FILE"
+}
 
 case "$ACTION" in
 	"login")
@@ -46,16 +68,10 @@ case "$ACTION" in
 		INPUT_HASH=$(echo -n "$PASSWORD" | md5sum | cut -d' ' -f1)
 
 		if [ "$STORED_HASH" = "$INPUT_HASH" ]; then
-			sed -i "/^.*:$USERNAME:/d" "$SESSION_FILE"
-
-			TOKEN=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
-
-			echo "$TOKEN:$USERNAME:$(date +%s)" >> "$SESSION_FILE"
-
-			EXPIRY=$(($(date +%s) + 86400))
-
+			cleanup_sessions
+			create_session "$USERNAME"
+			
 			echo "Content-type: application/json"
-			echo "Set-Cookie: auth_token=$TOKEN; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400; Expires=$(date -u -d "@$EXPIRY" "+%a, %d %b %Y %H:%M:%S GMT")"
 			echo "Status: 200"
 			echo
 			echo '0'
