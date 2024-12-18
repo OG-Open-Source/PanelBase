@@ -89,6 +89,16 @@ SHOW_NOT_FOUND() {
 	SHOW_ERROR "404" "not_found" "$message"
 }
 
+REDIRECT_TO_LOGIN() {
+	local message="$1"
+	[ -n "$message" ] && log_auth_event "INFO" "$message"
+	echo "Content-type: text/html"
+	echo "Status: 302"
+	echo "Location: /"
+	echo
+	exit 0
+}
+
 is_public_resource() {
 	local url="$1"
 	case "$url" in
@@ -114,14 +124,12 @@ fi
 SESSION_FILE="$INSTALL_DIR/config/sessions.conf"
 if [ ! -f "$SESSION_FILE" ]; then
 	log_auth_event "ERROR" "Session file not found"
-	SHOW_ERROR "500" "session_file_missing" "Session file not found"
-	exit 1
+	REDIRECT_TO_LOGIN "Session file not found"
 fi
 
 if [ -z "$AUTH_TOKEN" ]; then
 	log_auth_event "WARN" "No auth token provided"
-	SHOW_ERROR "401" "authentication_required" "Authentication required"
-	exit 0
+	REDIRECT_TO_LOGIN "No auth token provided"
 fi
 
 CURRENT_TIME=$(date +%s)
@@ -131,8 +139,7 @@ VALID_SESSION=$(awk -F: -v token="$AUTH_TOKEN" -v time="$CURRENT_TIME" -v max_ag
 if [ -z "$VALID_SESSION" ]; then
 	log_auth_event "WARN" "Invalid or expired session token: $AUTH_TOKEN"
 	echo "Set-Cookie: auth_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
-	SHOW_ERROR "401" "invalid_session" "Invalid or expired session"
-	exit 0
+	REDIRECT_TO_LOGIN "Invalid or expired session"
 fi
 
 if [ $((CURRENT_TIME - $(awk -F: -v token="$AUTH_TOKEN" '$1 == token {print $3}' "$SESSION_FILE"))) -gt "$SESSION_ROTATION_INTERVAL" ]; then
