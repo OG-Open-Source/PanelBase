@@ -70,16 +70,34 @@ SECURITY_HEADERS() {
 	echo
 }
 
+SHOW_ERROR() {
+	local status="$1"
+	local message="$2"
+	local error_page="$3"
+	
+	log_auth_event "WARN" "$message"
+	SECURITY_HEADERS "text/html" "$status"
+	
+	if [ -f "$DOCUMENT_ROOT/$error_page" ]; then
+		cat "$DOCUMENT_ROOT/$error_page"
+	else
+		echo "<!DOCTYPE html>"
+		echo "<html><head><title>$status Error</title></head>"
+		echo "<body><h1>$status Error</h1>"
+		echo "<p>$message</p>"
+		echo "</body></html>"
+	fi
+	exit 0
+}
+
 SHOW_FORBIDDEN() {
 	local message="$1"
-	log_auth_event "WARN" "$message"
-	SECURITY_HEADERS "text/html" "403"
-	echo "<!DOCTYPE html>"
-	echo "<html><head><title>403 Forbidden</title></head>"
-	echo "<body><h1>403 Forbidden</h1>"
-	echo "<p>Access denied.</p>"
-	echo "</body></html>"
-	exit 0
+	SHOW_ERROR "403" "$message" "403.html"
+}
+
+SHOW_NOT_FOUND() {
+	local message="$1"
+	SHOW_ERROR "404" "$message" "404.html"
 }
 
 SHOW_LOGIN_PAGE() {
@@ -156,18 +174,7 @@ fi
 # Handle 404
 if [ ! -f "$REQUESTED_FILE" ]; then
 	log_auth_event "INFO" "404 Not Found: $REQUESTED_FILE"
-	if [ -f "$DOCUMENT_ROOT/404.html" ]; then
-		SECURITY_HEADERS "text/html" "404"
-		cat "$DOCUMENT_ROOT/404.html"
-	else
-		SECURITY_HEADERS "text/html" "404"
-		echo "<!DOCTYPE html>"
-		echo "<html><head><title>404 Not Found</title></head>"
-		echo "<body><h1>404 Not Found</h1>"
-		echo "<p>The requested URL $ORIGINAL_URL was not found on this server.</p>"
-		echo "</body></html>"
-	fi
-	exit 0
+	SHOW_NOT_FOUND "The requested URL $ORIGINAL_URL was not found on this server."
 fi
 
 # Handle file types
@@ -175,7 +182,7 @@ EXTENSION="${REQUESTED_FILE##*.}"
 case "$EXTENSION" in
 	"html")
 		SECURITY_HEADERS
-		;;
+			;;
 	"css")
 		SECURITY_HEADERS "text/css"
 		echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
