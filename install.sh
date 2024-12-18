@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta99"
+Version="Beta100"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -72,6 +72,28 @@ while true; do
 	else
 		error "兩次輸入的密碼不一致，請重新輸入"
 	fi
+done
+
+while true; do
+	INPUT "請輸入面板端口 (1024-65535，預設: 8080)：" PANEL_PORT
+	PANEL_PORT=${PANEL_PORT:-8080}
+
+	if ! [[ $PANEL_PORT =~ ^[0-9]+$ ]]; then
+		error "端口必須是數字"
+		continue
+	fi
+
+	if [ $PANEL_PORT -lt 1024 ] || [ $PANEL_PORT -gt 65535 ]; then
+		error "端口必須在 1024-65535 之間"
+		continue
+	fi
+
+	if netstat -tuln | grep -q ":$PANEL_PORT "; then
+		error "端口 $PANEL_PORT 已被占用"
+		continue
+	fi
+
+	break
 done
 
 INPUT "是否使用自定義的面板頁面？(y/N) " USE_CUSTOM_HTML
@@ -182,25 +204,18 @@ server.modules = (
 	"mod_redirect",
 	"mod_rewrite",
 	"mod_cgi",
-	"mod_setenv"
+	"mod_accesslog"
 )
 
 server.document-root = "$INSTALL_DIR/www"
-server.port = 8080
+server.port = $PANEL_PORT
 
 server.username = "www-data"
 server.groupname = "www-data"
 
 server.errorlog = "$INSTALL_DIR/logs/error.log"
 accesslog.filename = "$INSTALL_DIR/logs/access.log"
-
-\$HTTP["url"] =~ "^/favicon\.ico\$" {
-	url.redirect = ( "^/.*" => "/PanelBase.jpg" )
-}
-
-setenv.add-response-header = (
-	"Link" => "</PanelBase.jpg>; rel=icon"
-)
+accesslog.format = "%h %V %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\""
 
 \$HTTP["url"] =~ "^/" {
 	dir-listing.activate = "disable"
@@ -293,7 +308,6 @@ CACHE_MAX_AGE=31536000
 # Logging Configuration
 LOG_FILE="/opt/panelbase/logs/auth.log"
 ERROR_LOG_FILE="/opt/panelbase/logs/error.log"
-ACCESS_LOG_FILE="/opt/panelbase/logs/access.log"
 
 # File Permission Settings
 CONFIG_FILE_MODE=600
@@ -338,17 +352,11 @@ if ! systemctl is-active --quiet lighttpd; then
 	exit 1
 fi
 
-if ! netstat -tuln | grep -q ":8080 "; then
-	error "服務未能在 8080 端口啟動"
-	error "請檢查是否有其他服務佔用該端口"
-	exit 1
-fi
-
 SERVER_IP=$(hostname -I | awk '{print $1}')
 
 text "================================="
 text "安裝完成！"
-text "請訪問 http://${SERVER_IP}:8080"
+text "請訪問 http://${SERVER_IP}:$PANEL_PORT"
 text "用戶：$ADMIN_NAME"
 text "密碼：$ADMIN_PASS"
 [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]] && text "已使用自定義面板頁面"

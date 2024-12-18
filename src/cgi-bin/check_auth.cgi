@@ -55,6 +55,14 @@ AUTH_TOKEN=$(echo "$HTTP_COOKIE" | grep -oP 'auth_token=\K[^;]+')
 ORIGINAL_URL="$REQUEST_URI"
 REFERER=$(echo "$HTTP_REFERER" | grep -oP 'http://[^/]+\K.*' || echo "")
 
+# Handle favicon request
+if [ "$ORIGINAL_URL" = "/favicon.ico" ]; then
+	SECURITY_HEADERS "image/jpeg"
+	echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
+	cat "$DOCUMENT_ROOT/PanelBase.jpg"
+	exit 0
+fi
+
 SECURITY_HEADERS() {
 	local content_type="${1:-text/html}"
 	local status="$2"
@@ -66,6 +74,7 @@ SECURITY_HEADERS() {
 	echo "Referrer-Policy: strict-origin-when-cross-origin"
 	echo "Permissions-Policy: geolocation=(), microphone=(), camera=()"
 	echo "Content-Security-Policy: $SECURITY_HEADERS_CSP"
+	echo "Link: </PanelBase.jpg>; rel=icon"
 	[ -n "$status" ] && echo "Status: $status"
 	echo
 }
@@ -74,10 +83,10 @@ SHOW_ERROR() {
 	local status="$1"
 	local message="$2"
 	local error_page="$3"
-	
+
 	log_auth_event "WARN" "$message"
 	SECURITY_HEADERS "text/html" "$status"
-	
+
 	if [ -f "$DOCUMENT_ROOT/$error_page" ]; then
 		cat "$DOCUMENT_ROOT/$error_page"
 	else
