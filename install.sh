@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta93"
+Version="Beta94"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -78,7 +78,7 @@ TASK "創建必要的目錄" "ADD -d $INSTALL_DIR/{www,cgi-bin,config,logs}" tru
 
 text "下載面板文件..."
 BASE_URL="https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main"
-for FILE in "src/cgi-bin/panel.cgi" "src/cgi-bin/auth.cgi" "src/cgi-bin/check_auth.cgi" "www/index.html" "www/404.html" "config/security.conf" "config/api_security.conf" "config/session_security.conf"; do
+for FILE in "src/cgi-bin/panel.cgi" "src/cgi-bin/auth.cgi" "src/cgi-bin/check_auth.cgi" "www/index.html" "www/404.html"; do
 	text "下載 $FILE..."
 	HTTP_CODE=$(curl -s -w "%{http_code}" -o "${FILE##*/}" "$BASE_URL/$FILE")
 	[ "$HTTP_CODE" != "200" ] && { error "無法下載 $FILE (HTTP 代碼: $HTTP_CODE)"; exit 1; }
@@ -94,13 +94,6 @@ chmod +x panel.cgi auth.cgi check_auth.cgi
 
 mv panel.cgi auth.cgi check_auth.cgi $INSTALL_DIR/cgi-bin/
 mv index.html 404.html $INSTALL_DIR/www/
-
-text "設置安全配置文件..."
-for CONF in security.conf api_security.conf session_security.conf; do
-	sed -i "s|\${INSTALL_DIR}|$INSTALL_DIR|g" "$CONF"
-	mv "$CONF" "$INSTALL_DIR/config/"
-	chmod 600 "$INSTALL_DIR/config/$CONF"
-done
 
 if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	text "正在處理自定義面板文件..."
@@ -167,9 +160,7 @@ server.modules = (
 	"mod_compress",
 	"mod_redirect",
 	"mod_rewrite",
-	"mod_cgi",
-	"mod_accesslog",
-	"mod_dirlisting"
+	"mod_cgi"
 )
 
 server.document-root = "$INSTALL_DIR/www"
@@ -181,7 +172,9 @@ server.groupname = "www-data"
 server.errorlog = "$INSTALL_DIR/logs/error.log"
 accesslog.filename = "$INSTALL_DIR/logs/access.log"
 
-dir.listing = "disable"
+\$HTTP["url"] =~ "^/" {
+	dir-listing.activate = "disable"
+}
 
 cgi.assign = ( ".cgi" => "" )
 alias.url = ( "/cgi-bin/" => "$INSTALL_DIR/cgi-bin/" )
@@ -215,8 +208,6 @@ mimetype.assign = (
 index-file.names = ( "index.html" )
 
 static-file.exclude-extensions = ( ".cgi" )
-
-accesslog.format = "%h %V %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\""
 EOF
 
 text "創建用戶配置..."
@@ -228,24 +219,12 @@ if ! id -u www-data >/dev/null 2>&1; then
 	useradd -r -s /usr/sbin/nologin www-data
 fi
 
-mkdir -p "$INSTALL_DIR/logs"
-touch "$INSTALL_DIR/logs/error.log"
-touch "$INSTALL_DIR/logs/access.log"
-touch "$INSTALL_DIR/logs/security.log"
-
 find $INSTALL_DIR -type d -exec chmod 755 {} \;
 find $INSTALL_DIR -type f -exec chmod 644 {} \;
 
 chmod -R 755 $INSTALL_DIR/cgi-bin
 chmod 600 $INSTALL_DIR/config/users.conf
 chmod 600 $INSTALL_DIR/config/sessions.conf
-chmod 600 $INSTALL_DIR/config/security.conf
-chmod 600 $INSTALL_DIR/config/api_security.conf
-chmod 600 $INSTALL_DIR/config/session_security.conf
-
-chmod 644 "$INSTALL_DIR/logs/error.log"
-chmod 644 "$INSTALL_DIR/logs/access.log"
-chmod 644 "$INSTALL_DIR/logs/security.log"
 
 chown -R www-data:www-data $INSTALL_DIR
 chown -R www-data:www-data /etc/lighttpd
