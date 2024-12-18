@@ -4,10 +4,10 @@
 if [ -f "/opt/panelbase/config/security.conf" ]; then
 	source "/opt/panelbase/config/security.conf"
 else
-	echo "Content-type: text/plain"
+	echo "Content-type: application/json"
 	echo "Status: 500"
 	echo
-	echo "Error: Security configuration file not found"
+	echo '{"status":"error","code":"config_not_found","message":"Security configuration file not found"}'
 	exit 1
 fi
 
@@ -55,14 +55,6 @@ AUTH_TOKEN=$(echo "$HTTP_COOKIE" | grep -oP 'auth_token=\K[^;]+')
 ORIGINAL_URL="$REQUEST_URI"
 REFERER=$(echo "$HTTP_REFERER" | grep -oP 'http://[^/]+\K.*' || echo "")
 
-# Handle favicon request
-if [ "$ORIGINAL_URL" = "/favicon.ico" ]; then
-	SECURITY_HEADERS "image/jpeg"
-	echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
-	cat "$DOCUMENT_ROOT/PanelBase.jpg"
-	exit 0
-fi
-
 SECURITY_HEADERS() {
 	local content_type="${1:-text/html}"
 	local status="$2"
@@ -74,46 +66,36 @@ SECURITY_HEADERS() {
 	echo "Referrer-Policy: strict-origin-when-cross-origin"
 	echo "Permissions-Policy: geolocation=(), microphone=(), camera=()"
 	echo "Content-Security-Policy: $SECURITY_HEADERS_CSP"
-	echo "Link: </PanelBase.jpg>; rel=icon"
 	[ -n "$status" ] && echo "Status: $status"
 	echo
 }
 
 SHOW_ERROR() {
 	local status="$1"
-	local message="$2"
-	local error_page="$3"
+	local code="$2"
+	local message="$3"
 
 	log_auth_event "WARN" "$message"
-	SECURITY_HEADERS "text/html" "$status"
-
-	if [ -f "$DOCUMENT_ROOT/$error_page" ]; then
-		cat "$DOCUMENT_ROOT/$error_page"
-	else
-		echo "<!DOCTYPE html>"
-		echo "<html><head><title>$status Error</title></head>"
-		echo "<body><h1>$status Error</h1>"
-		echo "<p>$message</p>"
-		echo "</body></html>"
-	fi
+	SECURITY_HEADERS "application/json" "$status"
+	echo "{\"status\":\"error\",\"code\":\"$code\",\"message\":\"$message\"}"
 	exit 0
 }
 
 SHOW_FORBIDDEN() {
 	local message="$1"
-	SHOW_ERROR "403" "$message" "403.html"
+	SHOW_ERROR "403" "forbidden" "$message"
 }
 
 SHOW_NOT_FOUND() {
 	local message="$1"
-	SHOW_ERROR "404" "$message" "404.html"
+	SHOW_ERROR "404" "not_found" "$message"
 }
 
 SHOW_LOGIN_PAGE() {
 	local message="$1"
 	[ -n "$message" ] && log_auth_event "INFO" "$message"
-	SECURITY_HEADERS
-	cat "$DOCUMENT_ROOT/index.html"
+	SECURITY_HEADERS "application/json" "401"
+	echo "{\"status\":\"error\",\"code\":\"authentication_required\",\"message\":\"Authentication required\"}"
 	exit 0
 }
 
@@ -146,9 +128,9 @@ if [ $((CURRENT_TIME - $(awk -F: -v token="$AUTH_TOKEN" '$1 == token {print $3}'
 
 	log_auth_event "INFO" "Session rotated for user: $VALID_SESSION"
 
-	SECURITY_HEADERS "text/html" "302"
+	SECURITY_HEADERS "application/json" "200"
 	echo "Set-Cookie: auth_token=$NEW_TOKEN; Path=/; HttpOnly; SameSite=Strict; Max-Age=$SESSION_LIFETIME"
-	echo "Location: $ORIGINAL_URL"
+	echo "{\"status\":\"success\",\"code\":\"session_rotated\",\"message\":\"Session rotated successfully\"}"
 	exit 0
 fi
 
@@ -171,7 +153,7 @@ REQUESTED_FILE="${DOCUMENT_ROOT}${ORIGINAL_URL}"
 
 # Security check for path traversal
 if echo "$REQUESTED_FILE" | grep -q "\.\."; then
-	SHOW_FORBIDDEN "Path traversal attempt: $REQUESTED_FILE"
+	SHOW_FORBIDDEN "Path traversal attempt detected"
 fi
 
 # Check file access permissions
@@ -183,7 +165,7 @@ fi
 # Handle 404
 if [ ! -f "$REQUESTED_FILE" ]; then
 	log_auth_event "INFO" "404 Not Found: $REQUESTED_FILE"
-	SHOW_NOT_FOUND "The requested URL $ORIGINAL_URL was not found on this server."
+	SHOW_NOT_FOUND "The requested URL $ORIGINAL_URL was not found on this server"
 fi
 
 # Handle file types
@@ -191,7 +173,7 @@ EXTENSION="${REQUESTED_FILE##*.}"
 case "$EXTENSION" in
 	"html")
 		SECURITY_HEADERS
-			;;
+		;;
 	"css")
 		SECURITY_HEADERS "text/css"
 		echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
