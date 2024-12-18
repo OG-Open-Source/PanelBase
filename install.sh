@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta94"
+Version="Beta95"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -214,6 +214,64 @@ text "創建用戶配置..."
 text "${ADMIN_NAME}:$(echo -n "${ADMIN_PASS}" | md5sum | cut -d' ' -f1)" > $INSTALL_DIR/config/users.conf
 touch $INSTALL_DIR/config/sessions.conf
 
+text "創建安全配置..."
+cat > $INSTALL_DIR/config/security.conf << EOF
+# PanelBase 安全配置文件
+
+# 基本設定
+INSTALL_DIR="/opt/panelbase"
+DOCUMENT_ROOT="/opt/panelbase/www"
+
+# Session 設置
+SESSION_LIFETIME=86400      # Session 有效期（秒）：24 小時
+SESSION_ROTATION_INTERVAL=3600  # Session 輪換間隔（秒）：1 小時
+
+# 安全限制
+MAX_LOGIN_ATTEMPTS=5       # 最大登入嘗試次數
+LOGIN_BLOCK_TIME=300      # 登入封鎖時間（秒）：5 分鐘
+PASSWORD_MIN_LENGTH=6     # 密碼最小長度
+
+# 檔案存取控制
+ACCESS_CONTROL_MODE="whitelist"  # whitelist 或 blacklist
+
+# 白名單：當 ACCESS_CONTROL_MODE="whitelist" 時生效
+WHITELIST_FILES="*.html *.htm"
+
+# 黑名單：當 ACCESS_CONTROL_MODE="blacklist" 時生效
+BLACKLIST_FILES="*.css *.js *.json *.xml *.txt *.md *.csv *.sql *.sh *.conf"
+
+# 是否允許通過 HTML 引用訪問受限制的檔案
+ALLOW_HTML_REFERENCE=true
+
+# 安全標頭設定
+SECURITY_HEADERS_CSP="default-src 'self' https://cdnjs.cloudflare.com; \
+script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com; \
+style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; \
+img-src 'self' data: https:; \
+font-src 'self' https://cdnjs.cloudflare.com; \
+frame-ancestors 'none'; \
+form-action 'self'; \
+base-uri 'self'"
+
+# 快取控制
+CACHE_MAX_AGE=31536000  # 靜態資源快取時間（秒）：1 年
+
+# 日誌設定
+LOG_FILE="/opt/panelbase/logs/auth.log"
+ERROR_LOG_FILE="/opt/panelbase/logs/error.log"
+ACCESS_LOG_FILE="/opt/panelbase/logs/access.log"
+
+# 檔案權限設定
+CONFIG_FILE_MODE=600      # 配置檔案權限
+CGI_FILE_MODE=755        # CGI 檔案權限
+WWW_FILE_MODE=644        # 網頁檔案權限
+DIR_MODE=755            # 目錄權限
+
+# 系統用戶設定
+WEB_USER="www-data"
+WEB_GROUP="www-data"
+EOF
+
 text "設置權限..."
 if ! id -u www-data >/dev/null 2>&1; then
 	useradd -r -s /usr/sbin/nologin www-data
@@ -225,6 +283,7 @@ find $INSTALL_DIR -type f -exec chmod 644 {} \;
 chmod -R 755 $INSTALL_DIR/cgi-bin
 chmod 600 $INSTALL_DIR/config/users.conf
 chmod 600 $INSTALL_DIR/config/sessions.conf
+chmod 600 $INSTALL_DIR/config/security.conf
 
 chown -R www-data:www-data $INSTALL_DIR
 chown -R www-data:www-data /etc/lighttpd
