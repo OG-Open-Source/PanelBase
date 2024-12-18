@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta98"
+Version="Beta99"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -25,7 +25,7 @@ CONFIG_MODE="600"
 
 declare -A FILES=(
 	["cgi-bin"]="panel.cgi auth.cgi check_auth.cgi"
-	["www"]="index.html 404.html 403.html panel.html"
+	["www"]="index.html 404.html 403.html panel.html PanelBase.jpg"
 )
 
 declare -A FILE_PERMISSIONS=(
@@ -181,7 +181,8 @@ server.modules = (
 	"mod_compress",
 	"mod_redirect",
 	"mod_rewrite",
-	"mod_cgi"
+	"mod_cgi",
+	"mod_setenv"
 )
 
 server.document-root = "$INSTALL_DIR/www"
@@ -192,6 +193,14 @@ server.groupname = "www-data"
 
 server.errorlog = "$INSTALL_DIR/logs/error.log"
 accesslog.filename = "$INSTALL_DIR/logs/access.log"
+
+\$HTTP["url"] =~ "^/favicon\.ico\$" {
+	url.redirect = ( "^/.*" => "/PanelBase.jpg" )
+}
+
+setenv.add-response-header = (
+	"Link" => "</PanelBase.jpg>; rel=icon"
+)
 
 \$HTTP["url"] =~ "^/" {
 	dir-listing.activate = "disable"
@@ -210,7 +219,9 @@ mimetype.assign = (
 	".js"   => "application/javascript",
 	".png"  => "image/png",
 	".jpg"  => "image/jpeg",
+	".jpeg" => "image/jpeg",
 	".gif"  => "image/gif",
+	".ico"  => "image/x-icon",
 	".svg"  => "image/svg+xml",
 	".woff" => "font/woff",
 	".woff2" => "font/woff2",
@@ -235,7 +246,7 @@ text "創建用戶配置..."
 text "${ADMIN_NAME}:$(echo -n "${ADMIN_PASS}" | md5sum | cut -d' ' -f1)" > $INSTALL_DIR/config/users.conf
 touch $INSTALL_DIR/config/sessions.conf
 
-text "Creating security configuration..."
+text "創建安全配置..."
 cat > $INSTALL_DIR/config/security.conf << EOF
 # PanelBase Security Configuration
 
