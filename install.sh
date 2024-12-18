@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta91"
+Version="Beta92"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -168,7 +168,8 @@ server.modules = (
 	"mod_redirect",
 	"mod_rewrite",
 	"mod_cgi",
-	"mod_accesslog"
+	"mod_accesslog",
+	"mod_dirlisting"
 )
 
 server.document-root = "$INSTALL_DIR/www"
@@ -181,6 +182,7 @@ server.errorlog = "$INSTALL_DIR/logs/error.log"
 accesslog.filename = "$INSTALL_DIR/logs/access.log"
 
 dir-listing.activate = "disable"
+dir-listing.encoding = "utf-8"
 
 cgi.assign = ( ".cgi" => "" )
 alias.url = ( "/cgi-bin/" => "$INSTALL_DIR/cgi-bin/" )
@@ -215,10 +217,6 @@ index-file.names = ( "index.html" )
 
 static-file.exclude-extensions = ( ".cgi" )
 
-server.modules += ( "mod_dirlisting" )
-dir.listing = "disable"
-
-server.modules += ( "mod_accesslog" )
 accesslog.format = "%h %V %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\""
 EOF
 

@@ -72,6 +72,13 @@ fi
 
 SESSION_ROTATION "$AUTH_TOKEN" "$SESSION_FILE" "$CURRENT_TIME"
 
+if [ "$ORIGINAL_URL" = "/panel.html" ]; then
+	log_security_event "INFO" "Access to panel.html: $VALID_SESSION"
+	SECURITY_HEADERS
+	cat "$DOCUMENT_ROOT/panel.html"
+	exit 0
+fi
+
 if echo "$ORIGINAL_URL" | grep -q "^/cgi-bin/panel\.cgi"; then
 	log_security_event "INFO" "Access to panel.cgi: $VALID_SESSION"
 	exec "${INSTALL_DIR:-/opt/panelbase}/cgi-bin/panel.cgi"
