@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta97"
+Version="Beta98"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -18,15 +18,20 @@ CLR8="\033[0;96m"
 CLR9="\033[0;97m"
 CLR0="\033[0m"
 
+DIR_MODE="755"
+WWW_MODE="644"
+CGI_MODE="755"
+CONFIG_MODE="600"
+
 declare -A FILES=(
 	["cgi-bin"]="panel.cgi auth.cgi check_auth.cgi"
 	["www"]="index.html 404.html 403.html panel.html"
 )
 
 declare -A FILE_PERMISSIONS=(
-	["cgi-bin"]=755
-	["www"]=644
-	["config"]=600
+	["cgi-bin"]="$CGI_MODE"
+	["www"]="$WWW_MODE"
+	["config"]="$CONFIG_MODE"
 )
 
 CLEAN
@@ -298,19 +303,21 @@ fi
 find "$INSTALL_DIR" -type d -exec chmod "$DIR_MODE" {} \;
 
 for dir in "${!FILE_PERMISSIONS[@]}"; do
-	find "$INSTALL_DIR/$dir" -type f -exec chmod "${FILE_PERMISSIONS[$dir]}" {} \;
+	if [ -d "$INSTALL_DIR/$dir" ]; then
+		find "$INSTALL_DIR/$dir" -type f -exec chmod "${FILE_PERMISSIONS[$dir]}" {} \;
+	fi
 done
 
-chmod 600 "$INSTALL_DIR/config/users.conf"
-chmod 600 "$INSTALL_DIR/config/sessions.conf"
-chmod 600 "$INSTALL_DIR/config/security.conf"
+chmod "$CONFIG_MODE" "$INSTALL_DIR/config/users.conf"
+chmod "$CONFIG_MODE" "$INSTALL_DIR/config/sessions.conf"
+chmod "$CONFIG_MODE" "$INSTALL_DIR/config/security.conf"
 
 chown -R www-data:www-data "$INSTALL_DIR"
 chown -R www-data:www-data /etc/lighttpd
 
 mkdir -p /var/log/lighttpd
 chown -R www-data:www-data /var/log/lighttpd
-chmod 755 /var/log/lighttpd
+chmod "$DIR_MODE" /var/log/lighttpd
 
 TASK "重啟 lighttpd 服務" "systemctl restart lighttpd" true
 
