@@ -592,7 +592,7 @@
 			<div class="language-switcher">
 				<button onclick="changeLanguage('en')" data-lang="en">EN</button>
 				<button onclick="changeLanguage('zh-TW')" data-lang="zh-TW">繁</button>
-				<button onclick="changeLanguage('zh-CN')" data-lang="zh-CN">��</button>
+				<button onclick="changeLanguage('zh-CN')" data-lang="zh-CN">简</button>
 			</div>
 			<div class="theme-switcher">
 				<button onclick="toggleTheme()" id="themeToggle">
@@ -677,13 +677,13 @@
 				const password = document.getElementById('password').value;
 
 				if (!/^[A-Za-z0-9]+$/.test(username)) {
-					errorMessage.innerHTML = `<i class="fas fa-exclamation-circle"></i>${i18n[currentLanguage]['error-invalid']}`;
+					errorMessage.innerHTML = `<i class="fas fa-exclamation-circle"></i>${i18n[currentLanguage]['error-invalid-chars']}`;
 					errorMessage.hidden = false;
 					return;
 				}
 
 				if (!/^[A-Za-z0-9!@$]+$/.test(password)) {
-					errorMessage.innerHTML = `<i class="fas fa-exclamation-circle"></i>${i18n[currentLanguage]['error-invalid']}`;
+					errorMessage.innerHTML = `<i class="fas fa-exclamation-circle"></i>${i18n[currentLanguage]['error-invalid-chars']}`;
 					errorMessage.hidden = false;
 					return;
 				}
@@ -702,10 +702,14 @@
 
 					const data = await response.json();
 
-					if (response.ok && data === 0) {
+					if (response.ok && data.status === 'success') {
 						window.location.href = '/panel.html';
 					} else {
-						errorMessage.innerHTML = `<i class="fas fa-exclamation-circle"></i>${i18n[currentLanguage]['error-invalid']}`;
+						let errorKey = 'error-invalid';
+						if (data.code === 'invalid_username' || data.code === 'invalid_password') {
+							errorKey = 'error-invalid-chars';
+						}
+						errorMessage.innerHTML = `<i class="fas fa-exclamation-circle"></i>${i18n[currentLanguage][errorKey]}`;
 						errorMessage.hidden = false;
 						submitButton.disabled = false;
 						submitButton.querySelector('[data-i18n="login-button"]').textContent = i18n[currentLanguage]['login-button'];

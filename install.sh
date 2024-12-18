@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta101"
+Version="Beta102"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -25,7 +25,7 @@ CONFIG_MODE="600"
 
 declare -A FILES=(
 	["cgi-bin"]="panel.cgi auth.cgi check_auth.cgi"
-	["www"]="index.html 404.html 403.html panel.html PanelBase.jpg"
+	["www"]="index.html 404.html 403.html panel.html favicon.ico"
 )
 
 declare -A FILE_PERMISSIONS=(

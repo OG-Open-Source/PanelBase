@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# Load security configuration
 if [ -f "/opt/panelbase/config/security.conf" ]; then
 	source "/opt/panelbase/config/security.conf"
 else
@@ -17,7 +16,6 @@ log_auth_event() {
 	echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $message" >> "$LOG_FILE"
 }
 
-# Convert wildcard patterns to regex patterns
 WHITELIST_REGEX=$(echo "$WHITELIST_FILES" | sed 's/\./\\./g' | sed 's/\*/.*/g' | tr ' ' '|')
 BLACKLIST_REGEX=$(echo "$BLACKLIST_FILES" | sed 's/\./\\./g' | sed 's/\*/.*/g' | tr ' ' '|')
 
@@ -91,22 +89,39 @@ SHOW_NOT_FOUND() {
 	SHOW_ERROR "404" "not_found" "$message"
 }
 
-SHOW_LOGIN_PAGE() {
-	local message="$1"
-	[ -n "$message" ] && log_auth_event "INFO" "$message"
-	SECURITY_HEADERS "application/json" "401"
-	echo "{\"status\":\"error\",\"code\":\"authentication_required\",\"message\":\"Authentication required\"}"
-	exit 0
+is_public_resource() {
+	local url="$1"
+	case "$url" in
+		"/"|"/index.html"|"/auth.cgi"|"/cgi-bin/auth.cgi")
+			return 0
+			;;
+		*)
+			return 1
+			;;
+	esac
 }
 
-if [ -z "$AUTH_TOKEN" ]; then
-	SHOW_LOGIN_PAGE "No auth token provided"
+if is_public_resource "$ORIGINAL_URL"; then
+	if [ "$ORIGINAL_URL" = "/" ] || [ "$ORIGINAL_URL" = "/index.html" ]; then
+		SECURITY_HEADERS
+		cat "$DOCUMENT_ROOT/index.html"
+	else
+		exec "$INSTALL_DIR$ORIGINAL_URL"
+	fi
+	exit 0
 fi
 
 SESSION_FILE="$INSTALL_DIR/config/sessions.conf"
 if [ ! -f "$SESSION_FILE" ]; then
-	log_auth_event "WARN" "Session file not found"
-	SHOW_LOGIN_PAGE "Session file not found"
+	log_auth_event "ERROR" "Session file not found"
+	SHOW_ERROR "500" "session_file_missing" "Session file not found"
+	exit 1
+fi
+
+if [ -z "$AUTH_TOKEN" ]; then
+	log_auth_event "WARN" "No auth token provided"
+	SHOW_ERROR "401" "authentication_required" "Authentication required"
+	exit 0
 fi
 
 CURRENT_TIME=$(date +%s)
@@ -116,10 +131,10 @@ VALID_SESSION=$(awk -F: -v token="$AUTH_TOKEN" -v time="$CURRENT_TIME" -v max_ag
 if [ -z "$VALID_SESSION" ]; then
 	log_auth_event "WARN" "Invalid or expired session token: $AUTH_TOKEN"
 	echo "Set-Cookie: auth_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
-	SHOW_LOGIN_PAGE "Invalid or expired session"
+	SHOW_ERROR "401" "invalid_session" "Invalid or expired session"
+	exit 0
 fi
 
-# Session rotation
 if [ $((CURRENT_TIME - $(awk -F: -v token="$AUTH_TOKEN" '$1 == token {print $3}' "$SESSION_FILE"))) -gt "$SESSION_ROTATION_INTERVAL" ]; then
 	NEW_TOKEN=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
 	sed -i "/^$AUTH_TOKEN:/d" "$SESSION_FILE"
@@ -134,7 +149,6 @@ if [ $((CURRENT_TIME - $(awk -F: -v token="$AUTH_TOKEN" '$1 == token {print $3}'
 	exit 0
 fi
 
-# Handle panel.html directly
 if [ "$ORIGINAL_URL" = "/panel.html" ]; then
 	log_auth_event "INFO" "Access to panel.html: $VALID_SESSION"
 	SECURITY_HEADERS
@@ -142,7 +156,6 @@ if [ "$ORIGINAL_URL" = "/panel.html" ]; then
 	exit 0
 fi
 
-# Handle panel.cgi
 if echo "$ORIGINAL_URL" | grep -q "^/cgi-bin/panel\.cgi"; then
 	log_auth_event "INFO" "Access to panel.cgi: $VALID_SESSION"
 	exec "$INSTALL_DIR/cgi-bin/panel.cgi"
@@ -151,24 +164,20 @@ fi
 
 REQUESTED_FILE="${DOCUMENT_ROOT}${ORIGINAL_URL}"
 
-# Security check for path traversal
 if echo "$REQUESTED_FILE" | grep -q "\.\."; then
 	SHOW_FORBIDDEN "Path traversal attempt detected"
 fi
 
-# Check file access permissions
 if ! check_file_access "$REQUESTED_FILE" "$REFERER"; then
 	log_auth_event "WARN" "Access denied to file: $ORIGINAL_URL (Mode: $ACCESS_CONTROL_MODE, Referer: $REFERER)"
 	SHOW_FORBIDDEN "Access to this resource is not allowed"
 fi
 
-# Handle 404
 if [ ! -f "$REQUESTED_FILE" ]; then
 	log_auth_event "INFO" "404 Not Found: $REQUESTED_FILE"
 	SHOW_NOT_FOUND "The requested URL $ORIGINAL_URL was not found on this server"
 fi
 
-# Handle file types
 EXTENSION="${REQUESTED_FILE##*.}"
 case "$EXTENSION" in
 	"html")
