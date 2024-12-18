@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta92"
+Version="Beta93"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -181,8 +181,7 @@ server.groupname = "www-data"
 server.errorlog = "$INSTALL_DIR/logs/error.log"
 accesslog.filename = "$INSTALL_DIR/logs/access.log"
 
-dir-listing.activate = "disable"
-dir-listing.encoding = "utf-8"
+dir.listing = "disable"
 
 cgi.assign = ( ".cgi" => "" )
 alias.url = ( "/cgi-bin/" => "$INSTALL_DIR/cgi-bin/" )

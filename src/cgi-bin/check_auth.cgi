@@ -21,7 +21,9 @@ SESSION_ROTATION() {
 		echo "$new_token:$username:$current_time" >> "$session_file"
 
 		echo "Set-Cookie: auth_token=$new_token; Path=/; HttpOnly; SameSite=Strict; Max-Age=$SESSION_LIFETIME"
+		return 1
 	fi
+	return 0
 }
 
 SECURITY_HEADERS() {
@@ -63,19 +65,22 @@ VALID_SESSION=$(awk -F: -v token="$AUTH_TOKEN" -v time="$CURRENT_TIME" -v max_ag
 
 if [ -z "$VALID_SESSION" ]; then
 	log_security_event "WARN" "Invalid or expired session token: $AUTH_TOKEN"
-	echo "Content-type: text/html"
+	SECURITY_HEADERS
 	echo "Set-Cookie: auth_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
-	echo
 	cat "$DOCUMENT_ROOT/index.html"
 	exit 0
 fi
 
-SESSION_ROTATION "$AUTH_TOKEN" "$SESSION_FILE" "$CURRENT_TIME"
-
-if [ "$ORIGINAL_URL" = "/panel.html" ]; then
-	log_security_event "INFO" "Access to panel.html: $VALID_SESSION"
-	SECURITY_HEADERS
-	cat "$DOCUMENT_ROOT/panel.html"
+if SESSION_ROTATION "$AUTH_TOKEN" "$SESSION_FILE" "$CURRENT_TIME"; then
+	if [ "$ORIGINAL_URL" = "/panel.html" ]; then
+		log_security_event "INFO" "Access to panel.html: $VALID_SESSION"
+		SECURITY_HEADERS
+		cat "$DOCUMENT_ROOT/panel.html"
+		exit 0
+	fi
+else
+	SECURITY_HEADERS "302"
+	echo "Location: $ORIGINAL_URL"
 	exit 0
 fi
 
