@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta90"
+Version="Beta91"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -167,7 +167,8 @@ server.modules = (
 	"mod_compress",
 	"mod_redirect",
 	"mod_rewrite",
-	"mod_cgi"
+	"mod_cgi",
+	"mod_accesslog"
 )
 
 server.document-root = "$INSTALL_DIR/www"
@@ -179,9 +180,7 @@ server.groupname = "www-data"
 server.errorlog = "$INSTALL_DIR/logs/error.log"
 accesslog.filename = "$INSTALL_DIR/logs/access.log"
 
-\$HTTP["url"] =~ "^/" {
-	dir-listing.activate = "disable"
-}
+dir-listing.activate = "disable"
 
 cgi.assign = ( ".cgi" => "" )
 alias.url = ( "/cgi-bin/" => "$INSTALL_DIR/cgi-bin/" )
@@ -215,6 +214,12 @@ mimetype.assign = (
 index-file.names = ( "index.html" )
 
 static-file.exclude-extensions = ( ".cgi" )
+
+server.modules += ( "mod_dirlisting" )
+dir.listing = "disable"
+
+server.modules += ( "mod_accesslog" )
+accesslog.format = "%h %V %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\""
 EOF
 
 text "創建用戶配置..."
@@ -226,6 +231,11 @@ if ! id -u www-data >/dev/null 2>&1; then
 	useradd -r -s /usr/sbin/nologin www-data
 fi
 
+mkdir -p "$INSTALL_DIR/logs"
+touch "$INSTALL_DIR/logs/error.log"
+touch "$INSTALL_DIR/logs/access.log"
+touch "$INSTALL_DIR/logs/security.log"
+
 find $INSTALL_DIR -type d -exec chmod 755 {} \;
 find $INSTALL_DIR -type f -exec chmod 644 {} \;
 
@@ -235,6 +245,10 @@ chmod 600 $INSTALL_DIR/config/sessions.conf
 chmod 600 $INSTALL_DIR/config/security.conf
 chmod 600 $INSTALL_DIR/config/api_security.conf
 chmod 600 $INSTALL_DIR/config/session_security.conf
+
+chmod 644 "$INSTALL_DIR/logs/error.log"
+chmod 644 "$INSTALL_DIR/logs/access.log"
+chmod 644 "$INSTALL_DIR/logs/security.log"
 
 chown -R www-data:www-data $INSTALL_DIR
 chown -R www-data:www-data /etc/lighttpd
@@ -250,8 +264,6 @@ if ! systemctl is-active --quiet lighttpd; then
 	text "請檢查日誌文件：$INSTALL_DIR/logs/error.log"
 	exit 1
 fi
-
-sleep 2
 
 if ! netstat -tuln | grep -q ":8080 "; then
 	text "${CLR3}警告：服務未能在 8080 端口啟動${CLR0}"

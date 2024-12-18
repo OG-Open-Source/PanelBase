@@ -63,7 +63,9 @@ VALID_SESSION=$(awk -F: -v token="$AUTH_TOKEN" -v time="$CURRENT_TIME" -v max_ag
 
 if [ -z "$VALID_SESSION" ]; then
 	log_security_event "WARN" "Invalid or expired session token: $AUTH_TOKEN"
-	SECURITY_HEADERS
+	echo "Content-type: text/html"
+	echo "Set-Cookie: auth_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
+	echo
 	cat "$DOCUMENT_ROOT/index.html"
 	exit 0
 fi
