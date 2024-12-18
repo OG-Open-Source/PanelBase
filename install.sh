@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta96"
+Version="Beta97"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -17,6 +17,17 @@ CLR7="\033[0;37m"
 CLR8="\033[0;96m"
 CLR9="\033[0;97m"
 CLR0="\033[0m"
+
+declare -A FILES=(
+	["cgi-bin"]="panel.cgi auth.cgi check_auth.cgi"
+	["www"]="index.html 404.html 403.html panel.html"
+)
+
+declare -A FILE_PERMISSIONS=(
+	["cgi-bin"]=755
+	["www"]=644
+	["config"]=600
+)
 
 CLEAN
 text "${CLR3}=================================${CLR0}"
@@ -78,29 +89,52 @@ TASK "創建必要的目錄" "ADD -d $INSTALL_DIR/{www,cgi-bin,config,logs}" tru
 
 text "下載面板文件..."
 BASE_URL="https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main"
-for FILE in "src/cgi-bin/panel.cgi" "src/cgi-bin/auth.cgi" "src/cgi-bin/check_auth.cgi" "www/index.html" "www/404.html"; do
-	text "下載 $FILE..."
-	HTTP_CODE=$(curl -s -w "%{http_code}" -o "${FILE##*/}" "$BASE_URL/$FILE")
-	[ "$HTTP_CODE" != "200" ] && { error "無法下載 $FILE (HTTP 代碼: $HTTP_CODE)"; exit 1; }
+TMP_DIR=$(mktemp -d)
+
+download_files() {
+	local dir="$1"
+	local files="$2"
+	local target_dir="$INSTALL_DIR/$dir"
+
+	for file in $files; do
+		text "下載 $dir/$file..."
+		local source_url="$BASE_URL/src/$dir/$file"
+		[ "$dir" = "www" ] && source_url="$BASE_URL/$dir/$file"
+
+		if ! curl -sSL -o "$TMP_DIR/$file" "$source_url"; then
+			error "無法下載 $file"
+			return 1
+		fi
+
+		chmod ${FILE_PERMISSIONS[$dir]} "$TMP_DIR/$file"
+	done
+
+	mv $TMP_DIR/* "$target_dir/"
+	return 0
+}
+
+for dir in "${!FILES[@]}"; do
+	if [[ "$dir" = "www" ]] && [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]] && [[ "${FILES[$dir]}" =~ "panel.html" ]]; then
+		FILES[$dir]=${FILES[$dir]/panel.html/}
+	fi
+
+	if [ -n "${FILES[$dir]}" ]; then
+		if ! download_files "$dir" "${FILES[$dir]}"; then
+			rm -rf "$TMP_DIR"
+			error "安裝失敗"
+			exit 1
+		fi
+	fi
 done
 
-if [[ ! $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
-	text "下載 panel.html..."
-	HTTP_CODE=$(curl -s -w "%{http_code}" -o "panel.html" "$BASE_URL/www/panel.html")
-	[ "$HTTP_CODE" != "200" ] && { error "無法下載面板頁面 (HTTP 代碼: $HTTP_CODE)"; exit 1; }
-fi
-
-chmod +x panel.cgi auth.cgi check_auth.cgi
-
-mv panel.cgi auth.cgi check_auth.cgi $INSTALL_DIR/cgi-bin/
-mv index.html 404.html $INSTALL_DIR/www/
+rm -rf "$TMP_DIR"
 
 if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	text "正在處理自定義面板文件..."
 	TMP_DIR=$(mktemp -d)
 	text "臨時目錄：$TMP_DIR"
 
-	case "$FILE_EXT" in
+	case "${CUSTOM_ARCHIVE_PATH##*.}" in
 		"zip")
 			text "解壓縮 ZIP 文件..."
 			unzip -q "$CUSTOM_ARCHIVE_PATH" -d "$TMP_DIR"
@@ -115,41 +149,23 @@ if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 			;;
 	esac
 
-	text "解壓縮後的文件列表："
-	ls -la "$TMP_DIR"
-
 	PANEL_HTML=$(find "$TMP_DIR" -name "panel.html" -type f)
 
 	if [ -z "$PANEL_HTML" ]; then
-		text "${CLR3}錯誤：在壓縮檔中找不到 panel.html 文件${CLR0}"
-		text "${CLR3}請確保文件名稱正確（區分大小寫）${CLR0}"
+		error "在壓縮檔中找不到 panel.html 文件"
+		error "請確保文件名稱正確（區分大小寫）"
 		rm -rf "$TMP_DIR"
 		exit 1
-	else
-		text "找到 panel.html：$PANEL_HTML"
-		cp -f "$PANEL_HTML" "$INSTALL_DIR/www/panel.html"
-
-		PANEL_DIR=$(dirname "$PANEL_HTML")
-
-		for file in "$PANEL_DIR"/*; do
-			if [ -f "$file" ] && [ "$(basename "$file")" != "index.html" ] && [ "$(basename "$file")" != "panel.html" ]; then
-				cp -f "$file" "$INSTALL_DIR/www/"
-			fi
-		done
-
-		for dir in "$PANEL_DIR"/*; do
-			[ -d "$dir" ] && cp -rf "$dir" "$INSTALL_DIR/www/"
-		done
 	fi
 
-	text "安裝目錄文件列表："
-	ls -la "$INSTALL_DIR/www/"
+	PANEL_DIR=$(dirname "$PANEL_HTML")
+	cp -f "$PANEL_HTML" "$INSTALL_DIR/www/panel.html"
+
+	find "$PANEL_DIR" -type f ! -name "panel.html" ! -name "index.html" -exec cp -f {} "$INSTALL_DIR/www/" \;
+	find "$PANEL_DIR" -type d ! -path "$PANEL_DIR" -exec cp -rf {} "$INSTALL_DIR/www/" \;
 
 	rm -rf "$TMP_DIR"
-
 	text "${CLR2}自定義面板文件安裝完成${CLR0}"
-else
-	mv panel.html $INSTALL_DIR/www/
 fi
 
 text "配置 lighttpd..."
@@ -214,36 +230,38 @@ text "創建用戶配置..."
 text "${ADMIN_NAME}:$(echo -n "${ADMIN_PASS}" | md5sum | cut -d' ' -f1)" > $INSTALL_DIR/config/users.conf
 touch $INSTALL_DIR/config/sessions.conf
 
-text "創建安全配置..."
+text "Creating security configuration..."
 cat > $INSTALL_DIR/config/security.conf << EOF
-# PanelBase 安全配置文件
+# PanelBase Security Configuration
 
-# 基本設定
+# Basic Settings
 INSTALL_DIR="/opt/panelbase"
 DOCUMENT_ROOT="/opt/panelbase/www"
 
-# Session 設置
-SESSION_LIFETIME=86400      # Session 有效期（秒）：24 小時
-SESSION_ROTATION_INTERVAL=3600  # Session 輪換間隔（秒）：1 小時
+# Session Settings
+SESSION_LIFETIME=86400
+SESSION_ROTATION_INTERVAL=3600
 
-# 安全限制
-MAX_LOGIN_ATTEMPTS=5       # 最大登入嘗試次數
-LOGIN_BLOCK_TIME=300      # 登入封鎖時間（秒）：5 分鐘
-PASSWORD_MIN_LENGTH=6     # 密碼最小長度
+# Security Restrictions
+MAX_LOGIN_ATTEMPTS=5
+LOGIN_BLOCK_TIME=300
+PASSWORD_MIN_LENGTH=6
 
-# 檔案存取控制
-ACCESS_CONTROL_MODE="whitelist"  # whitelist 或 blacklist
+# File Access Control
+ACCESS_CONTROL_MODE="whitelist"
 
-# 白名單：當 ACCESS_CONTROL_MODE="whitelist" 時生效
+# Whitelist: Active when ACCESS_CONTROL_MODE="whitelist"
+# Format: Space-separated list of file patterns, supports wildcards
 WHITELIST_FILES="*.html *.htm"
 
-# 黑名單：當 ACCESS_CONTROL_MODE="blacklist" 時生效
+# Blacklist: Active when ACCESS_CONTROL_MODE="blacklist"
+# Format: Space-separated list of file patterns, supports wildcards
 BLACKLIST_FILES="*.css *.js *.json *.xml *.txt *.md *.csv *.sql *.sh *.conf"
 
-# 是否允許通過 HTML 引用訪問受限制的檔案
+# Allow access to restricted files when referenced from HTML
 ALLOW_HTML_REFERENCE=true
 
-# 安全標頭設定
+# Security Headers Configuration
 SECURITY_HEADERS_CSP="default-src 'self' https://cdnjs.cloudflare.com; \
 script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com; \
 style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; \
@@ -253,21 +271,21 @@ frame-ancestors 'none'; \
 form-action 'self'; \
 base-uri 'self'"
 
-# 快取控制
-CACHE_MAX_AGE=31536000  # 靜態資源快取時間（秒）：1 年
+# Cache Control
+CACHE_MAX_AGE=31536000
 
-# 日誌設定
+# Logging Configuration
 LOG_FILE="/opt/panelbase/logs/auth.log"
 ERROR_LOG_FILE="/opt/panelbase/logs/error.log"
 ACCESS_LOG_FILE="/opt/panelbase/logs/access.log"
 
-# 檔案權限設定
-CONFIG_FILE_MODE=600      # 配置檔案權限
-CGI_FILE_MODE=755        # CGI 檔案權限
-WWW_FILE_MODE=644        # 網頁檔案權限
-DIR_MODE=755            # 目錄權限
+# File Permission Settings
+CONFIG_FILE_MODE=600
+CGI_FILE_MODE=755
+WWW_FILE_MODE=644
+DIR_MODE=755
 
-# 系統用戶設定
+# System User Settings
 WEB_USER="www-data"
 WEB_GROUP="www-data"
 EOF
@@ -277,15 +295,17 @@ if ! id -u www-data >/dev/null 2>&1; then
 	useradd -r -s /usr/sbin/nologin www-data
 fi
 
-find $INSTALL_DIR -type d -exec chmod 755 {} \;
-find $INSTALL_DIR -type f -exec chmod 644 {} \;
+find "$INSTALL_DIR" -type d -exec chmod "$DIR_MODE" {} \;
 
-chmod -R 755 $INSTALL_DIR/cgi-bin
-chmod 600 $INSTALL_DIR/config/users.conf
-chmod 600 $INSTALL_DIR/config/sessions.conf
-chmod 600 $INSTALL_DIR/config/security.conf
+for dir in "${!FILE_PERMISSIONS[@]}"; do
+	find "$INSTALL_DIR/$dir" -type f -exec chmod "${FILE_PERMISSIONS[$dir]}" {} \;
+done
 
-chown -R www-data:www-data $INSTALL_DIR
+chmod 600 "$INSTALL_DIR/config/users.conf"
+chmod 600 "$INSTALL_DIR/config/sessions.conf"
+chmod 600 "$INSTALL_DIR/config/security.conf"
+
+chown -R www-data:www-data "$INSTALL_DIR"
 chown -R www-data:www-data /etc/lighttpd
 
 mkdir -p /var/log/lighttpd
@@ -295,14 +315,14 @@ chmod 755 /var/log/lighttpd
 TASK "重啟 lighttpd 服務" "systemctl restart lighttpd" true
 
 if ! systemctl is-active --quiet lighttpd; then
-	text "${CLR3}警告：lighttpd 服務未能正常啟動${CLR0}"
-	text "請檢查日誌文件：$INSTALL_DIR/logs/error.log"
+	error "lighttpd 服務未能正常啟動"
+	error "請檢查日誌文件：$INSTALL_DIR/logs/error.log"
 	exit 1
 fi
 
 if ! netstat -tuln | grep -q ":8080 "; then
-	text "${CLR3}警告：服務未能在 8080 端口啟動${CLR0}"
-	text "請檢查是否有其他服務佔用該端口"
+	error "服務未能在 8080 端口啟動"
+	error "請檢查是否有其他服務佔用該端口"
 	exit 1
 fi
 
