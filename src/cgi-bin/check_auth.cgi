@@ -119,7 +119,11 @@ is_public_resource() {
 	local url="$1"
 	case "$url" in
 		"/"|"/index.html"|"/auth.cgi"|"/cgi-bin/auth.cgi")
-			return 0
+			if [ -n "$IS_CURL" ]; then
+				return 1
+			else
+				return 0
+			fi
 			;;
 		*)
 			return 1
