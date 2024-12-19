@@ -116,7 +116,7 @@ REDIRECT_TO_LOGIN() {
 is_public_resource() {
 	local url="$1"
 	case "$url" in
-		"/"|"/index.html"|"/403.html"|"/404.html"|"/auth.cgi"|"/cgi-bin/auth.cgi"|"/favicon.ico")
+		"/"|"/index.html"|"/403.html"|"/404.html"|"/auth.cgi"|"/cgi-bin/auth.cgi")
 			if [ -n "$IS_CURL" ] && [ "$url" != "/cgi-bin/auth.cgi" ] && [ "$url" != "/auth.cgi" ]; then
 				return 1
 			else
@@ -130,28 +130,12 @@ is_public_resource() {
 }
 
 if is_public_resource "$ORIGINAL_URL"; then
-	case "$ORIGINAL_URL" in
-		"/"|"/index.html")
-			SECURITY_HEADERS
-			cat "$DOCUMENT_ROOT/index.html"
-			;;
-		"/favicon.ico")
-			SECURITY_HEADERS "image/x-icon"
-			echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
-			cat "$DOCUMENT_ROOT/favicon.ico"
-			;;
-		"/403.html")
-			SECURITY_HEADERS
-			cat "$DOCUMENT_ROOT/403.html"
-			;;
-		"/404.html")
-			SECURITY_HEADERS
-			cat "$DOCUMENT_ROOT/404.html"
-			;;
-		*)
-			exec "$INSTALL_DIR$ORIGINAL_URL"
-			;;
-	esac
+	if [ "$ORIGINAL_URL" = "/" ] || [ "$ORIGINAL_URL" = "/index.html" ]; then
+		SECURITY_HEADERS
+		cat "$DOCUMENT_ROOT/index.html"
+	else
+		exec "$INSTALL_DIR$ORIGINAL_URL"
+	fi
 	exit 0
 fi
 

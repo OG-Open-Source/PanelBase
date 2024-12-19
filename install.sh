@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta107"
+Version="Beta108"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -25,7 +25,7 @@ CONFIG_MODE="600"
 
 declare -A FILES=(
 	["cgi-bin"]="auth.cgi check_auth.cgi"
-	["www"]="index.html 404.html 403.html panel.html favicon.ico"
+	["www"]="index.html 404.html 403.html panel.html"
 )
 
 declare -A FILE_PERMISSIONS=(
@@ -270,7 +270,7 @@ INSTALL_DIR="/opt/panelbase"
 DOCUMENT_ROOT="/opt/panelbase/www"
 
 # Session Settings
-SESSION_LIFETIME=10    #86400
+SESSION_LIFETIME=86400
 SESSION_ROTATION_INTERVAL=3600
 
 # Security Restrictions
@@ -283,14 +283,14 @@ ACCESS_CONTROL_MODE="whitelist"
 
 # Whitelist: Active when ACCESS_CONTROL_MODE="whitelist"
 # Format: Space-separated list of file patterns, supports wildcards
-WHITELIST_FILES="*.html *.htm *.ico"
+WHITELIST_FILES="*.html *.htm"
 
 # Blacklist: Active when ACCESS_CONTROL_MODE="blacklist"
 # Format: Space-separated list of file patterns, supports wildcards
 BLACKLIST_FILES="*.css *.js *.json *.xml *.txt *.md *.csv *.sql *.sh *.conf"
 
 # Allow access to restricted files when referenced from HTML
-ALLOW_HTML_REFERENCE=true
+ALLOW_HTML_REFERENCE=false
 
 # Security Headers Configuration
 SECURITY_HEADERS_CSP="default-src 'self' https://cdnjs.cloudflare.com; \
