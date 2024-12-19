@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta106"
+Version="Beta107"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -24,7 +24,7 @@ CGI_MODE="755"
 CONFIG_MODE="600"
 
 declare -A FILES=(
-	["cgi-bin"]="panel.cgi auth.cgi check_auth.cgi"
+	["cgi-bin"]="auth.cgi check_auth.cgi"
 	["www"]="index.html 404.html 403.html panel.html favicon.ico"
 )
 
@@ -270,7 +270,7 @@ INSTALL_DIR="/opt/panelbase"
 DOCUMENT_ROOT="/opt/panelbase/www"
 
 # Session Settings
-SESSION_LIFETIME=86400
+SESSION_LIFETIME=10    #86400
 SESSION_ROTATION_INTERVAL=3600
 
 # Security Restrictions
@@ -283,7 +283,7 @@ ACCESS_CONTROL_MODE="whitelist"
 
 # Whitelist: Active when ACCESS_CONTROL_MODE="whitelist"
 # Format: Space-separated list of file patterns, supports wildcards
-WHITELIST_FILES="*.html *.htm"
+WHITELIST_FILES="*.html *.htm *.ico"
 
 # Blacklist: Active when ACCESS_CONTROL_MODE="blacklist"
 # Format: Space-separated list of file patterns, supports wildcards
