@@ -12,74 +12,19 @@ if [ ! -f "$ROUTES_FILE" ]; then
 fi
 
 REQUEST_PATH=$(echo "$REQUEST_URI" | cut -d'?' -f1 | sed 's/\/cgi-bin\/panel\.cgi//')
-REQUEST_METHOD="$REQUEST_METHOD"
 QUERY_STRING="${QUERY_STRING:-}"
-CONTENT_LENGTH="${CONTENT_LENGTH:-0}"
 
-if [ "$REQUEST_METHOD" = "POST" ] && [ "$CONTENT_LENGTH" -gt 0 ]; then
-	read -n "$CONTENT_LENGTH" POST_DATA
-fi
+while IFS=: read -r route command || [[ -n "$route" ]]; do
+	[[ "$route" =~ ^[[:space:]]*# ]] && continue
+	[ -z "$route" ] && continue
 
-parse_route_params() {
-	local route="$1"
-	local path="$2"
-	local params=()
+	route=$(echo "$route" | xargs)
+	command=$(echo "$command" | xargs)
 
-	IFS='/' read -ra ROUTE_PARTS <<< "$route"
-	IFS='/' read -ra PATH_PARTS <<< "$path"
-
-	for i in "${!ROUTE_PARTS[@]}"; do
-		if [[ "${ROUTE_PARTS[$i]}" =~ ^\$[0-9]+$ ]]; then
-			params+=("${PATH_PARTS[$i]}")
-		fi
-	done
-
-	echo "${params[@]}"
-}
-
-parse_post_params() {
-	local post_data="$1"
-	local params=()
-
-	IFS='&' read -ra PAIRS <<< "$post_data"
-	for pair in "${PAIRS[@]}"; do
-		IFS='=' read -r key value <<< "$pair"
-		params+=("$value")
-	done
-
-	echo "${params[@]}"
-}
-
-match_route() {
-	local route="$1"
-	local path="$2"
-
-	local route_regex=$(echo "$route" | sed 's/\$[0-9]\+/[^\/]\+/g')
-	[[ "$path" =~ ^$route_regex$ ]]
-}
-
-while IFS= read -r line || [[ -n "$line" ]]; do
-	[[ "$line" =~ ^[[:space:]]*# ]] && continue
-	[ -z "$line" ] && continue
-
-	read -r ROUTE_PATH ROUTE_METHOD ROUTE_COMMAND <<< "$line"
-
-	if match_route "$ROUTE_PATH" "$REQUEST_PATH" && [ "$ROUTE_METHOD" = "$REQUEST_METHOD" ]; then
-		ROUTE_PARAMS=($(parse_route_params "$ROUTE_PATH" "$REQUEST_PATH"))
-
-		if [ "$REQUEST_METHOD" = "POST" ]; then
-			POST_PARAMS=($(parse_post_params "$POST_DATA"))
-		fi
-
-		COMMAND="$ROUTE_COMMAND"
-		for i in "${!ROUTE_PARAMS[@]}"; do
-			COMMAND=${COMMAND//\$$((i+1))/${ROUTE_PARAMS[$i]}}
-		done
-		for i in "${!POST_PARAMS[@]}"; do
-			COMMAND=${COMMAND//\%$((i+1))/${POST_PARAMS[$i]}}
-		done
-
-		eval "$COMMAND"
+	if [ "$REQUEST_PATH" = "$route" ]; then
+		echo "Content-type: application/json"
+		echo
+		eval "$command"
 		exit 0
 	fi
 done < "$ROUTES_FILE"
