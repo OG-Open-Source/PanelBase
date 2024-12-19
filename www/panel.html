@@ -1,18 +1,53 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="en">
 	<head>
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<title>系統管理面板</title>
+		<title>System Panel - PanelBase</title>
+		<link rel="icon" href="favicon.ico" type="image/x-icon">
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 		<style>
 			:root {
 				--primary-color: #007AFF;
+				--primary-gradient: linear-gradient(135deg, #0A84FF, #0066CC);
 				--error-color: #FF3B30;
-				--success-color: #34C759;
-				--bg-color: #F2F2F7;
-				--card-bg: #FFFFFF;
+				--background-color: #F2F2F7;
+				--input-background: #FFFFFF;
 				--text-color: #1C1C1E;
-				--border-radius: 8px;
+				--secondary-text: #8E8E93;
+				--border-radius: 12px;
+				--border-radius-lg: 16px;
+				--border-radius-sm: 8px;
+				--input-height: 44px;
+				--container-bg: rgba(255, 255, 255, 0.95);
+				--container-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+				--input-border: rgba(0, 0, 0, 0.1);
+				--body-gradient: linear-gradient(135deg, #F6F8FB, #E9EEF3);
+				--primary-rgb: 0, 122, 255;
+				--terminal-bg: #1E1E1E;
+				--terminal-text: #FFFFFF;
+				--terminal-header-bg: rgba(255, 255, 255, 0.1);
+				--terminal-button-hover: rgba(255, 255, 255, 0.1);
+				--main-bg: transparent;
+			}
+
+			:root.dark-mode {
+				--background-color: #000000;
+				--input-background: #1C1C1E;
+				--text-color: #FFFFFF;
+				--secondary-text: #8E8E93;
+				--container-bg: rgba(28, 28, 30, 0.95);
+				--container-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+				--input-border: rgba(255, 255, 255, 0.1);
+				--body-gradient: linear-gradient(135deg, #1C1C1E, #2C2C2E);
+				--primary-rgb: 10, 132, 255;
+				--terminal-bg: #000000;
+				--main-bg: transparent;
+			}
+
+			.container,
+			.main-content {
+				background: var(--main-bg);
 			}
 
 			* {
@@ -23,339 +58,782 @@
 			}
 
 			body {
-				background: var(--bg-color);
-				color: var(--text-color);
+				background: var(--body-gradient);
+				min-height: 100vh;
 				padding: 20px;
+				position: relative;
+				overflow-x: hidden;
+				isolation: isolate;
+			}
+
+			body::before {
+				content: '';
+				position: fixed;
+				width: 150%;
+				height: 150%;
+				top: -25%;
+				left: -25%;
+				background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%);
+				animation: rotate 20s linear infinite;
+				z-index: -2;
+			}
+
+			body::after {
+				content: '';
+				position: fixed;
+				top: 0;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				background:
+					linear-gradient(45deg, transparent 45%, rgba(var(--primary-rgb), 0.03) 50%, transparent 55%),
+					linear-gradient(-45deg, transparent 45%, rgba(var(--primary-rgb), 0.03) 50%, transparent 55%);
+				background-size: 30px 30px;
+				animation: backgroundMove 60s linear infinite;
+				z-index: -1;
 			}
 
 			.container {
-				max-width: 800px;
+				max-width: 1200px;
 				margin: 0 auto;
+				display: grid;
+				grid-template-columns: 250px 1fr;
+				gap: 20px;
+				position: relative;
+				z-index: 1;
 			}
 
-			.card {
-				background: var(--card-bg);
+			.main-content {
+				display: flex;
+				flex-direction: column;
+				gap: 20px;
+			}
+
+			.sidebar {
+				background: var(--container-bg);
+				border-radius: var(--border-radius-lg);
 				padding: 20px;
-				border-radius: var(--border-radius);
-				box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-				margin-bottom: 20px;
-			}
-
-			h2 {
-				margin-bottom: 20px;
-				color: var(--primary-color);
-			}
-
-			.form-group {
-				margin-bottom: 15px;
-			}
-
-			label {
-				display: block;
-				margin-bottom: 5px;
-				font-weight: 500;
-			}
-
-			input, textarea {
-				width: 100%;
-				padding: 8px 12px;
-				border: 1px solid #ddd;
-				border-radius: 4px;
-				font-size: 14px;
-			}
-
-			button {
-				background: var(--primary-color);
-				color: white;
-				border: none;
-				padding: 8px 16px;
-				border-radius: 4px;
-				cursor: pointer;
-				font-weight: 500;
-			}
-
-			button:hover {
-				opacity: 0.9;
-			}
-
-			.output {
-				background: #1e1e1e;
-				color: #fff;
-				padding: 15px;
-				border-radius: 4px;
-				font-family: monospace;
-				white-space: pre-wrap;
-				margin-top: 10px;
-				max-height: 300px;
-				overflow-y: auto;
-			}
-
-			.output.success {
-				border-left: 4px solid var(--success-color);
-			}
-
-			.output.error {
-				border-left: 4px solid var(--error-color);
-			}
-
-			.loading {
-				display: none;
-				margin-left: 10px;
-				color: var(--primary-color);
+				box-shadow: var(--container-shadow);
+				backdrop-filter: blur(16px);
+				-webkit-backdrop-filter: blur(16px);
+				height: calc(100vh - 40px);
+				position: sticky;
+				top: 20px;
+				display: flex;
+				flex-direction: column;
 			}
 
 			.header {
-				background: var(--primary-color);
-				color: white;
+				background: var(--container-bg);
+				border-radius: var(--border-radius-lg);
 				padding: 20px;
-				border-radius: var(--border-radius);
-				margin-bottom: 20px;
+				box-shadow: var(--container-shadow);
+				backdrop-filter: blur(16px);
+				-webkit-backdrop-filter: blur(16px);
 				display: flex;
 				justify-content: space-between;
 				align-items: center;
 			}
 
-			.system-info {
-				display: grid;
-				grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-				gap: 15px;
-				margin-bottom: 20px;
+			.logo {
+				font-size: 24px;
+				font-weight: 700;
+				background: var(--primary-gradient);
+				background-clip: text;
+				-webkit-background-clip: text;
+				-webkit-text-fill-color: transparent;
+				margin-bottom: 24px;
 			}
 
-			.info-item {
-				background: var(--card-bg);
-				padding: 15px;
+			.nav-item {
+				padding: 12px 16px;
 				border-radius: var(--border-radius);
-				box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+				color: var(--text-color);
+				text-decoration: none;
+				display: flex;
+				align-items: center;
+				gap: 12px;
+				transition: all 0.3s ease;
+				margin-bottom: 8px;
 			}
 
-			.info-item strong {
-				display: block;
-				margin-bottom: 5px;
+			.nav-item:hover {
+				background: rgba(var(--primary-rgb), 0.1);
 				color: var(--primary-color);
 			}
 
-			.status-ok {
-				color: var(--success-color);
+			.nav-item.active {
+				background: var(--primary-gradient);
+				color: white;
 			}
 
-			.status-error {
+			.nav-item i {
+				width: 20px;
+				text-align: center;
+			}
+
+			.user-info {
+				margin-top: auto;
+				padding-top: 20px;
+				border-top: 1px solid var(--input-border);
+				display: flex;
+				align-items: center;
+				gap: 12px;
+			}
+
+			.user-avatar {
+				width: 40px;
+				height: 40px;
+				border-radius: 50%;
+				background: var(--primary-gradient);
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				color: white;
+				font-weight: 600;
+			}
+
+			.user-details {
+				flex: 1;
+			}
+
+			.user-name {
+				font-weight: 600;
+				color: var(--text-color);
+			}
+
+			.user-role {
+				font-size: 12px;
+				color: var(--secondary-text);
+			}
+
+			.logout-button {
+				padding: 8px;
+				border-radius: var(--border-radius-sm);
+				color: var(--secondary-text);
+				cursor: pointer;
+				transition: all 0.3s ease;
+			}
+
+			.logout-button:hover {
+				color: var(--error-color);
+				background: rgba(255, 59, 48, 0.1);
+			}
+
+			.system-stats {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+				gap: 20px;
+			}
+
+			.stat-card {
+				background: var(--container-bg);
+				border-radius: var(--border-radius);
+				padding: 20px;
+				box-shadow: var(--container-shadow);
+				backdrop-filter: blur(8px);
+				-webkit-backdrop-filter: blur(8px);
+			}
+
+			.stat-title {
+				color: var(--secondary-text);
+				font-size: 14px;
+				display: flex;
+				align-items: center;
+				gap: 8px;
+			}
+
+			.stat-value {
+				font-size: 24px;
+				font-weight: 600;
+				color: var(--text-color);
+			}
+
+			.stat-trend {
+				font-size: 12px;
+				display: flex;
+				align-items: center;
+				gap: 4px;
+			}
+
+			.trend-up {
+				color: #34C759;
+			}
+
+			.trend-down {
 				color: var(--error-color);
 			}
+
+			.terminal {
+				background: var(--terminal-bg);
+				border-radius: var(--border-radius);
+				overflow: hidden;
+			}
+
+			.terminal-header {
+				padding: 12px;
+				background: rgba(255, 255, 255, 0.1);
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+			}
+
+			.terminal-title {
+				color: var(--terminal-text);
+				font-size: 14px;
+				display: flex;
+				align-items: center;
+				gap: 8px;
+			}
+
+			.terminal-actions {
+				display: flex;
+				gap: 8px;
+			}
+
+			.terminal-button {
+				background: none;
+				border: none;
+				color: var(--terminal-text);
+				opacity: 0.7;
+				cursor: pointer;
+				padding: 4px 8px;
+				border-radius: var(--border-radius-sm);
+				transition: all 0.3s ease;
+			}
+
+			.terminal-button:hover {
+				opacity: 1;
+				background: rgba(255, 255, 255, 0.1);
+			}
+
+			.terminal-content {
+				padding: 12px;
+				font-family: monospace;
+				color: var(--terminal-text);
+				white-space: pre-wrap;
+				max-height: 300px;
+				overflow-y: auto;
+				background: var(--terminal-bg);
+			}
+
+			.progress-bar {
+				height: 4px;
+				background: rgba(255, 255, 255, 0.1);
+				border-radius: 2px;
+				overflow: hidden;
+				margin-top: 12px;
+			}
+
+			.progress-fill {
+				height: 100%;
+				background: var(--primary-color);
+				width: 0;
+				transition: width 0.3s ease;
+			}
+
+			.theme-switcher {
+				position: relative;
+			}
+
+			.theme-switcher button {
+				background: none;
+				border: none;
+				color: var(--secondary-text);
+				font-size: 18px;
+				cursor: pointer;
+				padding: 8px;
+				border-radius: var(--border-radius-sm);
+				transition: all 0.3s ease;
+				width: 36px;
+				height: 36px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+
+			.theme-switcher button:hover {
+				background: rgba(0, 122, 255, 0.1);
+				color: var(--primary-color);
+			}
+
+			@keyframes rotate {
+				from { transform: rotate(0deg); }
+				to { transform: rotate(360deg); }
+			}
+
+			@keyframes backgroundMove {
+				from { background-position: 0 0; }
+				to { background-position: 100% 100%; }
+			}
+
+			@media (prefers-color-scheme: dark) {
+				:root:not(.light-mode) {
+					--background-color: #000000;
+					--input-background: #1C1C1E;
+					--text-color: #FFFFFF;
+					--secondary-text: #8E8E93;
+					--container-bg: rgba(28, 28, 30, 0.95);
+					--container-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+					--input-border: rgba(255, 255, 255, 0.1);
+					--body-gradient: linear-gradient(135deg, #1C1C1E, #2C2C2E);
+					--primary-rgb: 10, 132, 255;
+					--terminal-bg: #000000;
+				}
+
+				:root:not(.light-mode) body {
+					background: var(--body-gradient);
+				}
+
+				:root:not(.light-mode) .container,
+				:root:not(.light-mode) .main-content {
+					background: transparent;
+				}
+
+				:root:not(.light-mode) .sidebar,
+				:root:not(.light-mode) .header,
+				:root:not(.light-mode) .stat-card {
+					background: var(--container-bg);
+					backdrop-filter: blur(16px);
+					-webkit-backdrop-filter: blur(16px);
+				}
+
+				:root:not(.light-mode) p,
+				:root:not(.light-mode) label {
+					color: var(--text-color);
+				}
+
+				:root:not(.light-mode) input {
+					color: var(--text-color);
+					background: var(--input-background);
+					border-color: var(--input-border);
+				}
+
+				:root:not(.light-mode) .nav-item {
+					color: var(--text-color);
+				}
+
+				:root:not(.light-mode) .user-info {
+					border-top-color: var(--input-border);
+				}
+
+				:root:not(.light-mode) .user-name,
+				:root:not(.light-mode) .stat-value,
+				:root:not(.light-mode) h1 {
+					color: var(--text-color);
+				}
+
+				:root:not(.light-mode) body::before {
+					background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
+				}
+			}
+
+			@media (max-width: 768px) {
+				.container {
+					grid-template-columns: 1fr;
+				}
+
+				.sidebar {
+					position: fixed;
+					left: -250px;
+					top: 0;
+					bottom: 0;
+					z-index: 1000;
+					transition: left 0.3s ease;
+				}
+
+				.sidebar.active {
+					left: 0;
+				}
+
+				.mobile-menu {
+					display: block;
+				}
+			}
+
+			@media (max-width: 480px) {
+				body {
+					padding: 10px;
+				}
+
+				.system-stats {
+					grid-template-columns: 1fr;
+				}
+			}
 		</style>
+		<script>
+			(function() {
+				const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+				const savedTheme = localStorage.getItem('theme-preference');
+
+				if (savedTheme) {
+					document.documentElement.classList.add(`${savedTheme}-mode`);
+				} else if (prefersDark) {
+					document.documentElement.classList.add('dark-mode');
+				}
+			})();
+		</script>
 	</head>
 	<body>
 		<div class="container">
-			<div class="header">
-				<h1>系統管理面板</h1>
-				<div id="username">載入中...</div>
-			</div>
+			<aside class="sidebar">
+				<div class="logo">PanelBase</div>
+				<nav>
+					<a href="#dashboard" class="nav-item active">
+						<i class="fas fa-chart-line"></i>
+						<span data-i18n="nav-dashboard">儀表板</span>
+					</a>
+					<a href="#system" class="nav-item">
+						<i class="fas fa-server"></i>
+						<span data-i18n="nav-system">系統管理</span>
+					</a>
+					<a href="#services" class="nav-item">
+						<i class="fas fa-cogs"></i>
+						<span data-i18n="nav-services">服務管理</span>
+					</a>
+					<a href="#network" class="nav-item">
+						<i class="fas fa-network-wired"></i>
+						<span data-i18n="nav-network">網路管理</span>
+					</a>
+					<a href="#files" class="nav-item">
+						<i class="fas fa-folder"></i>
+						<span data-i18n="nav-files">檔案管理</span>
+					</a>
+					<a href="#settings" class="nav-item">
+						<i class="fas fa-cog"></i>
+						<span data-i18n="nav-settings">設定</span>
+					</a>
+				</nav>
+				<div class="user-info">
+					<div class="user-avatar">
+						<i class="fas fa-user"></i>
+					</div>
+					<div class="user-details">
+						<div class="user-name" id="username">載入中...</div>
+						<div class="user-role" data-i18n="user-role">管理員</div>
+					</div>
+					<div class="logout-button" onclick="handleLogout()">
+						<i class="fas fa-sign-out-alt"></i>
+					</div>
+				</div>
+			</aside>
 
-			<!-- 系統資訊區塊 -->
-			<div class="card">
-				<h2>系統資訊</h2>
-				<div id="systemInfo" class="system-info">載入中...</div>
-			</div>
+			<main class="main-content">
+				<header class="header">
+					<h1 data-i18n="dashboard-title">系統儀表板</h1>
+					<div class="theme-switcher">
+						<button onclick="toggleTheme()" id="themeToggle">
+							<i class="fas fa-moon"></i>
+						</button>
+					</div>
+				</header>
 
-			<!-- 修改密碼區塊 -->
-			<div class="card">
-				<h2>修改用戶密碼</h2>
-				<form id="passwordForm">
-					<div class="form-group">
-						<label>用戶名</label>
-						<input type="text" id="username" required>
+				<div class="system-stats">
+					<div class="stat-card">
+						<div class="stat-title">
+							<i class="fas fa-microchip"></i>
+							<span data-i18n="stat-cpu">CPU 使用率</span>
+						</div>
+						<div class="stat-value" id="cpuUsage">--</div>
+						<div class="stat-trend trend-up">
+							<i class="fas fa-arrow-up"></i>
+							<span>2.5%</span>
+						</div>
 					</div>
-					<div class="form-group">
-						<label>舊密碼</label>
-						<input type="password" id="oldPassword" required>
+					<div class="stat-card">
+						<div class="stat-title">
+							<i class="fas fa-memory"></i>
+							<span data-i18n="stat-memory">記憶體使用率</span>
+						</div>
+						<div class="stat-value" id="memoryUsage">--</div>
+						<div class="stat-trend trend-down">
+							<i class="fas fa-arrow-down"></i>
+							<span>1.2%</span>
+						</div>
 					</div>
-					<div class="form-group">
-						<label>新密碼</label>
-						<input type="password" id="newPassword" required>
+					<div class="stat-card">
+						<div class="stat-title">
+							<i class="fas fa-hdd"></i>
+							<span data-i18n="stat-disk">磁碟使用率</span>
+						</div>
+						<div class="stat-value" id="diskUsage">--</div>
+						<div class="stat-trend trend-up">
+							<i class="fas fa-arrow-up"></i>
+							<span>0.8%</span>
+						</div>
 					</div>
-					<button type="submit">修改密碼</button>
-					<span id="passwordLoading" class="loading">處理中...</span>
-				</form>
-				<div id="passwordOutput" class="output" style="display: none;"></div>
-			</div>
+				</div>
 
-			<!-- 執行指令區塊 -->
-			<div class="card">
-				<h2>執行系統指令</h2>
-				<form id="commandForm">
-					<div class="form-group">
-						<label>指令</label>
-						<textarea id="command" rows="3" required></textarea>
+				<div class="stat-card">
+					<div class="terminal">
+						<div class="terminal-header">
+							<div class="terminal-title">
+								<i class="fas fa-terminal"></i>
+								<span data-i18n="terminal-title">系統更新</span>
+							</div>
+							<div class="terminal-actions">
+								<button class="terminal-button" onclick="startUpdate()" id="updateButton">
+									<i class="fas fa-sync-alt"></i>
+								</button>
+								<button class="terminal-button" onclick="clearTerminal()">
+									<i class="fas fa-trash"></i>
+								</button>
+							</div>
+						</div>
+						<div class="terminal-content" id="terminalOutput"></div>
+						<div class="progress-bar">
+							<div class="progress-fill" id="updateProgress"></div>
+						</div>
 					</div>
-					<button type="submit">執行</button>
-					<span id="commandLoading" class="loading">執行中...</span>
-				</form>
-				<div id="commandOutput" class="output" style="display: none;"></div>
-			</div>
+				</div>
+			</main>
 		</div>
 
 		<script>
-			// API 客戶端
-			class PanelAPI {
-				static async request(path, method = 'GET', data = null) {
-					try {
-						const options = {
-							method,
-							headers: {
-								'Content-Type': 'application/x-www-form-urlencoded'
-							}
-						};
-
-						if (data) {
-							options.body = Object.entries(data)
-								.map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
-								.join('&');
-						}
-
-						const response = await fetch(path, options);
-						if (!response.ok) {
-							throw new Error(`HTTP error! status: ${response.status}`);
-						}
-						const result = await response.json();
-						return result;
-					} catch (error) {
-						console.error(`API 請求失敗 (${path}):`, error);
-						throw error;
-					}
+			const i18n = {
+				'en': {
+					'nav-dashboard': 'Dashboard',
+					'nav-system': 'System',
+					'nav-services': 'Services',
+					'nav-network': 'Network',
+					'nav-files': 'Files',
+					'nav-settings': 'Settings',
+					'user-role': 'Administrator',
+					'dashboard-title': 'System Dashboard',
+					'stat-cpu': 'CPU Usage',
+					'stat-memory': 'Memory Usage',
+					'stat-disk': 'Disk Usage',
+					'terminal-title': 'System Update'
+				},
+				'zh-TW': {
+					'nav-dashboard': '儀表板',
+					'nav-system': '系統管理',
+					'nav-services': '服務管理',
+					'nav-network': '網路管理',
+					'nav-files': '檔案管理',
+					'nav-settings': '設定',
+					'user-role': '管理員',
+					'dashboard-title': '系統儀表板',
+					'stat-cpu': 'CPU 使用率',
+					'stat-memory': '記憶體使用率',
+					'stat-disk': '磁碟使用率',
+					'terminal-title': '系統更新'
 				}
+			};
 
-				// 獲取用戶名
-				static async getUsername() {
-					return await this.request('/api/panel/username');
-				}
+			let currentLanguage = localStorage.getItem('panelbase-language') || 'zh-TW';
 
-				// 獲取系統資訊
-				static async getSystemInfo() {
-					return await this.request('/api/panel/system_info');
-				}
+			function updateTexts() {
+				document.querySelectorAll('[data-i18n]').forEach(element => {
+					const key = element.getAttribute('data-i18n');
+					element.textContent = i18n[currentLanguage][key];
+				});
+			}
 
-				// 修改密碼
-				static async changePassword(username, oldPassword, newPassword) {
-					return await this.request('/api/user/password', 'POST', {
-						username,
-						oldPassword,
-						newPassword
-					});
-				}
+			function toggleTheme() {
+				const html = document.documentElement;
+				const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+				const isDark = html.classList.contains('dark-mode') || (!html.classList.contains('light-mode') && prefersDark);
 
-				// 執行指令
-				static async executeCommand(command) {
-					return await this.request('/api/custom/shell', 'POST', {
-						command
-					});
+				if (isDark) {
+					html.classList.remove('dark-mode');
+					html.classList.add('light-mode');
+					document.querySelector('#themeToggle i').className = 'fas fa-moon';
+					localStorage.setItem('theme-preference', 'light');
+				} else {
+					html.classList.remove('light-mode');
+					html.classList.add('dark-mode');
+					document.querySelector('#themeToggle i').className = 'fas fa-sun';
+					localStorage.setItem('theme-preference', 'dark');
 				}
 			}
 
-			// 更新用戶名顯示
+			class SystemMonitor {
+				constructor() {
+					this.terminal = document.getElementById('terminalOutput');
+					this.progressBar = document.getElementById('updateProgress');
+					this.updateButton = document.getElementById('updateButton');
+					this.updateInterval = null;
+				}
+
+				async updateSystemStats() {
+					try {
+						const response = await fetch('/cgi-bin/panel.cgi/api/panel/system_info');
+						const data = await response.json();
+
+						document.getElementById('cpuUsage').textContent = `${data.cpu}%`;
+						document.getElementById('memoryUsage').textContent = data.memory;
+						document.getElementById('diskUsage').textContent = data.disk;
+					} catch (error) {
+						console.error('Error updating system stats:', error);
+						document.getElementById('cpuUsage').textContent = '--';
+						document.getElementById('memoryUsage').textContent = '--';
+						document.getElementById('diskUsage').textContent = '--';
+					}
+				}
+
+				async startUpdate() {
+					try {
+						this.updateButton.disabled = true;
+						this.terminal.textContent = '';
+						this.progressBar.style.width = '0%';
+
+						const response = await fetch('/cgi-bin/panel.cgi/api/system/apt/update', {
+							method: 'POST'
+						});
+
+						const reader = response.body.getReader();
+						const decoder = new TextDecoder();
+						let buffer = '';
+
+						while (true) {
+							const {value, done} = await reader.read();
+							if (done) break;
+
+							buffer += decoder.decode(value, {stream: true});
+							const lines = buffer.split('\n');
+							buffer = lines.pop() || '';
+
+							for (const line of lines) {
+								if (line.trim()) {
+									this.appendToTerminal(line);
+									this.updateProgress(line);
+								}
+							}
+						}
+
+						this.updateButton.disabled = false;
+						await this.checkUpgradable();
+					} catch (error) {
+						console.error('Error:', error);
+						this.appendToTerminal('更新失敗：' + error.message);
+						this.updateButton.disabled = false;
+					}
+				}
+
+				appendToTerminal(text) {
+					const shouldScroll = 
+						this.terminal.scrollTop + this.terminal.clientHeight === this.terminal.scrollHeight;
+
+					this.terminal.textContent += text + '\n';
+
+					if (shouldScroll) {
+						this.terminal.scrollTop = this.terminal.scrollHeight;
+					}
+				}
+
+				updateProgress(line) {
+					if (line.includes('Get:')) {
+						const match = line.match(/Get:(\d+)/);
+						if (match) {
+							const current = parseInt(match[1]);
+							const progress = (current / 10) * 100;
+							this.progressBar.style.width = `${Math.min(progress, 100)}%`;
+						}
+					} else if (line.includes('Reading package lists...')) {
+						this.progressBar.style.width = '90%';
+					} else if (line.includes('Done')) {
+						this.progressBar.style.width = '100%';
+					}
+				}
+
+				async checkUpgradable() {
+					try {
+						const response = await fetch('/cgi-bin/panel.cgi/api/system/apt/upgradable');
+						const data = await response.json();
+						
+						if (data.packages && data.packages.length > 0) {
+							this.appendToTerminal('\n可更新的套件：');
+							data.packages.forEach(pkg => {
+								this.appendToTerminal(`${pkg.package} (${pkg.version})`);
+							});
+						} else {
+							this.appendToTerminal('\n沒有可更新的套件');
+						}
+					} catch (error) {
+						console.error('Error:', error);
+						this.appendToTerminal('檢查更新失敗');
+					}
+				}
+
+				clearTerminal() {
+					this.terminal.textContent = '';
+				}
+
+				startMonitoring() {
+					this.updateSystemStats();
+					this.updateInterval = setInterval(() => this.updateSystemStats(), 5000);
+				}
+
+				stopMonitoring() {
+					if (this.updateInterval) {
+						clearInterval(this.updateInterval);
+						this.updateInterval = null;
+					}
+				}
+			}
+
 			async function updateUsername() {
 				try {
-					const username = await PanelAPI.getUsername();
-					document.getElementById('username').textContent = `歡迎，${username}`;
+					const response = await fetch('/cgi-bin/auth.cgi?action=username');
+					const data = await response.json();
+					if (data.status === 'success') {
+						document.getElementById('username').textContent = data.username;
+					} else {
+						document.getElementById('username').textContent = '未知用戶';
+					}
 				} catch (error) {
 					console.error('Error fetching username:', error);
-					document.getElementById('username').textContent = '未登入';
+					document.getElementById('username').textContent = '未知用戶';
 				}
 			}
 
-			// 更新系統資訊
-			async function updateSystemInfo() {
+			async function handleLogout() {
 				try {
-					const data = await PanelAPI.getSystemInfo();
-					document.getElementById('systemInfo').innerHTML = `
-						<div class="info-item">
-							<strong>CPU 使用率</strong>
-							<span>${data.cpu}%</span>
-						</div>
-						<div class="info-item">
-							<strong>記憶體</strong>
-							<span>${data.memory}</span>
-						</div>
-						<div class="info-item">
-							<strong>磁碟空間</strong>
-							<span>${data.disk}</span>
-						</div>
-						<div class="info-item">
-							<strong>Lighttpd 狀態</strong>
-							<span class="${data.lighttpd_status === '運行中' ? 'status-ok' : 'status-error'}">
-								${data.lighttpd_status}
-							</span>
-						</div>
-					`;
+					const response = await fetch('/cgi-bin/auth.cgi?action=logout');
+					const data = await response.json();
+					if (data.status === 'success') {
+						window.location.href = '/';
+					} else {
+						console.error('Logout failed:', data.message);
+						window.location.href = '/';
+					}
 				} catch (error) {
-					console.error('Error fetching system info:', error);
-					document.getElementById('systemInfo').innerHTML = '<div class="error">無法載入系統資訊</div>';
+					console.error('Error logging out:', error);
+					window.location.href = '/';
 				}
 			}
 
-			// 修改密碼表單處理
-			document.getElementById('passwordForm').onsubmit = async (e) => {
-				e.preventDefault();
-				const username = document.getElementById('username').value;
-				const oldPassword = document.getElementById('oldPassword').value;
-				const newPassword = document.getElementById('newPassword').value;
-				const loading = document.getElementById('passwordLoading');
-				const output = document.getElementById('passwordOutput');
+			const systemMonitor = new SystemMonitor();
 
-				loading.style.display = 'inline';
-				output.style.display = 'none';
+			function startUpdate() {
+				systemMonitor.startUpdate();
+			}
 
-				try {
-					const result = await PanelAPI.changePassword(username, oldPassword, newPassword);
-					output.textContent = result.data || result.error;
-					output.className = 'output ' + (result.success ? 'success' : 'error');
-					output.style.display = 'block';
+			function clearTerminal() {
+				systemMonitor.clearTerminal();
+			}
 
-					if (result.success) {
-						document.getElementById('passwordForm').reset();
-					}
-				} catch (error) {
-					output.textContent = '操作失敗: ' + error.message;
-					output.className = 'output error';
-					output.style.display = 'block';
-				} finally {
-					loading.style.display = 'none';
+			document.addEventListener('DOMContentLoaded', () => {
+				updateTexts();
+				updateUsername();
+				systemMonitor.startMonitoring();
+
+				const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+				const savedTheme = localStorage.getItem('theme-preference');
+
+				if (savedTheme) {
+					document.documentElement.classList.add(`${savedTheme}-mode`);
+					document.querySelector('#themeToggle i').className = `fas fa-${savedTheme === 'dark' ? 'sun' : 'moon'}`;
+				} else if (prefersDark) {
+					document.documentElement.classList.add('dark-mode');
+					document.querySelector('#themeToggle i').className = 'fas fa-sun';
 				}
-			};
+			});
 
-			// 執行指令表單處理
-			document.getElementById('commandForm').onsubmit = async (e) => {
-				e.preventDefault();
-				const command = document.getElementById('command').value;
-				const loading = document.getElementById('commandLoading');
-				const output = document.getElementById('commandOutput');
-
-				loading.style.display = 'inline';
-				output.style.display = 'none';
-
-				try {
-					const result = await PanelAPI.executeCommand(command);
-					output.textContent = result.data || result.error;
-					output.className = 'output ' + (result.success ? 'success' : 'error');
-					output.style.display = 'block';
-
-					if (result.success) {
-						document.getElementById('commandForm').reset();
-					}
-				} catch (error) {
-					output.textContent = '執行失敗: ' + error.message;
-					output.className = 'output error';
-					output.style.display = 'block';
-				} finally {
-					loading.style.display = 'none';
-				}
-			};
-
-			// 初始化
-			updateUsername();
-			updateSystemInfo();
-
-			// 定期更新系統資訊
-			setInterval(updateSystemInfo, 1000);
+			window.addEventListener('beforeunload', () => {
+				systemMonitor.stopMonitoring();
+			});
 		</script>
 	</body>
 </html>
