@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta111"
+Version="Beta112"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -26,7 +26,7 @@ CONFIG_MODE="600"
 declare -A FILES=(
 	["cgi-bin"]="auth.cgi check_auth.cgi panel.cgi"
 	["www"]="index.html 403.html 404.html panel.html favicon.ico"
-	["config"]="lighttpd.conf routes.conf security.conf"
+	["config"]="routes.conf security.conf"
 )
 
 declare -A FILE_PERMISSIONS=(
@@ -201,6 +201,68 @@ if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	rm -rf "$TMP_DIR"
 	text "${CLR2}自定義面板文件安裝完成${CLR0}"
 fi
+
+text "配置 lighttpd..."
+cat > /etc/lighttpd/lighttpd.conf << EOF
+server.modules = (
+	"mod_access",
+	"mod_alias",
+	"mod_compress",
+	"mod_redirect",
+	"mod_rewrite",
+	"mod_cgi",
+	"mod_accesslog"
+)
+
+server.document-root = "$INSTALL_DIR/www"
+server.port = $PANEL_PORT
+
+server.username = "www-data"
+server.groupname = "www-data"
+
+server.errorlog = "$INSTALL_DIR/logs/error.log"
+accesslog.filename = "$INSTALL_DIR/logs/access.log"
+accesslog.format = "%h %V %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\""
+
+\$HTTP["url"] =~ "^/" {
+	dir-listing.activate = "disable"
+}
+
+cgi.assign = ( ".cgi" => "" )
+alias.url = ( "/cgi-bin/" => "$INSTALL_DIR/cgi-bin/" )
+
+\$HTTP["url"] =~ "^/cgi-bin/" {
+	cgi.assign = ( "" => "" )
+}
+
+mimetype.assign = (
+	".html" => "text/html",
+	".css"  => "text/css",
+	".js"   => "application/javascript",
+	".png"  => "image/png",
+	".jpg"  => "image/jpeg",
+	".jpeg" => "image/jpeg",
+	".gif"  => "image/gif",
+	".ico"  => "image/x-icon",
+	".svg"  => "image/svg+xml",
+	".woff" => "font/woff",
+	".woff2" => "font/woff2",
+	".ttf"  => "font/ttf",
+	".eot"  => "application/vnd.ms-fontobject"
+)
+
+\$HTTP["url"] !~ "^/\$" {
+	\$HTTP["url"] !~ "^/cgi-bin/(auth|panel)\.cgi" {
+		url.rewrite-once = (
+			"^/.*" => "/cgi-bin/check_auth.cgi"
+		)
+	}
+}
+
+index-file.names = ( "index.html" )
+
+static-file.exclude-extensions = ( ".cgi" )
+EOF
 
 text "創建用戶配置..."
 text "${ADMIN_NAME}:$(echo -n "${ADMIN_PASS}" | md5sum | cut -d' ' -f1)" > $INSTALL_DIR/config/user.conf
