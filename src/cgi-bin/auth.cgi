@@ -22,11 +22,9 @@ ACTION=$(echo "$QUERY_STRING" | grep -oP 'action=\K[^&]+')
 create_session() {
 	local username="$1"
 	local current_time=$(date +%s)
-
 	sed -i "/:[^:]*$username:/d" "$SESSION_FILE"
 
 	local token=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
-
 	echo "$token:$username:$current_time" >> "$SESSION_FILE"
 
 	local expiry=$((current_time + 86400))
