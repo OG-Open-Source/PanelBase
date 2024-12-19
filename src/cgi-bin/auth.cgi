@@ -4,7 +4,7 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
 	read -n $CONTENT_LENGTH POST_DATA
 fi
 
-CONFIG_FILE="/opt/panelbase/config/users.conf"
+CONFIG_FILE="/opt/panelbase/config/user.conf"
 SESSION_FILE="/opt/panelbase/config/sessions.conf"
 THEME_FILE="/opt/panelbase/config/themes.conf"
 
@@ -92,9 +92,9 @@ case "$ACTION" in
 		fi
 		;;
 
-	"get_username")
+	"username")
 		if [ -n "$AUTH_TOKEN" ]; then
-			USERNAME=$(awk -F: -v token="$AUTH_TOKEN" '$1 == token {print $2}' "$SESSION_FILE")
+			USERNAME=$(grep "^$AUTH_TOKEN:" "$SESSION_FILE" | cut -d: -f2)
 			if [ -n "$USERNAME" ]; then
 				echo "Content-type: application/json"
 				echo "Status: 200"

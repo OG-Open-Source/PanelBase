@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta109"
+Version="Beta110"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -24,8 +24,9 @@ CGI_MODE="755"
 CONFIG_MODE="600"
 
 declare -A FILES=(
-	["cgi-bin"]="auth.cgi check_auth.cgi"
+	["cgi-bin"]="auth.cgi check_auth.cgi panel.cgi"
 	["www"]="index.html 404.html 403.html panel.html"
+	["config"]="routes.conf"
 )
 
 declare -A FILE_PERMISSIONS=(
@@ -258,7 +259,7 @@ static-file.exclude-extensions = ( ".cgi" )
 EOF
 
 text "創建用戶配置..."
-text "${ADMIN_NAME}:$(echo -n "${ADMIN_PASS}" | md5sum | cut -d' ' -f1)" > $INSTALL_DIR/config/users.conf
+text "${ADMIN_NAME}:$(echo -n "${ADMIN_PASS}" | md5sum | cut -d' ' -f1)" > $INSTALL_DIR/config/user.conf
 touch $INSTALL_DIR/config/sessions.conf
 
 text "創建安全配置..."
@@ -333,7 +334,7 @@ for dir in "${!FILE_PERMISSIONS[@]}"; do
 	fi
 done
 
-chmod "$CONFIG_MODE" "$INSTALL_DIR/config/users.conf"
+chmod "$CONFIG_MODE" "$INSTALL_DIR/config/user.conf"
 chmod "$CONFIG_MODE" "$INSTALL_DIR/config/sessions.conf"
 chmod "$CONFIG_MODE" "$INSTALL_DIR/config/security.conf"
 
