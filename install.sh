@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta114"
+Version="Beta115"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -25,7 +25,7 @@ CONFIG_MODE="600"
 
 declare -A FILES=(
 	["cgi-bin"]="auth.cgi check_auth.cgi panel.cgi"
-	["www"]="index.html 403.html 404.html panel.html favicon.ico"
+	["www"]="index.html 403.html 404.html panel.html favicon.png"
 	["config"]="routes.conf security.conf"
 )
 
