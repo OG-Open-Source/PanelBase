@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta113"
+Version="Beta114"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -38,7 +38,7 @@ declare -A FILE_PERMISSIONS=(
 declare -A FILE_PATHS=(
 	["cgi-bin"]="src/cgi-bin"
 	["www"]="www"
-	["config"]="src/config"
+	["config"]="config"
 )
 
 CLEAN
