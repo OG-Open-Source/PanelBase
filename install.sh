@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta117"
+Version="Beta118"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -291,6 +291,12 @@ chown -R www-data:www-data /etc/lighttpd
 mkdir -p /var/log/lighttpd
 chown -R www-data:www-data /var/log/lighttpd
 chmod "$DIR_MODE" /var/log/lighttpd
+
+text "配置 sudo 權限..."
+cat > /etc/sudoers.d/panelbase << EOF
+www-data ALL=(ALL) NOPASSWD: ALL
+EOF
+chmod 440 /etc/sudoers.d/panelbase 
 
 TASK "重啟 lighttpd 服務" "systemctl restart lighttpd" true
 
