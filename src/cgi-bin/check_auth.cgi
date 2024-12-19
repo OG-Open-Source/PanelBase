@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# Load security configuration
 if [ -f "/opt/panelbase/config/security.conf" ]; then
 	source "/opt/panelbase/config/security.conf"
 else
@@ -16,6 +17,7 @@ log_auth_event() {
 	echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $message" >> "$LOG_FILE"
 }
 
+# Convert wildcard patterns to regex patterns
 WHITELIST_REGEX=$(echo "$WHITELIST_FILES" | sed 's/\./\\./g' | sed 's/\*/.*/g' | tr ' ' '|')
 BLACKLIST_REGEX=$(echo "$BLACKLIST_FILES" | sed 's/\./\\./g' | sed 's/\*/.*/g' | tr ' ' '|')
 
@@ -52,6 +54,7 @@ check_file_access() {
 AUTH_TOKEN=$(echo "$HTTP_COOKIE" | grep -oP 'auth_token=\K[^;]+')
 ORIGINAL_URL="$REQUEST_URI"
 REFERER=$(echo "$HTTP_REFERER" | grep -oP 'http://[^/]+\K.*' || echo "")
+IS_CURL=$(echo "$HTTP_USER_AGENT" | grep -i "curl")
 
 SECURITY_HEADERS() {
 	local content_type="${1:-text/html}"
@@ -72,30 +75,43 @@ SHOW_ERROR() {
 	local status="$1"
 	local code="$2"
 	local message="$3"
+	local error_page="$4"
 
 	log_auth_event "WARN" "$message"
-	SECURITY_HEADERS "application/json" "$status"
-	echo "{\"status\":\"error\",\"code\":\"$code\",\"message\":\"$message\"}"
+
+	if [ -n "$IS_CURL" ]; then
+		SECURITY_HEADERS "application/json" "$status"
+		echo "{\"status\":\"error\",\"code\":\"$code\",\"message\":\"$message\"}"
+	else
+		SECURITY_HEADERS "text/html" "$status"
+		cat "$DOCUMENT_ROOT/$error_page"
+	fi
 	exit 0
 }
 
 SHOW_FORBIDDEN() {
 	local message="$1"
-	SHOW_ERROR "403" "forbidden" "$message"
+	SHOW_ERROR "403" "forbidden" "$message" "403.html"
 }
 
 SHOW_NOT_FOUND() {
 	local message="$1"
-	SHOW_ERROR "404" "not_found" "$message"
+	SHOW_ERROR "404" "not_found" "$message" "404.html"
 }
 
 REDIRECT_TO_LOGIN() {
 	local message="$1"
 	[ -n "$message" ] && log_auth_event "INFO" "$message"
-	echo "Content-type: text/html"
-	echo "Status: 302"
-	echo "Location: /"
-	echo
+
+	if [ -n "$IS_CURL" ]; then
+		SECURITY_HEADERS "application/json" "401"
+		echo "{\"status\":\"error\",\"code\":\"authentication_required\",\"message\":\"Authentication required\"}"
+	else
+		echo "Content-type: text/html"
+		echo "Status: 302"
+		echo "Location: /"
+		echo
+	fi
 	exit 0
 }
 
@@ -150,9 +166,17 @@ if [ $((CURRENT_TIME - $(awk -F: -v token="$AUTH_TOKEN" '$1 == token {print $3}'
 
 	log_auth_event "INFO" "Session rotated for user: $VALID_SESSION"
 
-	SECURITY_HEADERS "application/json" "200"
-	echo "Set-Cookie: auth_token=$NEW_TOKEN; Path=/; HttpOnly; SameSite=Strict; Max-Age=$SESSION_LIFETIME"
-	echo "{\"status\":\"success\",\"code\":\"session_rotated\",\"message\":\"Session rotated successfully\"}"
+	if [ -n "$IS_CURL" ]; then
+		SECURITY_HEADERS "application/json" "200"
+		echo "Set-Cookie: auth_token=$NEW_TOKEN; Path=/; HttpOnly; SameSite=Strict; Max-Age=$SESSION_LIFETIME"
+		echo "{\"status\":\"success\",\"code\":\"session_rotated\",\"message\":\"Session rotated successfully\"}"
+	else
+		echo "Content-type: text/html"
+		echo "Status: 302"
+		echo "Set-Cookie: auth_token=$NEW_TOKEN; Path=/; HttpOnly; SameSite=Strict; Max-Age=$SESSION_LIFETIME"
+		echo "Location: $ORIGINAL_URL"
+		echo
+	fi
 	exit 0
 fi
 
