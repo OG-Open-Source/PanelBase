@@ -143,6 +143,7 @@
 				-webkit-background-clip: text;
 				-webkit-text-fill-color: transparent;
 				margin-bottom: 24px;
+				text-align: center;
 			}
 
 			.nav-item {
@@ -477,7 +478,9 @@
 	<body>
 		<div class="container">
 			<aside class="sidebar">
-				<div class="logo">PanelBase</div>
+				<div class="logo">
+					<a href="/panel.html" style="text-decoration: none; background: var(--primary-gradient); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; display: block; text-align: center;">PanelBase</a>
+				</div>
 				<nav>
 					<a href="#dashboard" class="nav-item active">
 						<i class="fas fa-chart-line"></i>
@@ -712,7 +715,7 @@
 				}
 
 				appendToTerminal(text) {
-					const shouldScroll = 
+					const shouldScroll =
 						this.terminal.scrollTop + this.terminal.clientHeight === this.terminal.scrollHeight;
 
 					this.terminal.textContent += text + '\n';
@@ -741,7 +744,7 @@
 					try {
 						const response = await fetch('/cgi-bin/panel.cgi/api/system/apt/upgradable');
 						const data = await response.json();
-						
+
 						if (data.packages && data.packages.length > 0) {
 							this.appendToTerminal('\n可更新的套件：');
 							data.packages.forEach(pkg => {
