@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta112"
+Version="Beta113"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -293,12 +293,6 @@ chown -R www-data:www-data /var/log/lighttpd
 chmod "$DIR_MODE" /var/log/lighttpd
 
 TASK "重啟 lighttpd 服務" "systemctl restart lighttpd" true
-
-if ! systemctl is-active --quiet lighttpd; then
-	error "lighttpd 服務未能正常啟動"
-	error "請檢查日誌文件：$INSTALL_DIR/logs/error.log"
-	exit 1
-fi
 
 SERVER_IP=$(hostname -I | awk '{print $1}')
 

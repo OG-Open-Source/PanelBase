@@ -116,12 +116,8 @@ REDIRECT_TO_LOGIN() {
 is_public_resource() {
 	local url="$1"
 	case "$url" in
-		"/"|"/index.html"|"/403.html"|"/404.html"|"/auth.cgi"|"/cgi-bin/auth.cgi")
-			if [ -n "$IS_CURL" ] && [ "$url" != "/cgi-bin/auth.cgi" ] && [ "$url" != "/auth.cgi" ]; then
-				return 1
-			else
-				return 0
-			fi
+		"/"|"/index.html"|"/403.html"|"/404.html"|"/favicon.ico"|"/auth.cgi"|"/cgi-bin/auth.cgi")
+			return 0
 			;;
 		*)
 			return 1
@@ -139,46 +135,20 @@ if is_public_resource "$ORIGINAL_URL"; then
 	exit 0
 fi
 
-SESSION_FILE="$INSTALL_DIR/config/sessions.conf"
-if [ ! -f "$SESSION_FILE" ]; then
-	log_auth_event "ERROR" "Session file not found"
-	REDIRECT_TO_LOGIN "Session file not found"
-fi
-
 if [ -z "$AUTH_TOKEN" ]; then
 	log_auth_event "WARN" "No auth token provided"
 	REDIRECT_TO_LOGIN "No auth token provided"
 fi
 
+SESSION_FILE="/opt/panelbase/config/sessions.conf"
 CURRENT_TIME=$(date +%s)
 VALID_SESSION=$(awk -F: -v token="$AUTH_TOKEN" -v time="$CURRENT_TIME" -v max_age="$SESSION_LIFETIME" \
 	'$1 == token && (time - $3) < max_age {print $2}' "$SESSION_FILE")
 
 if [ -z "$VALID_SESSION" ]; then
-	log_auth_event "WARN" "Invalid or expired session token: $AUTH_TOKEN"
+	log_auth_event "WARN" "Invalid session token: $AUTH_TOKEN"
 	echo "Set-Cookie: auth_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
-	REDIRECT_TO_LOGIN "Invalid or expired session"
-fi
-
-if [ $((CURRENT_TIME - $(awk -F: -v token="$AUTH_TOKEN" '$1 == token {print $3}' "$SESSION_FILE"))) -gt "$SESSION_ROTATION_INTERVAL" ]; then
-	NEW_TOKEN=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
-	sed -i "/^$AUTH_TOKEN:/d" "$SESSION_FILE"
-	echo "$NEW_TOKEN:$VALID_SESSION:$CURRENT_TIME" >> "$SESSION_FILE"
-	chmod "$CONFIG_FILE_MODE" "$SESSION_FILE"
-
-	log_auth_event "INFO" "Session rotated for user: $VALID_SESSION"
-
-	if [ -n "$IS_CURL" ]; then
-		SECURITY_HEADERS "application/json" "200"
-		echo "Set-Cookie: auth_token=$NEW_TOKEN; Path=/; HttpOnly; SameSite=Strict; Max-Age=$SESSION_LIFETIME"
-		echo "{\"status\":\"success\",\"code\":\"session_rotated\",\"message\":\"Session rotated successfully\"}"
-	else
-		echo "Content-type: text/html"
-		echo "Status: 302"
-		echo "Set-Cookie: auth_token=$NEW_TOKEN; Path=/; HttpOnly; SameSite=Strict; Max-Age=$SESSION_LIFETIME"
-		echo "Location: $ORIGINAL_URL"
-		echo
-	fi
+	REDIRECT_TO_LOGIN "Invalid session"
 	exit 0
 fi
 
