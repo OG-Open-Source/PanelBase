@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta110"
+Version="Beta111"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -25,14 +25,20 @@ CONFIG_MODE="600"
 
 declare -A FILES=(
 	["cgi-bin"]="auth.cgi check_auth.cgi panel.cgi"
-	["www"]="index.html 404.html 403.html panel.html"
-	["config"]="routes.conf"
+	["www"]="index.html 403.html 404.html panel.html favicon.ico"
+	["config"]="lighttpd.conf routes.conf security.conf"
 )
 
 declare -A FILE_PERMISSIONS=(
 	["cgi-bin"]="$CGI_MODE"
 	["www"]="$WWW_MODE"
 	["config"]="$CONFIG_MODE"
+)
+
+declare -A FILE_PATHS=(
+	["cgi-bin"]="src/cgi-bin"
+	["www"]="www"
+	["config"]="src/config"
 )
 
 CLEAN
@@ -123,11 +129,11 @@ download_files() {
 	local dir="$1"
 	local files="$2"
 	local target_dir="$INSTALL_DIR/$dir"
+	local source_path="${FILE_PATHS[$dir]}"
 
 	for file in $files; do
 		text "下載 $dir/$file..."
-		local source_url="$BASE_URL/src/$dir/$file"
-		[ "$dir" = "www" ] && source_url="$BASE_URL/$dir/$file"
+		local source_url="$BASE_URL/$source_path/$file"
 
 		if ! curl -sSL -o "$TMP_DIR/$file" "$source_url"; then
 			error "無法下載 $file"
@@ -196,130 +202,9 @@ if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	text "${CLR2}自定義面板文件安裝完成${CLR0}"
 fi
 
-text "配置 lighttpd..."
-cat > /etc/lighttpd/lighttpd.conf << EOF
-server.modules = (
-	"mod_access",
-	"mod_alias",
-	"mod_compress",
-	"mod_redirect",
-	"mod_rewrite",
-	"mod_cgi",
-	"mod_accesslog"
-)
-
-server.document-root = "$INSTALL_DIR/www"
-server.port = $PANEL_PORT
-
-server.username = "www-data"
-server.groupname = "www-data"
-
-server.errorlog = "$INSTALL_DIR/logs/error.log"
-accesslog.filename = "$INSTALL_DIR/logs/access.log"
-accesslog.format = "%h %V %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\""
-
-\$HTTP["url"] =~ "^/" {
-	dir-listing.activate = "disable"
-}
-
-cgi.assign = ( ".cgi" => "" )
-alias.url = ( "/cgi-bin/" => "$INSTALL_DIR/cgi-bin/" )
-
-\$HTTP["url"] =~ "^/cgi-bin/" {
-	cgi.assign = ( "" => "" )
-}
-
-mimetype.assign = (
-	".html" => "text/html",
-	".css"  => "text/css",
-	".js"   => "application/javascript",
-	".png"  => "image/png",
-	".jpg"  => "image/jpeg",
-	".jpeg" => "image/jpeg",
-	".gif"  => "image/gif",
-	".ico"  => "image/x-icon",
-	".svg"  => "image/svg+xml",
-	".woff" => "font/woff",
-	".woff2" => "font/woff2",
-	".ttf"  => "font/ttf",
-	".eot"  => "application/vnd.ms-fontobject"
-)
-
-\$HTTP["url"] !~ "^/\$" {
-	\$HTTP["url"] !~ "^/cgi-bin/(auth|panel)\.cgi" {
-		url.rewrite-once = (
-			"^/.*" => "/cgi-bin/check_auth.cgi"
-		)
-	}
-}
-
-index-file.names = ( "index.html" )
-
-static-file.exclude-extensions = ( ".cgi" )
-EOF
-
 text "創建用戶配置..."
 text "${ADMIN_NAME}:$(echo -n "${ADMIN_PASS}" | md5sum | cut -d' ' -f1)" > $INSTALL_DIR/config/user.conf
 touch $INSTALL_DIR/config/sessions.conf
-
-text "創建安全配置..."
-cat > $INSTALL_DIR/config/security.conf << EOF
-# PanelBase Security Configuration
-
-# Basic Settings
-INSTALL_DIR="/opt/panelbase"
-DOCUMENT_ROOT="/opt/panelbase/www"
-
-# Session Settings
-SESSION_LIFETIME=86400
-SESSION_ROTATION_INTERVAL=3600
-
-# Security Restrictions
-MAX_LOGIN_ATTEMPTS=5
-LOGIN_BLOCK_TIME=300
-PASSWORD_MIN_LENGTH=6
-
-# File Access Control
-ACCESS_CONTROL_MODE="whitelist"
-
-# Whitelist: Active when ACCESS_CONTROL_MODE="whitelist"
-# Format: Space-separated list of file patterns, supports wildcards
-WHITELIST_FILES="*.html *.htm"
-
-# Blacklist: Active when ACCESS_CONTROL_MODE="blacklist"
-# Format: Space-separated list of file patterns, supports wildcards
-BLACKLIST_FILES="*.css *.js *.json *.xml *.txt *.md *.csv *.sql *.sh *.conf"
-
-# Allow access to restricted files when referenced from HTML
-ALLOW_HTML_REFERENCE=false
-
-# Security Headers Configuration
-SECURITY_HEADERS_CSP="default-src 'self' https://cdnjs.cloudflare.com; \
-script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com; \
-style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; \
-img-src 'self' data: https:; \
-font-src 'self' https://cdnjs.cloudflare.com; \
-frame-ancestors 'none'; \
-form-action 'self'; \
-base-uri 'self'"
-
-# Cache Control
-CACHE_MAX_AGE=31536000
-
-# Logging Configuration
-LOG_FILE="/opt/panelbase/logs/auth.log"
-ERROR_LOG_FILE="/opt/panelbase/logs/error.log"
-
-# File Permission Settings
-CONFIG_FILE_MODE=600
-CGI_FILE_MODE=755
-WWW_FILE_MODE=644
-DIR_MODE=755
-
-# System User Settings
-WEB_USER="www-data"
-WEB_GROUP="www-data"
-EOF
 
 text "設置權限..."
 if ! id -u www-data >/dev/null 2>&1; then

@@ -6,9 +6,8 @@ fi
 
 CONFIG_FILE="/opt/panelbase/config/user.conf"
 SESSION_FILE="/opt/panelbase/config/sessions.conf"
-THEME_FILE="/opt/panelbase/config/themes.conf"
 
-for FILE in "$CONFIG_FILE" "$SESSION_FILE" "$THEME_FILE"; do
+for FILE in "$CONFIG_FILE" "$SESSION_FILE"; do
 	if [ ! -f "$FILE" ]; then
 		touch "$FILE"
 		chmod 600 "$FILE"
@@ -148,7 +147,6 @@ case "$ACTION" in
 				else
 					sed -i "s/^$CURRENT_USERNAME:/$NEW_USERNAME:/" "$CONFIG_FILE"
 					sed -i "s/:$CURRENT_USERNAME:/:$NEW_USERNAME:/" "$SESSION_FILE"
-					sed -i "s/^$CURRENT_USERNAME:/$NEW_USERNAME:/" "$THEME_FILE"
 
 					echo "Content-type: application/json"
 					echo "Status: 200"
