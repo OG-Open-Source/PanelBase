@@ -27,12 +27,17 @@ while IFS=: read -r route command || [[ -n "$route" ]]; do
 		echo "X-Accel-Buffering: no"
 		echo
 
-		IFS=';' read -ra COMMANDS <<< "$command"
 		last_exit_code=0
+		IFS=';' read -ra COMMANDS <<< "$command"
 		for cmd in "${COMMANDS[@]}"; do
 			cmd=$(echo "$cmd" | xargs)
-			bash -c "$cmd" 2>&1
-			last_exit_code=$?
+			eval "$cmd" 2>&1 | while IFS= read -r line; do
+				echo "$line"
+			done
+			last_exit_code=${PIPESTATUS[0]}
+			if [ $last_exit_code -ne 0 ]; then
+				exit $last_exit_code
+			fi
 		done
 		exit $last_exit_code
 	fi
