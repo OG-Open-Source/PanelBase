@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta123"
+Version="Beta124"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -233,6 +233,10 @@ alias.url = ( "/cgi-bin/" => "$INSTALL_DIR/cgi-bin/" )
 
 \$HTTP["url"] =~ "^/cgi-bin/" {
 	cgi.assign = ( "" => "" )
+	setenv.add-response-header = (
+		"Cache-Control" => "no-cache",
+		"X-Accel-Buffering" => "no"
+	)
 }
 
 mimetype.assign = (

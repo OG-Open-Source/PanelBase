@@ -831,6 +831,32 @@
 			window.addEventListener('beforeunload', () => {
 				systemMonitor.stopMonitoring();
 			});
+
+			async function startUpdate() {
+				const terminal = document.querySelector('.terminal-output');
+				terminal.textContent = '正在更新系統...\n';
+				
+				try {
+					const response = await fetch('/cgi-bin/panel.cgi/api/panel/system_update');
+					const reader = response.body.getReader();
+					const decoder = new TextDecoder();
+
+					while (true) {
+						const { value, done } = await reader.read();
+						if (done) break;
+						
+						const text = decoder.decode(value);
+						terminal.textContent += text;
+						terminal.scrollTop = terminal.scrollHeight;
+					}
+				} catch (error) {
+					terminal.innerHTML += `\n<span class="error">錯誤：${error.message}</span>`;
+				}
+			}
+
+			function clearTerminal() {
+				document.querySelector('.terminal-output').textContent = '';
+			}
 		</script>
 	</body>
 </html>

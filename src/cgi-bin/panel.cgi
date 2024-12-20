@@ -23,12 +23,11 @@ while IFS=: read -r route command || [[ -n "$route" ]]; do
 
 	if [ "$REQUEST_PATH" = "$route" ]; then
 		echo "Content-type: text/plain"
+		echo "Cache-Control: no-cache"
+		echo "X-Accel-Buffering: no"
 		echo
 
-		exec 3>&1
-		exec 1>&3
-		exec 2>&1
-		eval "$command"
+		eval "stdbuf -oL $command" 2>&1
 		exit_code=$?
 		
 		if [ $exit_code -ne 0 ]; then
