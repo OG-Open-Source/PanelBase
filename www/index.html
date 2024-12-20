@@ -702,11 +702,11 @@
 
 					const data = await response.json();
 
-					if (response.ok && data.status === 'success') {
+					if (data.status === 'success' && data.code === '200') {
 						window.location.href = '/panel.html';
 					} else {
 						let errorKey = 'error-invalid';
-						if (data.code === 'invalid_username' || data.code === 'invalid_password') {
+						if (data.code === '400') {
 							errorKey = 'error-invalid-chars';
 						}
 						errorMessage.innerHTML = `<i class="fas fa-exclamation-circle"></i>${i18n[currentLanguage][errorKey]}`;

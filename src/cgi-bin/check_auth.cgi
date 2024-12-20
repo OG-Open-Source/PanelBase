@@ -6,7 +6,7 @@ else
 	echo "Content-type: application/json"
 	echo "Status: 500"
 	echo
-	echo '{"status":"error","code":"config_not_found","message":"Security configuration file not found"}'
+	echo '{"status":"error","code":"500","message":"Security configuration file not found"}'
 	exit 1
 fi
 
@@ -79,7 +79,7 @@ SHOW_ERROR() {
 
 	if [ -n "$IS_CURL" ]; then
 		SECURITY_HEADERS "application/json" "$status"
-		echo "{\"status\":\"error\",\"code\":\"$code\",\"message\":\"$message\"}"
+		echo "{\"status\":\"error\",\"code\":\"$status\",\"message\":\"$message\"}"
 	else
 		SECURITY_HEADERS "text/html" "$status"
 		cat "$DOCUMENT_ROOT/$error_page"
@@ -89,12 +89,12 @@ SHOW_ERROR() {
 
 SHOW_FORBIDDEN() {
 	local message="$1"
-	SHOW_ERROR "403" "forbidden" "$message" "403.html"
+	SHOW_ERROR "403" "403" "$message" "403.html"
 }
 
 SHOW_NOT_FOUND() {
 	local message="$1"
-	SHOW_ERROR "404" "not_found" "$message" "404.html"
+	SHOW_ERROR "404" "404" "$message" "404.html"
 }
 
 REDIRECT_TO_LOGIN() {
@@ -103,7 +103,7 @@ REDIRECT_TO_LOGIN() {
 
 	if [ -n "$IS_CURL" ]; then
 		SECURITY_HEADERS "application/json" "401"
-		echo "{\"status\":\"error\",\"code\":\"authentication_required\",\"message\":\"Authentication required\"}"
+		echo "{\"status\":\"error\",\"code\":\"401\",\"message\":\"Authentication required\"}"
 	else
 		echo "Content-type: text/html"
 		echo "Status: 302"

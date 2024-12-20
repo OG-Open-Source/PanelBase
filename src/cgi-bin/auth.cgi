@@ -48,7 +48,7 @@ case "$ACTION" in
 			echo "Content-type: application/json"
 			echo "Status: 400"
 			echo
-			echo '{"status":"error","code":"invalid_username","message":"Invalid username format"}'
+			echo '{"status":"error","code":"400","message":"Invalid username format"}'
 			exit 0
 		fi
 
@@ -56,7 +56,7 @@ case "$ACTION" in
 			echo "Content-type: application/json"
 			echo "Status: 400"
 			echo
-			echo '{"status":"error","code":"invalid_password","message":"Invalid password format"}'
+			echo '{"status":"error","code":"400","message":"Invalid password format"}'
 			exit 0
 		fi
 
@@ -70,13 +70,13 @@ case "$ACTION" in
 			echo "Content-type: application/json"
 			echo "Status: 200"
 			echo
-			echo '{"status":"success","message":"Login successful"}'
+			echo '{"status":"success","code":"200","message":"Login successful"}'
 		else
 			sleep 1
 			echo "Content-type: application/json"
 			echo "Status: 401"
 			echo
-			echo '{"status":"error","code":"invalid_credentials","message":"Invalid username or password"}'
+			echo '{"status":"error","code":"401","message":"Invalid username or password"}'
 		fi
 		;;
 
@@ -87,7 +87,7 @@ case "$ACTION" in
 			echo "Set-Cookie: auth_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
 			echo "Status: 200"
 			echo
-			echo '{"status":"success","message":"Logout successful"}'
+			echo '{"status":"success","code":"200","message":"Logout successful"}'
 		fi
 		;;
 
@@ -98,18 +98,18 @@ case "$ACTION" in
 				echo "Content-type: application/json"
 				echo "Status: 200"
 				echo
-				echo "{\"status\":\"success\",\"username\":\"$USERNAME\"}"
+				echo "{\"status\":\"success\",\"code\":\"200\",\"message\":\"$USERNAME\"}"
 			else
 				echo "Content-type: application/json"
 				echo "Status: 401"
 				echo
-				echo '{"status":"error","code":"invalid_session","message":"Invalid session"}'
+				echo '{"status":"error","code":"401","message":"Invalid session"}'
 			fi
 		else
 			echo "Content-type: application/json"
 			echo "Status: 401"
 			echo
-			echo '{"status":"error","code":"no_session","message":"No session found"}'
+			echo '{"status":"error","code":"401","message":"No session found"}'
 		fi
 		;;
 
@@ -123,7 +123,7 @@ case "$ACTION" in
 				echo "Content-type: application/json"
 				echo "Status: 400"
 				echo
-				echo '{"status":"error","code":"invalid_username","message":"Invalid username format"}'
+				echo '{"status":"error","code":"400","message":"Invalid username format"}'
 				exit 0
 			fi
 
@@ -131,7 +131,7 @@ case "$ACTION" in
 				echo "Content-type: application/json"
 				echo "Status: 400"
 				echo
-				echo '{"status":"error","code":"invalid_password","message":"Invalid password format"}'
+				echo '{"status":"error","code":"400","message":"Invalid password format"}'
 				exit 0
 			fi
 
@@ -143,7 +143,7 @@ case "$ACTION" in
 					echo "Content-type: application/json"
 					echo "Status: 409"
 					echo
-					echo '{"status":"error","code":"username_exists","message":"Username already exists"}'
+					echo '{"status":"error","code":"409","message":"Username already exists"}'
 				else
 					sed -i "s/^$CURRENT_USERNAME:/$NEW_USERNAME:/" "$CONFIG_FILE"
 					sed -i "s/:$CURRENT_USERNAME:/:$NEW_USERNAME:/" "$SESSION_FILE"
@@ -151,20 +151,20 @@ case "$ACTION" in
 					echo "Content-type: application/json"
 					echo "Status: 200"
 					echo
-					echo '{"status":"success","message":"Username changed successfully"}'
+					echo '{"status":"success","code":"200","message":"Username changed successfully"}'
 				fi
 			else
 				sleep 1
 				echo "Content-type: application/json"
 				echo "Status: 401"
 				echo
-				echo '{"status":"error","code":"invalid_password","message":"Invalid password"}'
+				echo '{"status":"error","code":"401","message":"Invalid password"}'
 			fi
 		else
 			echo "Content-type: application/json"
 			echo "Status: 401"
 			echo
-			echo '{"status":"error","code":"no_session","message":"No session found"}'
+			echo '{"status":"error","code":"401","message":"No session found"}'
 		fi
 		;;
 
@@ -172,6 +172,6 @@ case "$ACTION" in
 		echo "Content-type: application/json"
 		echo "Status: 400"
 		echo
-		echo '{"status":"error","code":"invalid_action","message":"Invalid action"}'
+		echo '{"status":"error","code":"400","message":"Invalid action"}'
 		;;
 esac
