@@ -28,13 +28,13 @@ while IFS=: read -r route command || [[ -n "$route" ]]; do
 		echo
 
 		IFS=';' read -ra COMMANDS <<< "$command"
+		last_exit_code=0
 		for cmd in "${COMMANDS[@]}"; do
 			cmd=$(echo "$cmd" | xargs)
-			eval "$cmd" | while IFS= read -r line; do
-				echo "$line"
-			done
+			bash -c "$cmd" 2>&1
+			last_exit_code=$?
 		done
-		exit ${PIPESTATUS[0]}
+		exit $last_exit_code
 	fi
 done < "$ROUTES_FILE"
 
