@@ -24,7 +24,16 @@ while IFS=: read -r route command || [[ -n "$route" ]]; do
 	if [ "$REQUEST_PATH" = "$route" ]; then
 		echo "Content-type: application/json"
 		echo
-		eval "$command"
+
+		output=$(eval "$command" 2>&1)
+		exit_code=$?
+
+		if [ $exit_code -eq 0 ]; then
+			echo "$output"
+		else
+			echo "Failed to execute command ($exit_code)"
+			[ -n "$output" ] && echo && echo "$output"
+		fi
 		exit 0
 	fi
 done < "$ROUTES_FILE"
