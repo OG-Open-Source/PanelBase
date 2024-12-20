@@ -27,14 +27,14 @@ while IFS=: read -r route command || [[ -n "$route" ]]; do
 		echo "X-Accel-Buffering: no"
 		echo
 
-		eval "stdbuf -oL $command" 2>&1
-		exit_code=$?
-		
-		if [ $exit_code -ne 0 ]; then
-			echo "Failed to execute command ($exit_code)"
-		fi
-		
-		exit $exit_code
+		IFS=';' read -ra COMMANDS <<< "$command"
+		for cmd in "${COMMANDS[@]}"; do
+			cmd=$(echo "$cmd" | xargs)
+			eval "$cmd" | while IFS= read -r line; do
+				echo "$line"
+			done
+		done
+		exit ${PIPESTATUS[0]}
 	fi
 done < "$ROUTES_FILE"
 
