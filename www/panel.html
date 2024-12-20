@@ -268,54 +268,58 @@
 			.terminal {
 				background: var(--terminal-bg);
 				border-radius: var(--border-radius);
-				overflow: hidden;
+				padding: 20px;
+				color: var(--terminal-text);
+				font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+				font-size: 14px;
+				line-height: 1.5;
+				overflow-y: auto;
+				max-height: 400px;
+				position: relative;
+				margin-top: 20px;
 			}
 
 			.terminal-header {
-				padding: 12px;
-				background: rgba(255, 255, 255, 0.1);
+				background: var(--terminal-header-bg);
+				padding: 8px 16px;
+				border-radius: var(--border-radius) var(--border-radius) 0 0;
 				display: flex;
 				justify-content: space-between;
 				align-items: center;
+				margin: -20px -20px 16px;
 			}
 
 			.terminal-title {
-				color: var(--terminal-text);
 				font-size: 14px;
-				display: flex;
-				align-items: center;
-				gap: 8px;
+				font-weight: 500;
 			}
 
-			.terminal-actions {
+			.terminal-buttons {
 				display: flex;
 				gap: 8px;
 			}
 
 			.terminal-button {
-				background: none;
-				border: none;
-				color: var(--terminal-text);
-				opacity: 0.7;
-				cursor: pointer;
-				padding: 4px 8px;
+				padding: 4px 12px;
 				border-radius: var(--border-radius-sm);
+				background: transparent;
+				color: var(--terminal-text);
+				border: 1px solid var(--terminal-text);
+				cursor: pointer;
 				transition: all 0.3s ease;
 			}
 
 			.terminal-button:hover {
-				opacity: 1;
-				background: rgba(255, 255, 255, 0.1);
+				background: var(--terminal-button-hover);
 			}
 
-			.terminal-content {
-				padding: 12px;
-				font-family: monospace;
-				color: var(--terminal-text);
+			.terminal-output {
 				white-space: pre-wrap;
-				max-height: 300px;
-				overflow-y: auto;
-				background: var(--terminal-bg);
+				word-wrap: break-word;
+			}
+
+			.terminal-output .error {
+				color: var(--error-color);
 			}
 
 			.progress-bar {
@@ -570,23 +574,13 @@
 				<div class="stat-card">
 					<div class="terminal">
 						<div class="terminal-header">
-							<div class="terminal-title">
-								<i class="fas fa-terminal"></i>
-								<span data-i18n="terminal-title">系統更新</span>
-							</div>
-							<div class="terminal-actions">
-								<button class="terminal-button" onclick="startUpdate()" id="updateButton">
-									<i class="fas fa-sync-alt"></i>
-								</button>
-								<button class="terminal-button" onclick="clearTerminal()">
-									<i class="fas fa-trash"></i>
-								</button>
+							<div class="terminal-title">系統更新</div>
+							<div class="terminal-buttons">
+								<button class="terminal-button" onclick="startUpdate()">開始更新</button>
+								<button class="terminal-button" onclick="clearTerminal()">清除</button>
 							</div>
 						</div>
-						<div class="terminal-content" id="terminalOutput"></div>
-						<div class="progress-bar">
-							<div class="progress-fill" id="updateProgress"></div>
-						</div>
+						<div class="terminal-output"></div>
 					</div>
 				</div>
 			</main>

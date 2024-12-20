@@ -22,19 +22,20 @@ while IFS=: read -r route command || [[ -n "$route" ]]; do
 	command=$(echo "$command" | xargs)
 
 	if [ "$REQUEST_PATH" = "$route" ]; then
-		echo "Content-type: application/json"
+		echo "Content-type: text/plain"
 		echo
 
-		output=$(eval "$command" 2>&1)
+		exec 3>&1
+		exec 1>&3
+		exec 2>&1
+		eval "$command"
 		exit_code=$?
-
-		if [ $exit_code -eq 0 ]; then
-			echo "$output"
-		else
+		
+		if [ $exit_code -ne 0 ]; then
 			echo "Failed to execute command ($exit_code)"
-			[ -n "$output" ] && echo && echo "$output"
 		fi
-		exit 0
+		
+		exit $exit_code
 	fi
 done < "$ROUTES_FILE"
 

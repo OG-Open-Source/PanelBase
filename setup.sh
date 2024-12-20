@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta122"
+Version="Beta123"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -116,7 +116,7 @@ fi
 
 [ -f /etc/os-release ] && { source /etc/os-release; OS=$NAME; } || { error "無法確定操作系統類型"; exit 1; }
 
-TASK "正在安裝必要的套件" "deps=(curl wget lighttpd); CHECK_DEPS -a;" true
+TASK "正在安裝必要的套件" "deps=(curl wget lighttpd expect); CHECK_DEPS -a;" true
 
 INSTALL_DIR="/opt/panelbase"
 TASK "創建必要的目錄" "ADD -d $INSTALL_DIR/{www,cgi-bin,config,logs}" true
