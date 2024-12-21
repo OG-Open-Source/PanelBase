@@ -835,10 +835,19 @@
 
 			async function startUpdate() {
 				const terminal = document.querySelector('.terminal-output');
-				terminal.textContent = '正在更新系統...\n';
+				terminal.textContent = 'Starting system update...\n';
 				
 				try {
-					const response = await fetch('/cgi-bin/panel.cgi/api/panel/system_update');
+					const response = await fetch('/cgi-bin/panel.cgi/api/panel/system_update', {
+							headers: {
+								'Accept': 'text/plain'
+							}
+						});
+
+					if (!response.ok) {
+						throw new Error(`HTTP error! status: ${response.status}`);
+					}
+
 					const reader = response.body.getReader();
 					const decoder = new TextDecoder();
 
@@ -851,7 +860,8 @@
 						terminal.scrollTop = terminal.scrollHeight;
 					}
 				} catch (error) {
-					terminal.innerHTML += `\n<span class="error">錯誤：${error.message}</span>`;
+					terminal.textContent += `\nError: ${error.message}\n`;
+					terminal.scrollTop = terminal.scrollHeight;
 				}
 			}
 

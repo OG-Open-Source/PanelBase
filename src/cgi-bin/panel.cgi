@@ -20,9 +20,47 @@ fi
 
 REQUEST_PATH=$(echo "$REQUEST_URI" | cut -d'?' -f1 | sed 's/\/cgi-bin\/panel\.cgi//')
 QUERY_STRING="${QUERY_STRING:-}"
+ACCEPT_HEADER="${HTTP_ACCEPT:-application/json}"
 
 log_command() {
 	echo "[$(date '+%Y-%m-%d %H:%M:%S')] $2" >> "$ACCESS_LOG"
+}
+
+output_result() {
+	local status="$1"
+	local code="$2"
+	local message="$3"
+	local output="$4"
+	local current="$5"
+	local total="$6"
+	local cmd="$7"
+
+	if [[ "$ACCEPT_HEADER" == *"text/plain"* ]]; then
+		echo "Content-type: text/plain"
+		echo "Cache-Control: no-cache"
+		[ "$status" = "error" ] && echo "Status: $code"
+		echo
+		if [ "$status" = "error" ]; then
+			echo "Execution failed (${current}/${total}): $cmd"
+			echo "Error code: $code"
+			echo "Error message:"
+			echo "$output"
+		else
+			[ -n "$cmd" ] && echo "Executing command (${current}/${total}): $cmd"
+			[ -n "$output" ] && echo "$output"
+			[ -n "$cmd" ] && echo "----------------------------------------"
+			fi
+	else
+		echo "Content-type: application/json"
+		echo "Cache-Control: no-cache"
+		[ "$status" = "error" ] && echo "Status: $code"
+		echo
+		if [ -n "$output" ]; then
+			echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"$message\",\"output\":\"$(echo "$output" | sed 's/"/\\"/g' | tr '\n' ' ')\"}"
+		else
+			echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"$message\"}"
+		fi
+	fi
 }
 
 execute_command() {
@@ -52,10 +90,7 @@ execute_command() {
 			execute_command "$commands"
 			return $?
 		fi
-		echo "Content-type: application/json"
-		echo "Cache-Control: no-cache"
-		echo
-		echo '{"status":"success","code":"0","message":"All commands completed"}'
+		output_result "success" "0" "All commands completed" "" "" "" ""
 		return 0
 	fi
 
@@ -69,21 +104,24 @@ execute_command() {
 	if [ $exit_code -eq 0 ]; then
 		sed -i "${current_command}s/^${current_command}|/&[Done] /" "$temp_file"
 		log_command "$date_prefix" "(${current_command}/${total_commands}) Completed successfully"
-		echo "Content-type: application/json"
-		echo "Cache-Control: no-cache"
-		echo
+		
 		if [ $current_command -eq $total_commands ]; then
-			echo '{"status":"success","code":"0","message":"All commands completed"}'
+			if [ $(grep -c "\[Done\]" "$temp_file") -eq $total_commands ]; then
+				output_result "success" "0" "All commands completed" "$output" "$current_command" "$total_commands" "$cmd"
+				rm -f "$temp_file"
+				for ((i=0; i<total_commands; i++)); do
+					echo "$((i+1))|${CMD_ARRAY[i]}" >> "$temp_file"
+					done
+				execute_command "$commands"
+				return $?
+			fi
 		else
-			echo "{\"status\":\"success\",\"code\":\"0\",\"message\":\"Command executed to ${current_command}/${total_commands}\"}"
+			output_result "success" "0" "Command executed to ${current_command}/${total_commands}" "$output" "$current_command" "$total_commands" "$cmd"
 		fi
 	else
 		sed -i "${current_command}s/^${current_command}|/&[Failed] /" "$temp_file"
 		log_command "$date_prefix" "(${current_command}/${total_commands}) Failed with code $exit_code"
-		echo "Content-type: application/json"
-		echo "Status: 500"
-		echo
-		echo "{\"status\":\"error\",\"code\":\"$exit_code\",\"message\":\"Command failed at ${current_command}/${total_commands}: $output\"}"
+		output_result "error" "$exit_code" "Command failed at ${current_command}/${total_commands}" "$output" "$current_command" "$total_commands" "$cmd"
 	fi
 
 	return $exit_code
@@ -102,7 +140,4 @@ while IFS=: read -r route command || [[ -n "$route" ]]; do
 	fi
 done < "$ROUTES_FILE"
 
-echo "Content-type: application/json"
-echo "Status: 404"
-echo
-echo '{"status":"error","code":"404","message":"API endpoint not found"}'
+output_result "error" "404" "API endpoint not found" "" "" "" ""

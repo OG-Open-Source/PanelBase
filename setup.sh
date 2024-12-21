@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta137"
+Version="Beta138"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -293,6 +293,6 @@ text "│            安裝完成            │"
 text "╰────────────────────────────────╯"
 text "${CLR8}►${CLR0} 訪問地址: ${GREEN}http://${SERVER_IP}:${PANEL_PORT}${CLR0}"
 text "${CLR8}►${CLR0} 登入信息:"
-text "  - 用戶名: ${GREEN}${ADMIN_NAME}${CLR0}"
+text "  - 用戶: ${GREEN}${ADMIN_NAME}${CLR0}"
 text "  - 密碼: ${GREEN}${ADMIN_PASS}${CLR0}"
 [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]] && text "${CLR8}►${CLR0} 使用自定義面板頁面"
