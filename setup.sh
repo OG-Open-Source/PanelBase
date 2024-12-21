@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta135"
+Version="Beta136"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -108,10 +108,10 @@ fi
 
 [ -f /etc/os-release ] && { source /etc/os-release; OS=$NAME; } || { error "無法確定操作系統類型"; exit 1; }
 
-TASK "  正在安裝必要的套件" "deps=(curl wget lighttpd expect); CHECK_DEPS -a;" true
+TASK "  正在安裝必要的套件" "deps=(curl wget lighttpd expect); CHECK_DEPS -a;"
 
 INSTALL_DIR="/opt/panelbase"
-TASK "  創建必要的目錄" "ADD -d $INSTALL_DIR/{www,cgi-bin,config,logs}" true
+TASK "  創建必要的目錄" "ADD -d $INSTALL_DIR/{www,cgi-bin,config,logs}"
 
 text "  下載面板文件..."
 BASE_URL="https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main"
@@ -194,7 +194,7 @@ if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	text "  ${CLR2}自定義面板文件安裝完成${CLR0}"
 fi
 
-text "配置 lighttpd..."
+text "  配置 lighttpd..."
 cat > /etc/lighttpd/lighttpd.conf << EOF
 server.modules = (
 	"mod_access",
@@ -260,23 +260,15 @@ index-file.names = ( "index.html" )
 static-file.exclude-extensions = ( ".cgi" )
 EOF
 
-text "  創建用戶配置..."
-text "${ADMIN_NAME}:$(echo -n "${ADMIN_PASS}" | md5sum | cut -d' ' -f1)" > $INSTALL_DIR/config/user.conf
-touch $INSTALL_DIR/config/sessions.conf
+TASK "  創建用戶配置" "echo '${ADMIN_NAME}:$(echo -n "${ADMIN_PASS}" | md5sum | cut -d' ' -f1)' > $INSTALL_DIR/config/user.conf && touch $INSTALL_DIR/config/sessions.conf"
 
-text "  設置權限..."
-if ! id -u www-data >/dev/null 2>&1; then
-	useradd -r -s /usr/sbin/nologin www-data
-fi
-
+TASK "  設置權限" "if ! id -u www-data >/dev/null 2>&1; then useradd -r -s /usr/sbin/nologin www-data; fi"
 find "$INSTALL_DIR" -type d -exec chmod "$DIR_MODE" {} \;
-
 for dir in "${!FILE_PERMISSIONS[@]}"; do
 	if [ -d "$INSTALL_DIR/$dir" ]; then
 		find "$INSTALL_DIR/$dir" -type f -exec chmod "${FILE_PERMISSIONS[$dir]}" {} \;
 	fi
 done
-
 chmod "$CONFIG_MODE" "$INSTALL_DIR/config/user.conf"
 chmod "$CONFIG_MODE" "$INSTALL_DIR/config/sessions.conf"
 chmod "$CONFIG_MODE" "$INSTALL_DIR/config/security.conf"
@@ -288,16 +280,14 @@ mkdir -p /var/log/lighttpd
 chown -R www-data:www-data /var/log/lighttpd
 chmod "$DIR_MODE" /var/log/lighttpd
 
-text "  配置 sudo 權限..."
-cat > /etc/sudoers.d/panelbase << EOF
+TASK "  配置 sudo 權限" "cat > /etc/sudoers.d/panelbase << EOF
 www-data ALL=(ALL) NOPASSWD: ALL
 EOF
-chmod 440 /etc/sudoers.d/panelbase
+chmod 440 /etc/sudoers.d/panelbase"
 
-TASK "  重啟 lighttpd 服務" "systemctl restart lighttpd" true
+TASK "  重啟 lighttpd 服務" "systemctl restart lighttpd"
 
 SERVER_IP=$(hostname -I | awk '{print $1}')
-text
 text "╭────────────────────────────────╮"
 text "│            安裝完成            │"
 text "╰────────────────────────────────╯"

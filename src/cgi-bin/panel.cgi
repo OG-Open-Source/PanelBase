@@ -51,6 +51,9 @@ execute_command() {
 
 	local next_cmd=$(grep -v "\[Done\]\|\[Failed\]" "$temp_file" | head -n1)
 	if [ -z "$next_cmd" ]; then
+		if [ $(grep -c "\[Done\]" "$temp_file") -eq $total_commands ]; then
+			rm -f "$temp_file"
+		fi
 		echo "Content-type: application/json"
 		echo "Cache-Control: no-cache"
 		echo
