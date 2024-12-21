@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta133"
+Version="Beta134"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -42,14 +42,19 @@ declare -A FILE_PATHS=(
 )
 
 CLEAN
-text "${CLR3}=================================${CLR0}"
-text "${CLR3}=      PanelBase  安裝程序      =${CLR0}$Version"
-text "${CLR3}=================================${CLR0}"
+text "╭────────────────────────────────╮"
+text "│  ${CLR3}$Version${CLR0}"
+text "│────────────────────────────────╮"
+text "│                                │"
+text "│       PanelBase 安裝程序       │"
+text "│                                │"
+text "╰────────────────────────────────╯"
 
 CHECK_ROOT
 
-INPUT "請輸入管理員用戶名：" ADMIN_NAME
-ADMIN_NAME=${ADMIN_NAME:-admin}
+text "${CLR8}►${CLR0} 基本設置"
+text "  ──────────────"
+INPUT "  管理員用戶名: " ADMIN_NAME
 
 if ! [[ $ADMIN_NAME =~ ^[A-Za-z0-9]+$ ]]; then
 	error "用戶名只能包含英文字母和數字"
@@ -57,28 +62,12 @@ if ! [[ $ADMIN_NAME =~ ^[A-Za-z0-9]+$ ]]; then
 fi
 
 while true; do
-	read -s -p "請輸入管理員密碼：" ADMIN_PASS
-	ADMIN_PASS=${ADMIN_PASS:-1917159}
-	text
-	read -s -p "請再次輸入密碼：" ADMIN_PASS2
-	ADMIN_PASS2=${ADMIN_PASS2:-1917159}
-	text
-
-	if [ "$ADMIN_PASS" = "$ADMIN_PASS2" ]; then
-		if [ ${#ADMIN_PASS} -lt 6 ]; then
-			error "密碼長度必須至少為 6 個字符"
-			continue
-		fi
-
-		if ! [[ $ADMIN_PASS =~ ^[A-Za-z0-9!@$]+$ ]]; then
-			error "密碼只能包含英文字母、數字和特殊符號 !@$"
-			continue
-		fi
-
-		break
-	else
-		error "兩次輸入的密碼不一致，請重新輸入"
-	fi
+	read -s -p "  管理員密碼: " ADMIN_PASS
+	echo
+	read -s -p "  確認密碼: " ADMIN_PASS_CONFIRM
+	echo
+	[ "$ADMIN_PASS" = "$ADMIN_PASS_CONFIRM" ] && break
+	error "密碼不匹配，請重試"
 done
 
 while true; do
@@ -300,16 +289,17 @@ text "配置 sudo 權限..."
 cat > /etc/sudoers.d/panelbase << EOF
 www-data ALL=(ALL) NOPASSWD: ALL
 EOF
-chmod 440 /etc/sudoers.d/panelbase 
+chmod 440 /etc/sudoers.d/panelbase
 
 TASK "重啟 lighttpd 服務" "systemctl restart lighttpd" true
 
 SERVER_IP=$(hostname -I | awk '{print $1}')
-
-text "================================="
-text "安裝完成！"
-text "請訪問 http://${SERVER_IP}:$PANEL_PORT"
-text "用戶：$ADMIN_NAME"
-text "密碼：$ADMIN_PASS"
-[[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]] && text "已使用自定義面板頁面"
-text "================================="
+text
+text "╭────────────────────────────────╮"
+text "│            安裝完成            │"
+text "╰────────────────────────────────╯"
+text "${CLR8}►${CLR0} 訪問地址: ${GREEN}http://${SERVER_IP}:${PANEL_PORT}${CLR0}"
+text "${CLR8}►${CLR0} 登入信息:"
+text "  - 用戶名: ${GREEN}${ADMIN_NAME}${CLR0}"
+text "  - 密碼: ${GREEN}${ADMIN_PASS}${CLR0}"
+[[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]] && text "${CLR8}►${CLR0} 使用自定義面板頁面"

@@ -27,18 +27,22 @@ log_command() {
 
 execute_command() {
 	local commands="$1"
-	local timestamp=$(date '+%Y%m%d%H%M%S')
-	local temp_file="$TEMP_DIR/${timestamp}.log"
+	local date_prefix=$(date '+%Y-%m-%d')
+	local api_path=$(echo "$REQUEST_PATH" | sed 's/\//_/g')
+	local temp_file="$TEMP_DIR/${date_prefix}${api_path}.log"
 	local total_commands=0
 	local current_command=0
 
 	IFS=';' read -ra CMD_ARRAY <<< "$commands"
 	total_commands=${#CMD_ARRAY[@]}
 
-	local existing_log=$(find "$TEMP_DIR" -name "*.log" -type f -exec grep -l "^1|$commands" {} \; | sort | head -n1)
-	
-	if [ -n "$existing_log" ]; then
-		temp_file="$existing_log"
+	if [ -f "$temp_file" ]; then
+		if grep -q "\[Failed\]" "$temp_file"; then
+			: > "$temp_file"
+			for ((i=0; i<total_commands; i++)); do
+				echo "$((i+1))|${CMD_ARRAY[i]}" >> "$temp_file"
+			done
+		fi
 	else
 		for ((i=0; i<total_commands; i++)); do
 			echo "$((i+1))|${CMD_ARRAY[i]}" >> "$temp_file"
@@ -57,13 +61,13 @@ execute_command() {
 	current_command=$(echo "$next_cmd" | cut -d'|' -f1)
 	local cmd=$(echo "$next_cmd" | cut -d'|' -f2)
 
-	log_command "$timestamp" "(${current_command}/${total_commands}) Executing: $cmd"
+	log_command "$date_prefix" "(${current_command}/${total_commands}) Executing: $cmd"
 	output=$(bash -c "$cmd" 2>&1)
 	exit_code=$?
 
 	if [ $exit_code -eq 0 ]; then
 		sed -i "${current_command}s/^${current_command}|/&[Done] /" "$temp_file"
-		log_command "$timestamp" "(${current_command}/${total_commands}) Completed successfully"
+		log_command "$date_prefix" "(${current_command}/${total_commands}) Completed successfully"
 		echo "Content-type: application/json"
 		echo "Cache-Control: no-cache"
 		echo
@@ -74,7 +78,7 @@ execute_command() {
 		fi
 	else
 		sed -i "${current_command}s/^${current_command}|/&[Failed] /" "$temp_file"
-		log_command "$timestamp" "(${current_command}/${total_commands}) Failed with code $exit_code"
+		log_command "$date_prefix" "(${current_command}/${total_commands}) Failed with code $exit_code"
 		echo "Content-type: application/json"
 		echo "Status: 500"
 		echo
