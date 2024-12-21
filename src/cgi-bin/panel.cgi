@@ -108,10 +108,11 @@ execute_command() {
 		if [ $current_command -eq $total_commands ]; then
 			if [ $(grep -c "\[Done\]" "$temp_file") -eq $total_commands ]; then
 				output_result "success" "0" "All commands completed" "$output" "$current_command" "$total_commands" "$cmd"
+				sed -i "${current_command}s/^${current_command}|/&[Done] /" "$temp_file"
 				rm -f "$temp_file"
 				for ((i=0; i<total_commands; i++)); do
 					echo "$((i+1))|${CMD_ARRAY[i]}" >> "$temp_file"
-					done
+				done
 				execute_command "$commands"
 				return $?
 			fi
