@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta134"
+Version="Beta135"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -55,6 +55,7 @@ CHECK_ROOT
 text "${CLR8}►${CLR0} 基本設置"
 text "  ──────────────"
 INPUT "  管理員用戶名: " ADMIN_NAME
+ADMIN_NAME=${ADMIN_NAME:-admin}
 
 if ! [[ $ADMIN_NAME =~ ^[A-Za-z0-9]+$ ]]; then
 	error "用戶名只能包含英文字母和數字"
@@ -63,15 +64,17 @@ fi
 
 while true; do
 	read -s -p "  管理員密碼: " ADMIN_PASS
+	ADMIN_PASS=${ADMIN_PASS:-1917159}
 	echo
 	read -s -p "  確認密碼: " ADMIN_PASS_CONFIRM
+	ADMIN_PASS_CONFIRM=${ADMIN_PASS_CONFIRM:-1917159}
 	echo
 	[ "$ADMIN_PASS" = "$ADMIN_PASS_CONFIRM" ] && break
 	error "密碼不匹配，請重試"
 done
 
 while true; do
-	INPUT "請輸入面板端口 (1024-65535，預設: 8080)：" PANEL_PORT
+	INPUT "  請輸入面板端口 (1024-65535)：" PANEL_PORT
 	PANEL_PORT=${PANEL_PORT:-8080}
 
 	if ! [[ $PANEL_PORT =~ ^[0-9]+$ ]]; then
@@ -92,11 +95,11 @@ while true; do
 	break
 done
 
-INPUT "是否使用自定義的面板頁面？(y/N) " USE_CUSTOM_HTML
+INPUT "  是否使用自定義的面板頁面？(y/N) " USE_CUSTOM_HTML
 USE_CUSTOM_HTML=${USE_CUSTOM_HTML:-n}
 
 if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
-	INPUT "請輸入自定義面板壓縮檔的路徑：" CUSTOM_ARCHIVE_PATH
+	INPUT "    請輸入自定義面板壓縮檔的路徑：" CUSTOM_ARCHIVE_PATH
 	[ ! -f "$CUSTOM_ARCHIVE_PATH" ] && { error "找不到指定的壓縮檔"; exit 1; }
 	FILE_EXT="${CUSTOM_ARCHIVE_PATH##*.}"
 	deps=(unzip tar)
@@ -105,12 +108,12 @@ fi
 
 [ -f /etc/os-release ] && { source /etc/os-release; OS=$NAME; } || { error "無法確定操作系統類型"; exit 1; }
 
-TASK "正在安裝必要的套件" "deps=(curl wget lighttpd expect); CHECK_DEPS -a;" true
+TASK "  正在安裝必要的套件" "deps=(curl wget lighttpd expect); CHECK_DEPS -a;" true
 
 INSTALL_DIR="/opt/panelbase"
-TASK "創建必要的目錄" "ADD -d $INSTALL_DIR/{www,cgi-bin,config,logs}" true
+TASK "  創建必要的目錄" "ADD -d $INSTALL_DIR/{www,cgi-bin,config,logs}" true
 
-text "下載面板文件..."
+text "  下載面板文件..."
 BASE_URL="https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main"
 TMP_DIR=$(mktemp -d)
 
@@ -121,7 +124,7 @@ download_files() {
 	local source_path="${FILE_PATHS[$dir]}"
 
 	for file in $files; do
-		text "下載 $dir/$file..."
+		text "  下載 $dir/$file..."
 		local source_url="$BASE_URL/$source_path/$file"
 
 		if ! curl -sSL -o "$TMP_DIR/$file" "$source_url"; then
@@ -153,21 +156,21 @@ done
 rm -rf "$TMP_DIR"
 
 if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
-	text "正在處理自定義面板文件..."
+	text "  正在處理自定義面板文件..."
 	TMP_DIR=$(mktemp -d)
-	text "臨時目錄：$TMP_DIR"
+	text "  臨時目錄：$TMP_DIR"
 
 	case "${CUSTOM_ARCHIVE_PATH##*.}" in
 		"zip")
-			text "解壓縮 ZIP 文件..."
+			text "  解壓縮 ZIP 文件..."
 			unzip -q "$CUSTOM_ARCHIVE_PATH" -d "$TMP_DIR"
 			;;
 		"tar")
-			text "解壓縮 TAR 文件..."
+			text "  解壓縮 TAR 文件..."
 			tar xf "$CUSTOM_ARCHIVE_PATH" -C "$TMP_DIR"
 			;;
 		"gz"|"tgz")
-			text "解壓縮 GZIP 文件..."
+			text "  解壓縮 GZIP 文件..."
 			tar xzf "$CUSTOM_ARCHIVE_PATH" -C "$TMP_DIR"
 			;;
 	esac
@@ -188,7 +191,7 @@ if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	find "$PANEL_DIR" -type d ! -path "$PANEL_DIR" -exec cp -rf {} "$INSTALL_DIR/www/" \;
 
 	rm -rf "$TMP_DIR"
-	text "${CLR2}自定義面板文件安裝完成${CLR0}"
+	text "  ${CLR2}自定義面板文件安裝完成${CLR0}"
 fi
 
 text "配置 lighttpd..."
@@ -257,11 +260,11 @@ index-file.names = ( "index.html" )
 static-file.exclude-extensions = ( ".cgi" )
 EOF
 
-text "創建用戶配置..."
+text "  創建用戶配置..."
 text "${ADMIN_NAME}:$(echo -n "${ADMIN_PASS}" | md5sum | cut -d' ' -f1)" > $INSTALL_DIR/config/user.conf
 touch $INSTALL_DIR/config/sessions.conf
 
-text "設置權限..."
+text "  設置權限..."
 if ! id -u www-data >/dev/null 2>&1; then
 	useradd -r -s /usr/sbin/nologin www-data
 fi
@@ -285,13 +288,13 @@ mkdir -p /var/log/lighttpd
 chown -R www-data:www-data /var/log/lighttpd
 chmod "$DIR_MODE" /var/log/lighttpd
 
-text "配置 sudo 權限..."
+text "  配置 sudo 權限..."
 cat > /etc/sudoers.d/panelbase << EOF
 www-data ALL=(ALL) NOPASSWD: ALL
 EOF
 chmod 440 /etc/sudoers.d/panelbase
 
-TASK "重啟 lighttpd 服務" "systemctl restart lighttpd" true
+TASK "  重啟 lighttpd 服務" "systemctl restart lighttpd" true
 
 SERVER_IP=$(hostname -I | awk '{print $1}')
 text
