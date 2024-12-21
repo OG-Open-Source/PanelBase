@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta136"
+Version="Beta137"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -58,7 +58,7 @@ INPUT "  管理員用戶名: " ADMIN_NAME
 ADMIN_NAME=${ADMIN_NAME:-admin}
 
 if ! [[ $ADMIN_NAME =~ ^[A-Za-z0-9]+$ ]]; then
-	error "用戶名只能包含英文字母和數字"
+	error "  用戶名只能包含英文字母和數字"
 	exit 1
 fi
 
@@ -70,7 +70,7 @@ while true; do
 	ADMIN_PASS_CONFIRM=${ADMIN_PASS_CONFIRM:-1917159}
 	echo
 	[ "$ADMIN_PASS" = "$ADMIN_PASS_CONFIRM" ] && break
-	error "密碼不匹配，請重試"
+	error "  密碼不匹配，請重試"
 done
 
 while true; do
@@ -78,17 +78,17 @@ while true; do
 	PANEL_PORT=${PANEL_PORT:-8080}
 
 	if ! [[ $PANEL_PORT =~ ^[0-9]+$ ]]; then
-		error "端口必須是數字"
+		error "  端口必須是數字"
 		continue
 	fi
 
 	if [ $PANEL_PORT -lt 1024 ] || [ $PANEL_PORT -gt 65535 ]; then
-		error "端口必須在 1024-65535 之間"
+		error "  端口必須在 1024-65535 之間"
 		continue
 	fi
 
 	if netstat -tuln | grep -q ":$PANEL_PORT "; then
-		error "端口 $PANEL_PORT 已被占用"
+		error "  端口 $PANEL_PORT 已被占用"
 		continue
 	fi
 
@@ -100,13 +100,13 @@ USE_CUSTOM_HTML=${USE_CUSTOM_HTML:-n}
 
 if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	INPUT "    請輸入自定義面板壓縮檔的路徑：" CUSTOM_ARCHIVE_PATH
-	[ ! -f "$CUSTOM_ARCHIVE_PATH" ] && { error "找不到指定的壓縮檔"; exit 1; }
+	[ ! -f "$CUSTOM_ARCHIVE_PATH" ] && { error "  找不到指定的壓縮檔"; exit 1; }
 	FILE_EXT="${CUSTOM_ARCHIVE_PATH##*.}"
 	deps=(unzip tar)
 	CHECK_DEPS -a
 fi
 
-[ -f /etc/os-release ] && { source /etc/os-release; OS=$NAME; } || { error "無法確定操作系統類型"; exit 1; }
+[ -f /etc/os-release ] && { source /etc/os-release; OS=$NAME; } || { error "  無法確定操作系統類型"; exit 1; }
 
 TASK "  正在安裝必要的套件" "deps=(curl wget lighttpd expect); CHECK_DEPS -a;"
 
@@ -128,7 +128,7 @@ download_files() {
 		local source_url="$BASE_URL/$source_path/$file"
 
 		if ! curl -sSL -o "$TMP_DIR/$file" "$source_url"; then
-			error "無法下載 $file"
+			error "  無法下載 $file"
 			return 1
 		fi
 
@@ -147,7 +147,7 @@ for dir in "${!FILES[@]}"; do
 	if [ -n "${FILES[$dir]}" ]; then
 		if ! download_files "$dir" "${FILES[$dir]}"; then
 			rm -rf "$TMP_DIR"
-			error "安裝失敗"
+			error "  安裝失敗"
 			exit 1
 		fi
 	fi
@@ -178,8 +178,8 @@ if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	PANEL_HTML=$(find "$TMP_DIR" -name "panel.html" -type f)
 
 	if [ -z "$PANEL_HTML" ]; then
-		error "在壓縮檔中找不到 panel.html 文件"
-		error "請確保文件名稱正確（區分大小寫）"
+		error "  在壓縮檔中找不到 panel.html 文件"
+		error "  請確保文件名稱正確（區分大小寫）"
 		rm -rf "$TMP_DIR"
 		exit 1
 	fi

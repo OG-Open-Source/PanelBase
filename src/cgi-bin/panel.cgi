@@ -36,14 +36,7 @@ execute_command() {
 	IFS=';' read -ra CMD_ARRAY <<< "$commands"
 	total_commands=${#CMD_ARRAY[@]}
 
-	if [ -f "$temp_file" ]; then
-		if grep -q "\[Failed\]" "$temp_file"; then
-			: > "$temp_file"
-			for ((i=0; i<total_commands; i++)); do
-				echo "$((i+1))|${CMD_ARRAY[i]}" >> "$temp_file"
-			done
-		fi
-	else
+	if [ ! -f "$temp_file" ]; then
 		for ((i=0; i<total_commands; i++)); do
 			echo "$((i+1))|${CMD_ARRAY[i]}" >> "$temp_file"
 		done
@@ -53,6 +46,11 @@ execute_command() {
 	if [ -z "$next_cmd" ]; then
 		if [ $(grep -c "\[Done\]" "$temp_file") -eq $total_commands ]; then
 			rm -f "$temp_file"
+			for ((i=0; i<total_commands; i++)); do
+				echo "$((i+1))|${CMD_ARRAY[i]}" >> "$temp_file"
+			done
+			execute_command "$commands"
+			return $?
 		fi
 		echo "Content-type: application/json"
 		echo "Cache-Control: no-cache"
