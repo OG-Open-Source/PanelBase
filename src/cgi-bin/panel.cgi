@@ -25,55 +25,59 @@ log_command() {
 	echo "[$(date '+%Y-%m-%d %H:%M:%S')] $2" >> "$ACCESS_LOG"
 }
 
-execute_commands() {
+execute_command() {
 	local commands="$1"
 	local timestamp=$(date '+%Y%m%d%H%M%S')
 	local temp_file="$TEMP_DIR/${timestamp}.log"
 	local total_commands=0
 	local current_command=0
-	local all_output=""
-	local final_exit_code=0
 
-	IFS=';' read -ra CMD_ARRAY <<< "$commands"
-	total_commands=${#CMD_ARRAY[@]}
-
-	for ((i=0; i<total_commands; i++)); do
-		echo "$((i+1))|${CMD_ARRAY[i]}" >> "$temp_file"
-	done
-
-	for ((i=0; i<total_commands; i++)); do
-		current_command=$((i+1))
-		cmd="${CMD_ARRAY[i]}"
-		
-		log_command "$timestamp" "(${current_command}/${total_commands}) Executing: $cmd"
-		
-		output=$(eval "$cmd" 2>&1)
-		exit_code=$?
-		
-		all_output="${all_output}${output}\n"
-		
-		if [ $exit_code -eq 0 ]; then
-			sed -i "${current_command}s/^${current_command}|/&[Done] /" "$temp_file"
-			log_command "$timestamp" "(${current_command}/${total_commands}) Completed successfully"
-		else
-			sed -i "${current_command}s/^${current_command}|/&[Failed] /" "$temp_file"
-			log_command "$timestamp" "(${current_command}/${total_commands}) Failed with code $exit_code"
-			final_exit_code=$exit_code
-			break
-		fi
-	done
-
-	if [ $final_exit_code -eq 0 ]; then
-		if [ $current_command -eq $total_commands ]; then
-			echo "{\"status\":\"success\",\"code\":\"0\",\"message\":\"Command executed successfully\"}"
-		else
-			echo "{\"status\":\"success\",\"code\":\"0\",\"message\":\"Command executed to ${current_command}/${total_commands}\"}"
-		fi
+	local existing_log=$(find "$TEMP_DIR" -name "*.log" -type f -exec grep -l "^1|$commands" {} \; | sort | head -n1)
+	
+	if [ -n "$existing_log" ]; then
+		temp_file="$existing_log"
 	else
-		echo "{\"status\":\"error\",\"code\":\"$final_exit_code\",\"message\":\"Command failed at ${current_command}/${total_commands}: ${output}\"}"
+		IFS=';' read -ra CMD_ARRAY <<< "$commands"
+		total_commands=${#CMD_ARRAY[@]}
+		for ((i=0; i<total_commands; i++)); do
+			echo "$((i+1))|${CMD_ARRAY[i]}" >> "$temp_file"
+		done
 	fi
 
-	return $final_exit_code
+	local next_cmd=$(grep -v "\[Done\]\|\[Failed\]" "$temp_file" | head -n1)
+	if [ -z "$next_cmd" ]; then
+		echo "Content-type: application/json"
+		echo "Cache-Control: no-cache"
+		echo
+		echo '{"status":"success","code":"0","message":"All commands completed"}'
+		return 0
+	fi
+
+	current_command=$(echo "$next_cmd" | cut -d'|' -f1)
+	local cmd=$(echo "$next_cmd" | cut -d'|' -f2)
+	total_commands=$(wc -l < "$temp_file")
+
+	log_command "$timestamp" "(${current_command}/${total_commands}) Executing: $cmd"
+	output=$(eval "$cmd" 2>&1)
+	exit_code=$?
+
+	if [ $exit_code -eq 0 ]; then
+		sed -i "${current_command}s/^${current_command}|/&[Done] /" "$temp_file"
+		log_command "$timestamp" "(${current_command}/${total_commands}) Completed successfully"
+		echo "Content-type: application/json"
+		echo "Cache-Control: no-cache"
+		echo
+		echo "{\"status\":\"success\",\"code\":\"0\",\"message\":\"Command executed to ${current_command}/${total_commands}\"}"
+	else
+		sed -i "${current_command}s/^${current_command}|/&[Failed] /" "$temp_file"
+		log_command "$timestamp" "(${current_command}/${total_commands}) Failed with code $exit_code"
+		echo "Content-type: application/json"
+		echo "Status: 500"
+		echo
+		echo "{\"status\":\"error\",\"code\":\"$exit_code\",\"message\":\"Command failed at ${current_command}/${total_commands}: $output\"}"
+	fi
+
+	return $exit_code
 }
 
 while IFS=: read -r route command || [[ -n "$route" ]]; do
@@ -84,16 +88,8 @@ while IFS=: read -r route command || [[ -n "$route" ]]; do
 	command=$(echo "$command" | xargs)
 
 	if [ "$REQUEST_PATH" = "$route" ]; then
-		echo "Content-type: application/json"
-		echo "Cache-Control: no-cache"
-		echo
-
-		result=$(execute_commands "$command")
-		exit_code=$?
-		
-		[ $exit_code -ne 0 ] && echo "Status: 500"
-		echo "$result"
-		exit $exit_code
+		execute_command "$command"
+		exit $?
 	fi
 done < "$ROUTES_FILE"
 
