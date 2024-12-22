@@ -114,7 +114,7 @@ execute_command() {
 		printf "2%.0s" $(seq 1 $total_commands) > "$temp_file"
 		echo "" >> "$temp_file"
 		for ((i=0; i<total_commands; i++)); do
-			echo "$((i+1))|${CMD_ARRAY[i]}" >> "$temp_file"
+			printf "%d|%s\n" "$((i+1))" "${CMD_ARRAY[i]}" >> "$temp_file"
 		done
 	fi
 
@@ -133,10 +133,11 @@ execute_command() {
 		return $?
 	fi
 
-	local cmd=$(sed -n "$((current_command + 1))p" "$temp_file" | cut -d'|' -f2)
+	local cmd
+	cmd=$(sed -n "$((current_command + 1))p" "$temp_file" | cut -d'|' -f2-)
 
 	log_command "$date_prefix" "(${current_command}/${total_commands}) Executing: $cmd"
-	output=$(bash -c "$cmd" 2>&1)
+	output=$(eval "$cmd" 2>&1)
 	exit_code=$?
 	local end_time=$(date +%s)
 	local duration=$((end_time - start_time))
@@ -145,13 +146,17 @@ execute_command() {
 		sed -i "1s/./0/$current_command" "$temp_file"
 		log_command "$date_prefix" "(${current_command}/${total_commands}) Completed successfully"
 		output_result "success" "0" "Command executed to ${current_command}/${total_commands}" "$output" "$current_command" "$total_commands" "$cmd" "$duration" "$start_time"
+		return 0
 	else
 		sed -i "1s/./1/$current_command" "$temp_file"
 		log_command "$date_prefix" "(${current_command}/${total_commands}) Failed with code $exit_code"
 		output_result "error" "$exit_code" "Command failed at ${current_command}/${total_commands}" "$output" "$current_command" "$total_commands" "$cmd" "$duration" "$start_time"
+		
+		if [ $current_command -eq $total_commands ]; then
+			return 1
+		fi
+		return 0
 	fi
-
-	return $exit_code
 }
 
 while IFS=: read -r route command || [[ -n "$route" ]]; do
@@ -162,15 +167,12 @@ while IFS=: read -r route command || [[ -n "$route" ]]; do
 	command=$(echo "$command" | xargs)
 
 	if [ "$REQUEST_PATH" = "$route" ]; then
-		while true; do
-			execute_command "$command"
-			result=$?
-			case $result in
-				0) break ;;
-				1|2) continue ;;
-				*) break ;;
-			esac
-		done
+		execute_command "$command"
+		result=$?
+		case $result in
+			0) ;;
+			1|2) execute_command "$command" ;;
+		esac
 		exit 0
 	fi
 done < "$ROUTES_FILE"
