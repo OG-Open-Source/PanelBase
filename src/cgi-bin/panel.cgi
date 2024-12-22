@@ -34,6 +34,7 @@ output_result() {
 	local current="$5"
 	local total="$6"
 	local cmd="$7"
+	local duration="$8"
 
 	if [[ "$ACCEPT_HEADER" == *"text/plain"* ]]; then
 		echo "Content-type: text/plain"
@@ -45,20 +46,20 @@ output_result() {
 			echo "Error code: $code"
 			echo "Error message:"
 			echo "$output"
-		else
-			[ -n "$cmd" ] && echo "Executing command (${current}/${total}): $cmd"
+		elif [ -n "$cmd" ]; then
+			echo "Executing command (${current}/${total}): $cmd"
 			[ -n "$output" ] && echo "$output"
-			[ -n "$cmd" ] && echo "----------------------------------------"
-			fi
+			echo "----------------------------------------"
+		fi
 	else
 		echo "Content-type: application/json"
 		echo "Cache-Control: no-cache"
 		[ "$status" = "error" ] && echo "Status: $code"
 		echo
 		if [ -n "$output" ]; then
-			echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"$message\",\"output\":\"$(echo "$output" | sed 's/"/\\"/g' | tr '\n' ' ')\"}"
+			echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"$message\",\"output\":\"$(echo "$output" | sed 's/"/\\"/g' | tr '\n' ' ')\",\"duration\":\"${duration}s\"}"
 		else
-			echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"$message\"}"
+			echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"$message\",\"duration\":\"${duration}s\"}"
 		fi
 	fi
 }
@@ -70,20 +71,20 @@ execute_command() {
 	local temp_file="$TEMP_DIR/${date_prefix}${api_path}.log"
 	local total_commands=0
 	local current_command=0
+	local start_time=$(date +%s)
 
 	IFS=';' read -ra CMD_ARRAY <<< "$commands"
 	total_commands=${#CMD_ARRAY[@]}
 
 	if [ ! -f "$temp_file" ]; then
-		echo "[$(date '+%Y-%m-%d %H:%M:%S')] Command execution started" > "$temp_file"
-		printf "2%.0s" $(seq 1 $total_commands) >> "$temp_file"
+		printf "2%.0s" $(seq 1 $total_commands) > "$temp_file"
 		echo "" >> "$temp_file"
 		for ((i=0; i<total_commands; i++)); do
 			echo "$((i+1))|${CMD_ARRAY[i]}" >> "$temp_file"
 		done
 	fi
 
-	local status_line=$(sed -n '2p' "$temp_file")
+	local status_line=$(head -n1 "$temp_file")
 	
 	current_command=0
 	for ((i=0; i<${#status_line}; i++)); do
@@ -94,13 +95,11 @@ execute_command() {
 	done
 
 	if [ $current_command -eq 0 ]; then
+		local end_time=$(date +%s)
+		local duration=$((end_time - start_time))
 		if ! echo "$status_line" | grep -q "[^0]"; then
-			echo "[$(date '+%Y-%m-%d %H:%M:%S')] All commands completed successfully" >> "$temp_file"
-			cat "$temp_file"
 			rm -f "$temp_file"
-			for ((i=0; i<total_commands; i++)); do
-				echo "$((i+1))|${CMD_ARRAY[i]}" >> "$temp_file"
-			done
+			output_result "success" "0" "All commands completed" "" "" "" "" "$duration"
 			return 0
 		fi
 		if echo "$status_line" | grep -q "1"; then
@@ -108,24 +107,26 @@ execute_command() {
 			execute_command "$commands"
 			return $?
 		fi
-		output_result "success" "0" "All commands completed" "" "" "" ""
+		output_result "success" "0" "All commands completed" "" "" "" "" "$duration"
 		return 0
 	fi
 
-	local cmd=$(sed -n "$((current_command + 2))p" "$temp_file" | cut -d'|' -f2)
+	local cmd=$(sed -n "$((current_command + 1))p" "$temp_file" | cut -d'|' -f2)
 
 	log_command "$date_prefix" "(${current_command}/${total_commands}) Executing: $cmd"
 	output=$(bash -c "$cmd" 2>&1)
 	exit_code=$?
+	local end_time=$(date +%s)
+	local duration=$((end_time - start_time))
 
 	if [ $exit_code -eq 0 ]; then
-		sed -i "2s/./0/$current_command" "$temp_file"
+		sed -i "1s/./0/$current_command" "$temp_file"
 		log_command "$date_prefix" "(${current_command}/${total_commands}) Completed successfully"
-		output_result "success" "0" "Command executed to ${current_command}/${total_commands}" "$output" "$current_command" "$total_commands" "$cmd"
+		output_result "success" "0" "Command executed to ${current_command}/${total_commands}" "$output" "$current_command" "$total_commands" "$cmd" "$duration"
 	else
-		sed -i "2s/./1/$current_command" "$temp_file"
+		sed -i "1s/./1/$current_command" "$temp_file"
 		log_command "$date_prefix" "(${current_command}/${total_commands}) Failed with code $exit_code"
-		output_result "error" "$exit_code" "Command failed at ${current_command}/${total_commands}" "$output" "$current_command" "$total_commands" "$cmd"
+		output_result "error" "$exit_code" "Command failed at ${current_command}/${total_commands}" "$output" "$current_command" "$total_commands" "$cmd" "$duration"
 	fi
 
 	return $exit_code
