@@ -35,7 +35,13 @@ output_result() {
 	local total="$6"
 	local cmd="$7"
 	local duration="$8"
-	local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+	local start_time="$9"
+	local end_time=$(date +%s)
+	local elapsed=$((end_time - start_time))
+	local hours=$((elapsed / 3600))
+	local minutes=$(( (elapsed % 3600) / 60 ))
+	local seconds=$((elapsed % 60))
+	local elapsed_time=$(printf "%02d:%02d:%02d" $hours $minutes $seconds)
 
 	if [[ "$ACCEPT_HEADER" == *"text/plain"* ]]; then
 		echo "Content-type: text/plain"
@@ -43,12 +49,12 @@ output_result() {
 		[ "$status" = "error" ] && echo "Status: $code"
 		echo
 		if [ "$status" = "error" ]; then
-			echo "[$timestamp] Execution failed (${current}/${total}): $cmd"
+			echo "[Elapsed: ${elapsed_time}] Execution failed (${current}/${total}): $cmd"
 			echo "Error code: $code"
 			echo "Error message:"
 			echo "$output"
 		elif [ -n "$cmd" ]; then
-			echo "[$timestamp] Executing command (${current}/${total}): $cmd"
+			echo "[Elapsed: ${elapsed_time}] Executing command (${current}/${total}): $cmd"
 			[ -n "$output" ] && echo "$output"
 			echo "----------------------------------------"
 		fi
@@ -58,9 +64,9 @@ output_result() {
 		[ "$status" = "error" ] && echo "Status: $code"
 		echo
 		if [ -n "$output" ]; then
-			echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"$message\",\"output\":\"$(echo "$output" | sed 's/"/\\"/g' | tr '\n' ' ')\",\"duration\":\"${duration}s\",\"timestamp\":\"$timestamp\"}"
+			echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"[Elapsed: ${elapsed_time}] ${message}\",\"output\":\"$(echo "$output" | sed 's/"/\\"/g' | tr '\n' ' ')\"}"
 		else
-			echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"$message\",\"duration\":\"${duration}s\",\"timestamp\":\"$timestamp\"}"
+			echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"[Elapsed: ${elapsed_time}] ${message}\"}"
 		fi
 	fi
 }
@@ -74,7 +80,7 @@ check_and_reset() {
 	local duration=$((end_time - start_time))
 
 	if ! echo "$status_line" | grep -q "[^0]"; then
-		output_result "success" "0" "All commands completed" "" "" "" "" "$duration"
+		output_result "success" "0" "All commands completed" "" "" "" "" "$duration" "$start_time"
 		rm -f "$temp_file"
 		return 2
 	fi
@@ -133,11 +139,11 @@ execute_command() {
 	if [ $exit_code -eq 0 ]; then
 		sed -i "1s/./0/$current_command" "$temp_file"
 		log_command "$date_prefix" "(${current_command}/${total_commands}) Completed successfully"
-		output_result "success" "0" "Command executed to ${current_command}/${total_commands}" "$output" "$current_command" "$total_commands" "$cmd" "$duration"
+		output_result "success" "0" "Command executed to ${current_command}/${total_commands}" "$output" "$current_command" "$total_commands" "$cmd" "$duration" "$start_time"
 	else
 		sed -i "1s/./1/$current_command" "$temp_file"
 		log_command "$date_prefix" "(${current_command}/${total_commands}) Failed with code $exit_code"
-		output_result "error" "$exit_code" "Command failed at ${current_command}/${total_commands}" "$output" "$current_command" "$total_commands" "$cmd" "$duration"
+		output_result "error" "$exit_code" "Command failed at ${current_command}/${total_commands}" "$output" "$current_command" "$total_commands" "$cmd" "$duration" "$start_time"
 	fi
 
 	return $exit_code
