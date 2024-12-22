@@ -44,19 +44,24 @@ output_result() {
 	local elapsed_time=$(printf "%02d:%02d:%02d" $hours $minutes $seconds)
 
 	if [[ "$ACCEPT_HEADER" == *"text/plain"* ]]; then
-		echo "Content-type: text/plain"
-		echo "Cache-Control: no-cache"
-		[ "$status" = "error" ] && echo "Status: $code"
-		echo
-		if [ "$status" = "error" ]; then
-			echo "[Elapsed: ${elapsed_time}] Execution failed (${current}/${total}): $cmd"
+		if [ -n "$cmd" ]; then
+			echo "[${elapsed_time}] Executing command (${current}/${total}): $cmd"
+			[ -n "$output" ] && echo "$output"
+			echo "----------------------------------------"
+		elif [ "$status" = "error" ]; then
+			echo "Content-type: text/plain"
+			echo "Cache-Control: no-cache"
+			echo "Status: $code"
+			echo
+			echo "[${elapsed_time}] Execution failed (${current}/${total}): $cmd"
 			echo "Error code: $code"
 			echo "Error message:"
 			echo "$output"
-		elif [ -n "$cmd" ]; then
-			echo "[Elapsed: ${elapsed_time}] Executing command (${current}/${total}): $cmd"
-			[ -n "$output" ] && echo "$output"
-			echo "----------------------------------------"
+		else
+			echo "Content-type: text/plain"
+			echo "Cache-Control: no-cache"
+			echo
+			echo "[${elapsed_time}] ${message}"
 		fi
 	else
 		echo "Content-type: application/json"
@@ -64,9 +69,9 @@ output_result() {
 		[ "$status" = "error" ] && echo "Status: $code"
 		echo
 		if [ -n "$output" ]; then
-			echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"[Elapsed: ${elapsed_time}] ${message}\",\"output\":\"$(echo "$output" | sed 's/"/\\"/g' | tr '\n' ' ')\"}"
+			echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"[${elapsed_time}] ${message}\",\"output\":\"$(echo "$output" | sed 's/"/\\"/g' | tr '\n' ' ')\"}"
 		else
-			echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"[Elapsed: ${elapsed_time}] ${message}\"}"
+			echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"[${elapsed_time}] ${message}\"}"
 		fi
 	fi
 }
