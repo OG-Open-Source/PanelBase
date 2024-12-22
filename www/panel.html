@@ -270,15 +270,37 @@
 				color: #ffffff;
 				padding: 10px;
 				border-radius: 5px;
-				font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+				font-family: 'Source Code Pro', 'Consolas', monospace;
 				font-size: 14px;
 				line-height: 1.5;
 				white-space: pre-wrap;
 				word-wrap: break-word;
 				overflow-y: auto;
+				
 				min-height: 200px;
-				max-height: none;
+				width: auto;
+				flex: 1;
 				margin-bottom: 20px;
+			}
+
+			.terminal-container {
+				display: flex;
+				flex-direction: column;
+				width: 100%;
+				height: 100%;
+			}
+
+			.terminal-output {
+				margin: 0;
+				padding: 0;
+				list-style-type: none;
+				width: 100%;
+			}
+
+			.terminal-output li {
+				margin: 5px 0;
+				padding: 0;
+				width: 100%;
 			}
 
 			.terminal-header {
@@ -313,17 +335,6 @@
 
 			.terminal-button:hover {
 				background: var(--terminal-button-hover);
-			}
-
-			.terminal-output {
-				margin: 0;
-				padding: 0;
-				list-style-type: none;
-			}
-
-			.terminal-output li {
-				margin: 5px 0;
-				padding: 0;
 			}
 
 			.terminal-output .command {
@@ -488,6 +499,12 @@
 				.system-stats {
 					grid-template-columns: 1fr;
 				}
+			}
+
+			@font-face {
+				font-family: 'Source Code Pro';
+				src: url('https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500&display=swap');
+				font-display: swap;
 			}
 		</style>
 		<script>

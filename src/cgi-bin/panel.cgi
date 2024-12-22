@@ -50,7 +50,6 @@ output_result() {
 			echo
 			echo "[${elapsed_time}] Executing command (${current}/${total}): $cmd"
 			[ -n "$output" ] && echo "$output"
-			echo "----------------------------------------"
 		elif [ "$status" = "error" ]; then
 			echo "Content-type: text/plain"
 			echo "Cache-Control: no-cache"
@@ -60,13 +59,11 @@ output_result() {
 			echo "Error code: $code"
 			echo "Error message:"
 			echo "$output"
-			echo "----------------------------------------"
 		else
 			echo "Content-type: text/plain"
 			echo "Cache-Control: no-cache"
 			echo
 			echo "[${elapsed_time}] ${message}"
-			echo "----------------------------------------"
 		fi
 	else
 		echo "Content-type: application/json"
