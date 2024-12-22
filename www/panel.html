@@ -11,44 +11,38 @@
 				--font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 				--font-monospace: "Source Code Pro", monospace;
 				--background-color: #F2F2F7;
-				--text-color: #000000;
-				--secondary-text: #6E6E73;
-				--primary-color: rgb(0, 122, 255);
+				--text-color: #1C1C1E;
+				--secondary-text: #8E8E93;
+				--primary-color: #007AFF;
+				--primary-gradient: linear-gradient(135deg, #0A84FF, #0066CC);
 				--primary-rgb: 0, 122, 255;
 				--error-color: #FF3B30;
 				--success-color: #34C759;
 				--warning-color: #FFCC00;
 				--info-color: #5856D6;
-				--border-radius: 10px;
-				--border-radius-sm: 6px;
-				--container-bg: #FFFFFF;
-				--container-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-				--input-background: #FFFFFF;
-				--text-color: #1C1C1E;
-				--secondary-text: #8E8E93;
 				--border-radius: 12px;
 				--border-radius-lg: 16px;
 				--border-radius-sm: 8px;
 				--input-height: 44px;
 				--container-bg: rgba(255, 255, 255, 0.95);
 				--container-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+				--input-background: #FFFFFF;
 				--input-border: rgba(0, 0, 0, 0.1);
 				--body-gradient: linear-gradient(135deg, #F6F8FB, #E9EEF3);
-				--primary-rgb: 0, 122, 255;
 				--terminal-bg: #1E1E1E;
 				--terminal-text: #FFFFFF;
-				--terminal-header-bg: #2D2D2D;
+				--terminal-header-bg: rgba(255, 255, 255, 0.1);
 				--terminal-button-hover: rgba(255, 255, 255, 0.1);
 				--main-bg: transparent;
 			}
 
 			:root.dark-mode {
 				--background-color: #000000;
-				--input-background: #1C1C1E;
 				--text-color: #FFFFFF;
 				--secondary-text: #8E8E93;
 				--container-bg: rgba(28, 28, 30, 0.95);
 				--container-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+				--input-background: #1C1C1E;
 				--input-border: rgba(255, 255, 255, 0.1);
 				--body-gradient: linear-gradient(135deg, #1C1C1E, #2C2C2E);
 				--primary-rgb: 10, 132, 255;
@@ -56,67 +50,25 @@
 				--main-bg: transparent;
 			}
 
-			.container,
-			.main-content {
-				background: var(--main-bg);
-			}
-
 			* {
 				margin: 0;
 				padding: 0;
 				box-sizing: border-box;
-				font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+				font-family: var(--font-family);
 			}
 
 			body {
-				margin: 0;
+				background: var(--body-gradient);
+				min-height: 100vh;
 				padding: 20px;
 				position: relative;
 				overflow-x: hidden;
 				isolation: isolate;
 			}
 
-			body::before {
-				content: '';
-				position: fixed;
-				width: 150%;
-				height: 150%;
-				top: -25%;
-				left: -25%;
-				background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%);
-				animation: rotate 20s linear infinite;
-				z-index: -2;
-			}
-
-			body::after {
-				content: '';
-				position: fixed;
-				top: 0;
-				left: 0;
-				right: 0;
-				bottom: 0;
-				background:
-					linear-gradient(45deg, transparent 45%, rgba(var(--primary-rgb), 0.03) 50%, transparent 55%),
-					linear-gradient(-45deg, transparent 45%, rgba(var(--primary-rgb), 0.03) 50%, transparent 55%);
-				background-size: 30px 30px;
-				animation: backgroundMove 60s linear infinite;
-				z-index: -1;
-			}
-
-			.container {
-				max-width: 1200px;
-				margin: 0 auto;
-				display: grid;
-				grid-template-columns: 250px 1fr;
-				gap: 20px;
-				position: relative;
-				z-index: 1;
-			}
-
+			.container,
 			.main-content {
-				display: flex;
-				flex-direction: column;
-				gap: 20px;
+				background: var(--main-bg);
 			}
 
 			.sidebar {
@@ -281,20 +233,17 @@
 			}
 
 			.terminal {
-				background-color: var(--terminal-bg);
-				color: var(--terminal-text);
-				padding: 10px;
+				background: var(--terminal-bg);
 				border-radius: var(--border-radius);
+				padding: 20px;
+				color: var(--terminal-text);
 				font-family: var(--font-monospace);
 				font-size: 14px;
 				line-height: 1.5;
-				white-space: pre-wrap;
-				word-wrap: break-word;
 				overflow-y: auto;
-				min-height: 200px;
-				width: auto;
-				flex: 1;
-				margin-bottom: 20px;
+				max-height: 400px;
+				position: relative;
+				margin-top: 20px;
 			}
 
 			.terminal-container {
@@ -309,6 +258,8 @@
 				padding: 0;
 				list-style-type: none;
 				width: 100%;
+				white-space: pre-wrap;
+				word-wrap: break-word;
 			}
 
 			.terminal-output li {
@@ -356,7 +307,7 @@
 			}
 
 			.terminal-output .error {
-				color: #ff0000;
+				color: var(--error-color);
 			}
 
 			.terminal-output .success {
@@ -520,6 +471,32 @@
 				src: url("https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500&display=swap");
 				font-display: swap;
 			}
+
+			.language-switcher {
+				position: relative;
+				margin-left: 10px;
+			}
+
+			.language-switcher button {
+				background: none;
+				border: none;
+				color: var(--secondary-text);
+				font-size: 14px;
+				cursor: pointer;
+				padding: 8px;
+				border-radius: var(--border-radius-sm);
+				transition: all 0.3s ease;
+				width: 36px;
+				height: 36px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+
+			.language-switcher button:hover {
+				background: rgba(0, 122, 255, 0.1);
+				color: var(--primary-color);
+			}
 		</style>
 		<script>
 			(function() {
@@ -584,9 +561,12 @@
 				<header class="header">
 					<h1 data-i18n="dashboard-title">系統儀表板</h1>
 					<div class="theme-switcher">
-						<button onclick="toggleTheme()" id="themeToggle">
+						<button id="themeToggle" onclick="toggleTheme()">
 							<i class="fas fa-moon"></i>
 						</button>
+					</div>
+					<div class="language-switcher">
+						<button id="langToggle" onclick="toggleLanguage()">ZH</button>
 					</div>
 				</header>
 
@@ -642,6 +622,95 @@
 		</div>
 
 		<script>
+			const translations = {
+				'en': {
+					'nav-dashboard': 'Dashboard',
+					'nav-system': 'System',
+					'nav-network': 'Network',
+					'nav-services': 'Services',
+					'nav-files': 'Files',
+					'nav-settings': 'Settings',
+					'stat-cpu': 'CPU Usage',
+					'stat-memory': 'Memory Usage',
+					'stat-disk': 'Disk Usage',
+					'terminal-title': 'System Update',
+					'user-role': 'Administrator',
+					'clear': 'Clear',
+					'update': 'Update',
+					'dashboard-title': 'System Dashboard'
+				},
+				'zh-TW': {
+					'nav-dashboard': '儀表板',
+					'nav-system': '系統管理',
+					'nav-network': '網路管理',
+					'nav-services': '服務管理',
+					'nav-files': '檔案管理',
+					'nav-settings': '設定',
+					'stat-cpu': 'CPU 使用率',
+					'stat-memory': '記憶體使用率',
+					'stat-disk': '磁碟使用率',
+					'terminal-title': '系統更新',
+					'user-role': '管理員',
+					'clear': '清除',
+					'update': '更新',
+					'dashboard-title': '系統儀表板'
+				},
+				'zh-CN': {
+					'nav-dashboard': '仪表板',
+					'nav-system': '系统管理',
+					'nav-network': '网络管理',
+					'nav-services': '服务管理',
+					'nav-files': '文件管理',
+					'nav-settings': '设置',
+					'stat-cpu': 'CPU 使用率',
+					'stat-memory': '内存使用率',
+					'stat-disk': '磁盘使用率',
+					'terminal-title': '系统更新',
+					'user-role': '管理员',
+					'clear': '清除',
+					'update': '更新',
+					'dashboard-title': '系统仪表板'
+				}
+			};
+
+			function setLanguage(lang) {
+				localStorage.setItem('language', lang);
+				document.querySelectorAll('[data-i18n]').forEach(element => {
+					const key = element.getAttribute('data-i18n');
+					if (translations[lang] && translations[lang][key]) {
+						element.textContent = translations[lang][key];
+					}
+				});
+			}
+
+			function initLanguage() {
+				const savedLang = localStorage.getItem('language') || 'zh-TW';
+				setLanguage(savedLang);
+				document.querySelector('#langToggle').textContent = savedLang.replace('zh-', '').toUpperCase();
+			}
+
+			function toggleLanguage() {
+				const currentLang = localStorage.getItem('language') || 'zh-TW';
+				let newLang;
+				switch (currentLang) {
+					case 'zh-TW':
+						newLang = 'zh-CN';
+						break;
+					case 'zh-CN':
+						newLang = 'en';
+						break;
+					default:
+						newLang = 'zh-TW';
+				}
+				setLanguage(newLang);
+				document.querySelector('#langToggle').textContent = newLang.replace('zh-', '').toUpperCase();
+			}
+
+			document.addEventListener('DOMContentLoaded', () => {
+				initLanguage();
+				initTheme();
+			});
+
 			const i18n = {
 				'en': {
 					'nav-dashboard': 'Dashboard',
@@ -890,33 +959,52 @@
 
 			async function startUpdate() {
 				const terminal = document.querySelector('.terminal-output');
-				terminal.textContent = 'Starting system update...\n';
-				
-				try {
-					const response = await fetch('/cgi-bin/panel.cgi/api/panel/system_update', {
+				const progressBar = document.querySelector('.progress-fill');
+				let isCompleted = false;
+
+				while (!isCompleted) {
+					try {
+						const response = await fetch('/cgi-bin/panel.cgi/api/panel/system_update', {
 							headers: {
-								'Accept': 'text/plain'
+								'Accept': 'application/json'
 							}
 						});
 
-					if (!response.ok) {
-						throw new Error(`HTTP error! status: ${response.status}`);
-					}
+						if (!response.ok) {
+							throw new Error(`HTTP error! status: ${response.status}`);
+						}
 
-					const reader = response.body.getReader();
-					const decoder = new TextDecoder();
-
-					while (true) {
-						const { value, done } = await reader.read();
-						if (done) break;
-						
-						const text = decoder.decode(value);
-						terminal.textContent += text;
+						const data = await response.json();
+						const li = document.createElement('li');
+						li.textContent = data.message;
+						terminal.appendChild(li);
 						terminal.scrollTop = terminal.scrollHeight;
+
+						if (data.message.includes('All commands completed')) {
+							isCompleted = true;
+							progressBar.style.width = '100%';
+						} else if (data.status === 'error') {
+							li.classList.add('error');
+						} else {
+							const match = data.message.match(/\((\d+)\/(\d+)\)/);
+							if (match) {
+								const [, current, total] = match;
+								const progress = (current / total) * 100;
+								progressBar.style.width = `${progress}%`;
+							}
+						}
+
+						if (!isCompleted) {
+							await new Promise(resolve => setTimeout(resolve, 1000));
+						}
+					} catch (error) {
+						const li = document.createElement('li');
+						li.textContent = `Error: ${error.message}`;
+						li.classList.add('error');
+						terminal.appendChild(li);
+						terminal.scrollTop = terminal.scrollHeight;
+						break;
 					}
-				} catch (error) {
-					terminal.textContent += `\nError: ${error.message}\n`;
-					terminal.scrollTop = terminal.scrollHeight;
 				}
 			}
 
