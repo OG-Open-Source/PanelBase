@@ -73,9 +73,9 @@ output_result() {
 		if [ -n "$output" ]; then
 			message="[${elapsed_time}] ${message}\n${output}"
 		else
-			message="[${elapsed_time}] ${message}"
+			message="${message}"
 		fi
-		echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"$(echo "$message" | sed 's/"/\\"/g')\"}"
+		echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"$(echo -e "$message" | sed 's/"/\\"/g')\"}"
 	fi
 }
 

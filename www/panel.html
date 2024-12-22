@@ -1091,22 +1091,22 @@
 							li.classList.add('error');
 							terminal.appendChild(li);
 							terminal.scrollTop = terminal.scrollHeight;
-							return; // 解析錯誤時立即停止
+							return;
 						}
 
 						const li = document.createElement('li');
 						li.textContent = data.message;
-							terminal.appendChild(li);
-							terminal.scrollTop = terminal.scrollHeight;
+						terminal.appendChild(li);
+						terminal.scrollTop = terminal.scrollHeight;
 
 						// 檢查完成或錯誤狀態
 						if (data.message && data.message.includes('All commands completed')) {
 							isCompleted = true;
 							progressBar.style.width = '100%';
-							break; // 完成時立即退出循環
+							break;
 						} else if (data.status === 'error') {
 							li.classList.add('error');
-							return; // 錯誤時立即停止
+							return;
 						}
 
 						// 更新進度條
@@ -1126,7 +1126,7 @@
 						li.classList.add('error');
 						terminal.appendChild(li);
 						terminal.scrollTop = terminal.scrollHeight;
-						return; // 發生錯誤時立即停止
+						return;
 					}
 				}
 			}
