@@ -266,17 +266,19 @@
 			}
 
 			.terminal {
-				background: var(--terminal-bg);
-				border-radius: var(--border-radius);
-				padding: 20px;
-				color: var(--terminal-text);
-				font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+				background-color: #1e1e1e;
+				color: #ffffff;
+				padding: 10px;
+				border-radius: 5px;
+				font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
 				font-size: 14px;
 				line-height: 1.5;
+				white-space: pre-wrap;
+				word-wrap: break-word;
 				overflow-y: auto;
-				max-height: 400px;
-				position: relative;
-				margin-top: 20px;
+				min-height: 200px;
+				max-height: none;
+				margin-bottom: 20px;
 			}
 
 			.terminal-header {
@@ -314,12 +316,34 @@
 			}
 
 			.terminal-output {
-				white-space: pre-wrap;
-				word-wrap: break-word;
+				margin: 0;
+				padding: 0;
+				list-style-type: none;
+			}
+
+			.terminal-output li {
+				margin: 5px 0;
+				padding: 0;
+			}
+
+			.terminal-output .command {
+				color: #00ff00;
 			}
 
 			.terminal-output .error {
-				color: var(--error-color);
+				color: #ff0000;
+			}
+
+			.terminal-output .success {
+				color: #00ff00;
+			}
+
+			.terminal-output .info {
+				color: #0099ff;
+			}
+
+			.terminal-output .warning {
+				color: #ffff00;
 			}
 
 			.progress-bar {

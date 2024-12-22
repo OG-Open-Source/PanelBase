@@ -50,6 +50,7 @@ output_result() {
 			echo
 			echo "[${elapsed_time}] Executing command (${current}/${total}): $cmd"
 			[ -n "$output" ] && echo "$output"
+			echo "----------------------------------------"
 		elif [ "$status" = "error" ]; then
 			echo "Content-type: text/plain"
 			echo "Cache-Control: no-cache"
@@ -59,11 +60,13 @@ output_result() {
 			echo "Error code: $code"
 			echo "Error message:"
 			echo "$output"
+			echo "----------------------------------------"
 		else
 			echo "Content-type: text/plain"
 			echo "Cache-Control: no-cache"
 			echo
 			echo "[${elapsed_time}] ${message}"
+			echo "----------------------------------------"
 		fi
 	else
 		echo "Content-type: application/json"
@@ -71,10 +74,11 @@ output_result() {
 		[ "$status" = "error" ] && echo "Status: $code"
 		echo
 		if [ -n "$output" ]; then
-			echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"[${elapsed_time}] ${message}\",\"output\":\"$(echo "$output" | sed 's/"/\\"/g' | tr '\n' ' ')\"}"
+			message="[${elapsed_time}] ${message}\n${output}"
 		else
-			echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"[${elapsed_time}] ${message}\"}"
+			message="[${elapsed_time}] ${message}"
 		fi
+		echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"$(echo "$message" | sed 's/"/\\"/g')\"}"
 	fi
 }
 
