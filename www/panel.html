@@ -1079,23 +1079,36 @@
 							throw new Error(`HTTP error! status: ${response.status}`);
 						}
 
-						const data = await response.json();
+						const text = await response.text();
+						let data;
+						try {
+							data = JSON.parse(text);
+						} catch (parseError) {
+							console.error('JSON Parse Error:', parseError);
+							console.log('Raw response:', text);
+							const li = document.createElement('li');
+							li.textContent = text;
+							terminal.appendChild(li);
+							terminal.scrollTop = terminal.scrollHeight;
+							continue;
+						}
+
 						const li = document.createElement('li');
 						li.textContent = data.message;
 						terminal.appendChild(li);
 						terminal.scrollTop = terminal.scrollHeight;
 
-						if (data.message.includes('All commands completed')) {
+						if (data.message && data.message.includes('All commands completed')) {
 							isCompleted = true;
 							progressBar.style.width = '100%';
 						} else if (data.status === 'error') {
 							li.classList.add('error');
 						} else {
-							const match = data.message.match(/\((\d+)\/(\d+)\)/);
+							const match = data.message && data.message.match(/\((\d+)\/(\d+)\)/);
 							if (match) {
 								const [, current, total] = match;
 								const progress = (current / total) * 100;
-								progressBar.style.width = `${progress}%`;
+									progressBar.style.width = `${progress}%`;
 							}
 						}
 
@@ -1103,12 +1116,13 @@
 							await new Promise(resolve => setTimeout(resolve, 1000));
 						}
 					} catch (error) {
+						console.error('Fetch Error:', error);
 						const li = document.createElement('li');
 						li.textContent = `Error: ${error.message}`;
 						li.classList.add('error');
 						terminal.appendChild(li);
 						terminal.scrollTop = terminal.scrollHeight;
-						break;
+						await new Promise(resolve => setTimeout(resolve, 1000));
 					}
 				}
 			}
