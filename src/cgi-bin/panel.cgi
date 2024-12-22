@@ -163,8 +163,8 @@ while IFS=: read -r route command || [[ -n "$route" ]]; do
 	[[ "$route" =~ ^[[:space:]]*# ]] && continue
 	[ -z "$route" ] && continue
 
-	route=$(echo "$route" | xargs)
-	command=$(echo "$command" | xargs)
+	route=$(echo "$route" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+	command=$(echo "$command" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
 	if [ "$REQUEST_PATH" = "$route" ]; then
 		execute_command "$command"
