@@ -497,6 +497,107 @@
 				background: rgba(0, 122, 255, 0.1);
 				color: var(--primary-color);
 			}
+
+			.container {
+				max-width: 1200px;
+				margin: 0 auto;
+				display: grid;
+				grid-template-columns: 250px 1fr;
+				gap: 20px;
+				position: relative;
+				z-index: 1;
+			}
+
+			.main-content {
+				display: flex;
+				flex-direction: column;
+				gap: 20px;
+				padding: 20px;
+				background: var(--container-bg);
+				border-radius: var(--border-radius-lg);
+				box-shadow: var(--container-shadow);
+				backdrop-filter: blur(16px);
+				-webkit-backdrop-filter: blur(16px);
+			}
+
+			.header {
+				margin: -20px -20px 0;
+				padding: 20px;
+				background: var(--container-bg);
+				border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
+				box-shadow: var(--container-shadow);
+				backdrop-filter: blur(16px);
+				-webkit-backdrop-filter: blur(16px);
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				border-bottom: 1px solid var(--input-border);
+			}
+
+			.system-stats {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+				gap: 20px;
+				padding: 20px 0;
+			}
+
+			.stat-card {
+				background: var(--container-bg);
+				border-radius: var(--border-radius);
+				padding: 20px;
+				box-shadow: var(--container-shadow);
+				backdrop-filter: blur(8px);
+				-webkit-backdrop-filter: blur(8px);
+			}
+
+			.header-controls {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+			}
+
+			.content-wrapper {
+				background: var(--container-bg);
+				border-radius: var(--border-radius-lg);
+				box-shadow: var(--container-shadow);
+				backdrop-filter: blur(16px);
+				-webkit-backdrop-filter: blur(16px);
+				overflow: hidden;
+			}
+
+			.main-content {
+				display: flex;
+				flex-direction: column;
+				gap: 20px;
+			}
+
+			.header {
+				padding: 20px;
+				background: var(--container-bg);
+				border-bottom: 1px solid var(--input-border);
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+			}
+
+			.system-stats {
+				padding: 20px;
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+				gap: 20px;
+			}
+
+			.terminal-wrapper {
+				padding: 20px;
+				background: var(--container-bg);
+			}
+
+			.stat-card {
+				background: var(--container-bg);
+				border: 1px solid var(--input-border);
+				border-radius: var(--border-radius);
+				padding: 20px;
+			}
 		</style>
 		<script>
 			(function() {
@@ -558,64 +659,68 @@
 			</aside>
 
 			<main class="main-content">
-				<header class="header">
-					<h1 data-i18n="dashboard-title">系統儀表板</h1>
-					<div class="theme-switcher">
-						<button id="themeToggle" onclick="toggleTheme()">
-							<i class="fas fa-moon"></i>
-						</button>
-					</div>
-					<div class="language-switcher">
-						<button id="langToggle" onclick="toggleLanguage()">ZH</button>
-					</div>
-				</header>
-
-				<div class="system-stats">
-					<div class="stat-card">
-						<div class="stat-title">
-							<i class="fas fa-microchip"></i>
-							<span data-i18n="stat-cpu">CPU 使用率</span>
-						</div>
-						<div class="stat-value" id="cpuUsage">--</div>
-						<div class="stat-trend trend-up">
-							<i class="fas fa-arrow-up"></i>
-							<span>2.5%</span>
-						</div>
-					</div>
-					<div class="stat-card">
-						<div class="stat-title">
-							<i class="fas fa-memory"></i>
-							<span data-i18n="stat-memory">記憶體使用率</span>
-						</div>
-						<div class="stat-value" id="memoryUsage">--</div>
-						<div class="stat-trend trend-down">
-							<i class="fas fa-arrow-down"></i>
-							<span>1.2%</span>
-						</div>
-					</div>
-					<div class="stat-card">
-						<div class="stat-title">
-							<i class="fas fa-hdd"></i>
-							<span data-i18n="stat-disk">磁碟使用率</span>
-						</div>
-						<div class="stat-value" id="diskUsage">--</div>
-						<div class="stat-trend trend-up">
-							<i class="fas fa-arrow-up"></i>
-							<span>0.8%</span>
-						</div>
-					</div>
-				</div>
-
-				<div class="stat-card">
-					<div class="terminal">
-						<div class="terminal-header">
-							<div class="terminal-title">系統更新</div>
-							<div class="terminal-buttons">
-								<button class="terminal-button" onclick="startUpdate()">開始更新</button>
-								<button class="terminal-button" onclick="clearTerminal()">清除</button>
+				<div class="content-wrapper">
+					<header class="header">
+						<h1 data-i18n="dashboard-title">系統儀表板</h1>
+						<div class="header-controls">
+							<div class="theme-switcher">
+								<button id="themeToggle" onclick="toggleTheme()">
+									<i class="fas fa-moon"></i>
+								</button>
+							</div>
+							<div class="language-switcher">
+								<button id="langToggle" onclick="toggleLanguage()">TW</button>
 							</div>
 						</div>
-						<div class="terminal-output"></div>
+					</header>
+
+					<div class="system-stats">
+						<div class="stat-card">
+							<div class="stat-title">
+								<i class="fas fa-microchip"></i>
+								<span data-i18n="stat-cpu">CPU 使用率</span>
+							</div>
+							<div class="stat-value" id="cpuUsage">--</div>
+							<div class="stat-trend trend-up">
+								<i class="fas fa-arrow-up"></i>
+								<span>2.5%</span>
+							</div>
+						</div>
+						<div class="stat-card">
+							<div class="stat-title">
+								<i class="fas fa-memory"></i>
+								<span data-i18n="stat-memory">記憶體使用率</span>
+							</div>
+							<div class="stat-value" id="memoryUsage">--</div>
+							<div class="stat-trend trend-down">
+								<i class="fas fa-arrow-down"></i>
+								<span>1.2%</span>
+							</div>
+						</div>
+						<div class="stat-card">
+							<div class="stat-title">
+								<i class="fas fa-hdd"></i>
+								<span data-i18n="stat-disk">磁碟使用率</span>
+							</div>
+							<div class="stat-value" id="diskUsage">--</div>
+							<div class="stat-trend trend-up">
+								<i class="fas fa-arrow-up"></i>
+								<span>0.8%</span>
+							</div>
+						</div>
+					</div>
+
+					<div class="terminal-wrapper">
+						<div class="terminal">
+							<div class="terminal-header">
+								<div class="terminal-title">系統更新</div>
+								<div class="terminal-buttons">
+									<button class="terminal-button" onclick="startUpdate()">開始更新</button>
+									<button class="terminal-button" onclick="clearTerminal()">清除</button>
+								</div>
+							</div>
+							<div class="terminal-output"></div>
+						</div>
 					</div>
 				</div>
 			</main>
