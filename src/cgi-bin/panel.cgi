@@ -75,18 +75,36 @@ execute_command() {
 	total_commands=${#CMD_ARRAY[@]}
 
 	if [ ! -f "$temp_file" ]; then
+		echo "[$(date '+%Y-%m-%d %H:%M:%S')] Command execution started" > "$temp_file"
+		printf "2%.0s" $(seq 1 $total_commands) >> "$temp_file"
+		echo "" >> "$temp_file"
 		for ((i=0; i<total_commands; i++)); do
 			echo "$((i+1))|${CMD_ARRAY[i]}" >> "$temp_file"
 		done
 	fi
 
-	local next_cmd=$(grep -v "\[Done\]\|\[Failed\]" "$temp_file" | head -n1)
-	if [ -z "$next_cmd" ]; then
-		if [ $(grep -c "\[Done\]" "$temp_file") -eq $total_commands ]; then
+	local status_line=$(sed -n '2p' "$temp_file")
+	
+	current_command=0
+	for ((i=0; i<${#status_line}; i++)); do
+		if [ "${status_line:$i:1}" = "2" ]; then
+			current_command=$((i + 1))
+			break
+		fi
+	done
+
+	if [ $current_command -eq 0 ]; then
+		if ! echo "$status_line" | grep -q "[^0]"; then
+			echo "[$(date '+%Y-%m-%d %H:%M:%S')] All commands completed successfully" >> "$temp_file"
+			cat "$temp_file"
 			rm -f "$temp_file"
 			for ((i=0; i<total_commands; i++)); do
 				echo "$((i+1))|${CMD_ARRAY[i]}" >> "$temp_file"
 			done
+			return 0
+		fi
+		if echo "$status_line" | grep -q "1"; then
+			rm -f "$temp_file"
 			execute_command "$commands"
 			return $?
 		fi
@@ -94,29 +112,18 @@ execute_command() {
 		return 0
 	fi
 
-	current_command=$(echo "$next_cmd" | cut -d'|' -f1)
-	local cmd=$(echo "$next_cmd" | cut -d'|' -f2)
+	local cmd=$(sed -n "$((current_command + 2))p" "$temp_file" | cut -d'|' -f2)
 
 	log_command "$date_prefix" "(${current_command}/${total_commands}) Executing: $cmd"
 	output=$(bash -c "$cmd" 2>&1)
 	exit_code=$?
 
 	if [ $exit_code -eq 0 ]; then
-		sed -i "${current_command}s/^${current_command}|/&[Done] /" "$temp_file"
+		sed -i "2s/./0/$current_command" "$temp_file"
 		log_command "$date_prefix" "(${current_command}/${total_commands}) Completed successfully"
-		
-		if [ $(grep -c "\[Done\]" "$temp_file") -eq $total_commands ]; then
-			output_result "success" "0" "All commands completed" "$output" "$current_command" "$total_commands" "$cmd"
-			rm -f "$temp_file"
-			for ((i=0; i<total_commands; i++)); do
-				echo "$((i+1))|${CMD_ARRAY[i]}" >> "$temp_file"
-			done
-			return 0
-		else
-			output_result "success" "0" "Command executed to ${current_command}/${total_commands}" "$output" "$current_command" "$total_commands" "$cmd"
-		fi
+		output_result "success" "0" "Command executed to ${current_command}/${total_commands}" "$output" "$current_command" "$total_commands" "$cmd"
 	else
-		sed -i "${current_command}s/^${current_command}|/&[Failed] /" "$temp_file"
+		sed -i "2s/./1/$current_command" "$temp_file"
 		log_command "$date_prefix" "(${current_command}/${total_commands}) Failed with code $exit_code"
 		output_result "error" "$exit_code" "Command failed at ${current_command}/${total_commands}" "$output" "$current_command" "$total_commands" "$cmd"
 	fi
