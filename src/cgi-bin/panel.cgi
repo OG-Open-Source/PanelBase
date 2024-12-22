@@ -45,9 +45,11 @@ output_result() {
 
 	if [[ "$ACCEPT_HEADER" == *"text/plain"* ]]; then
 		if [ -n "$cmd" ]; then
+			echo "Content-type: text/plain"
+			echo "Cache-Control: no-cache"
+			echo
 			echo "[${elapsed_time}] Executing command (${current}/${total}): $cmd"
 			[ -n "$output" ] && echo "$output"
-			echo "----------------------------------------"
 		elif [ "$status" = "error" ]; then
 			echo "Content-type: text/plain"
 			echo "Cache-Control: no-cache"
