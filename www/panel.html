@@ -8,10 +8,21 @@
 		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 		<style>
 			:root {
-				--primary-color: #007AFF;
-				--primary-gradient: linear-gradient(135deg, #0A84FF, #0066CC);
-				--error-color: #FF3B30;
+				--font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+				--font-monospace: "Source Code Pro", monospace;
 				--background-color: #F2F2F7;
+				--text-color: #000000;
+				--secondary-text: #6E6E73;
+				--primary-color: rgb(0, 122, 255);
+				--primary-rgb: 0, 122, 255;
+				--error-color: #FF3B30;
+				--success-color: #34C759;
+				--warning-color: #FFCC00;
+				--info-color: #5856D6;
+				--border-radius: 10px;
+				--border-radius-sm: 6px;
+				--container-bg: #FFFFFF;
+				--container-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
 				--input-background: #FFFFFF;
 				--text-color: #1C1C1E;
 				--secondary-text: #8E8E93;
@@ -26,7 +37,7 @@
 				--primary-rgb: 0, 122, 255;
 				--terminal-bg: #1E1E1E;
 				--terminal-text: #FFFFFF;
-				--terminal-header-bg: rgba(255, 255, 255, 0.1);
+				--terminal-header-bg: #2D2D2D;
 				--terminal-button-hover: rgba(255, 255, 255, 0.1);
 				--main-bg: transparent;
 			}
@@ -58,8 +69,7 @@
 			}
 
 			body {
-				background: var(--body-gradient);
-				min-height: 100vh;
+				margin: 0;
 				padding: 20px;
 				position: relative;
 				overflow-x: hidden;
@@ -149,6 +159,8 @@
 			.nav-item {
 				padding: 12px 16px;
 				border-radius: var(--border-radius);
+				font-family: var(--font-family);
+				background: var(--background-color);
 				color: var(--text-color);
 				text-decoration: none;
 				display: flex;
@@ -263,20 +275,22 @@
 
 			.trend-down {
 				color: var(--error-color);
+				line-height: 1.5;
+				-webkit-font-smoothing: antialiased;
+				-moz-osx-font-smoothing: grayscale;
 			}
 
 			.terminal {
-				background-color: #1e1e1e;
-				color: #ffffff;
+				background-color: var(--terminal-bg);
+				color: var(--terminal-text);
 				padding: 10px;
-				border-radius: 5px;
-				font-family: 'Source Code Pro', 'Consolas', monospace;
+				border-radius: var(--border-radius);
+				font-family: var(--font-monospace);
 				font-size: 14px;
 				line-height: 1.5;
 				white-space: pre-wrap;
 				word-wrap: break-word;
 				overflow-y: auto;
-				
 				min-height: 200px;
 				width: auto;
 				flex: 1;
@@ -502,8 +516,8 @@
 			}
 
 			@font-face {
-				font-family: 'Source Code Pro';
-				src: url('https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500&display=swap');
+				font-family: "Source Code Pro";
+				src: url("https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500&display=swap");
 				font-display: swap;
 			}
 		</style>
