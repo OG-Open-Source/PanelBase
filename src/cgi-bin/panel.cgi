@@ -35,6 +35,7 @@ output_result() {
 	local total="$6"
 	local cmd="$7"
 	local duration="$8"
+	local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
 
 	if [[ "$ACCEPT_HEADER" == *"text/plain"* ]]; then
 		echo "Content-type: text/plain"
@@ -42,12 +43,12 @@ output_result() {
 		[ "$status" = "error" ] && echo "Status: $code"
 		echo
 		if [ "$status" = "error" ]; then
-			echo "Execution failed (${current}/${total}): $cmd"
+			echo "[$timestamp] Execution failed (${current}/${total}): $cmd"
 			echo "Error code: $code"
 			echo "Error message:"
 			echo "$output"
 		elif [ -n "$cmd" ]; then
-			echo "Executing command (${current}/${total}): $cmd"
+			echo "[$timestamp] Executing command (${current}/${total}): $cmd"
 			[ -n "$output" ] && echo "$output"
 			echo "----------------------------------------"
 		fi
@@ -57,11 +58,33 @@ output_result() {
 		[ "$status" = "error" ] && echo "Status: $code"
 		echo
 		if [ -n "$output" ]; then
-			echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"$message\",\"output\":\"$(echo "$output" | sed 's/"/\\"/g' | tr '\n' ' ')\",\"duration\":\"${duration}s\"}"
+			echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"$message\",\"output\":\"$(echo "$output" | sed 's/"/\\"/g' | tr '\n' ' ')\",\"duration\":\"${duration}s\",\"timestamp\":\"$timestamp\"}"
 		else
-			echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"$message\",\"duration\":\"${duration}s\"}"
+			echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"$message\",\"duration\":\"${duration}s\",\"timestamp\":\"$timestamp\"}"
 		fi
 	fi
+}
+
+check_and_reset() {
+	local temp_file="$1"
+	local start_time="$2"
+	local status_line=$(head -n1 "$temp_file")
+
+	local end_time=$(date +%s)
+	local duration=$((end_time - start_time))
+
+	if ! echo "$status_line" | grep -q "[^0]"; then
+		output_result "success" "0" "All commands completed" "" "" "" "" "$duration"
+		rm -f "$temp_file"
+		return 2
+	fi
+
+	if echo "$status_line" | grep -q "1"; then
+		rm -f "$temp_file"
+		return 1
+	fi
+
+	return 0
 }
 
 execute_command() {
@@ -95,20 +118,8 @@ execute_command() {
 	done
 
 	if [ $current_command -eq 0 ]; then
-		local end_time=$(date +%s)
-		local duration=$((end_time - start_time))
-		if ! echo "$status_line" | grep -q "[^0]"; then
-			rm -f "$temp_file"
-			output_result "success" "0" "All commands completed" "" "" "" "" "$duration"
-			return 0
-		fi
-		if echo "$status_line" | grep -q "1"; then
-			rm -f "$temp_file"
-			execute_command "$commands"
-			return $?
-		fi
-		output_result "success" "0" "All commands completed" "" "" "" "" "$duration"
-		return 0
+		check_and_reset "$temp_file" "$start_time"
+		return $?
 	fi
 
 	local cmd=$(sed -n "$((current_command + 1))p" "$temp_file" | cut -d'|' -f2)
@@ -140,8 +151,16 @@ while IFS=: read -r route command || [[ -n "$route" ]]; do
 	command=$(echo "$command" | xargs)
 
 	if [ "$REQUEST_PATH" = "$route" ]; then
-		execute_command "$command"
-		exit $?
+		while true; do
+			execute_command "$command"
+			result=$?
+			case $result in
+				0) break ;;
+				1|2) continue ;;
+				*) break ;;
+			esac
+		done
+		exit 0
 	fi
 done < "$ROUTES_FILE"
 
