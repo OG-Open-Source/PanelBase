@@ -841,7 +841,7 @@
 					'user-role': '管理員',
 					'dashboard-title': '系統儀表板',
 					'stat-cpu': 'CPU 使用率',
-					'stat-memory': '���憶體使用率',
+					'stat-memory': '記憶體使用率',
 					'stat-disk': '磁碟使用率',
 					'terminal-title': '系統更新'
 				}
@@ -1096,11 +1096,11 @@
 
 						const li = document.createElement('li');
 						li.textContent = data.message;
-							terminal.appendChild(li);
-							terminal.scrollTop = terminal.scrollHeight;
+						terminal.appendChild(li);
+						terminal.scrollTop = terminal.scrollHeight;
 
 						// 檢查完成狀態
-						if (data.message && data.message.includes('All commands completed')) {
+						if (data.status === 'success' && data.code === '0' && data.message === 'All commands completed') {
 							isCompleted = true;
 							progressBar.style.width = '100%';
 							console.log('Final response:', data);
