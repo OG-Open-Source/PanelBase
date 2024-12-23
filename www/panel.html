@@ -1070,6 +1070,7 @@
 				const terminal = document.querySelector('.terminal-output');
 				const progressBar = document.querySelector('.progress-fill');
 				let isCompleted = false;
+				let lastMessage = '';
 
 				while (!isCompleted) {
 					try {
@@ -1098,9 +1099,15 @@
 							continue;
 						}
 
+						if (data.message === lastMessage) {
+							await new Promise(resolve => setTimeout(resolve, 1000));
+							continue;
+						}
+						lastMessage = data.message;
+
 						const li = document.createElement('li');
 						if (data.output) {
-							li.textContent = `${data.message}\n${data.output}`;
+							li.textContent = `${data.message}${data.output}`;
 						} else {
 							li.textContent = data.message;
 						}
@@ -1115,7 +1122,7 @@
 								progressBar.style.width = `${progress}%`;
 							}
 							
-							if (data.message.trim() === '[00:00:00] All commands completed') {
+							if (data.message.includes('All commands completed')) {
 								isCompleted = true;
 								progressBar.style.width = '100%';
 								console.log('Final response:', data);
@@ -1124,7 +1131,8 @@
 						} else if (data.status === 'error') {
 							li.classList.add('error');
 							console.log('Error response:', data);
-							continue;
+							isCompleted = true;
+							break;
 						}
 
 						await new Promise(resolve => setTimeout(resolve, 1000));
@@ -1135,7 +1143,7 @@
 						li.classList.add('error');
 						terminal.appendChild(li);
 						terminal.scrollTop = terminal.scrollHeight;
-						continue;
+						await new Promise(resolve => setTimeout(resolve, 1000));
 					}
 				}
 			}
