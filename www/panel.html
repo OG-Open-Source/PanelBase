@@ -1099,13 +1099,15 @@
 						}
 
 						const li = document.createElement('li');
-						li.textContent = data.message;
+						if (data.output) {
+							li.textContent = `${data.message}\n${data.output}`;
+						} else {
+							li.textContent = data.message;
+						}
 						terminal.appendChild(li);
 						terminal.scrollTop = terminal.scrollHeight;
 
-						// 檢查狀態
 						if (data.status === 'success') {
-							// 更新進度條
 							const match = data.message && data.message.match(/Command executed to (\d+)\/(\d+)/);
 							if (match) {
 								const [, current, total] = match;
@@ -1113,8 +1115,7 @@
 								progressBar.style.width = `${progress}%`;
 							}
 							
-							// 如果是完成訊息，則結束執行
-							if (data.message.trim() === 'All commands completed') {
+							if (data.message.trim() === '[00:00:00] All commands completed') {
 								isCompleted = true;
 								progressBar.style.width = '100%';
 								console.log('Final response:', data);
@@ -1126,7 +1127,6 @@
 							continue;
 						}
 
-						// 等待下一次請求
 						await new Promise(resolve => setTimeout(resolve, 1000));
 					} catch (error) {
 						console.error('Fetch Error:', error);

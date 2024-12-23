@@ -75,8 +75,13 @@ output_result() {
 		echo -e "Content-type: application/json\nCache-Control: no-cache"
 		[ "$status" = "error" ] && echo "Status: $code"
 		echo
-		message="[${elapsed_time}] ${message}$([ -n "$output" ] && echo -e "\n${output}")"
-		echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"$(echo -e "$message" | sed 's/"/\\"/g')\"}"
+		if [ -n "$output" ]; then
+			message="[${elapsed_time}] ${message}"
+			echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"$(echo -e "$message" | sed 's/"/\\"/g')\",\"output\":\"$(echo -e "$output" | sed 's/"/\\"/g')\"}"
+		else
+			message="[${elapsed_time}] ${message}"
+			echo "{\"status\":\"$status\",\"code\":\"$code\",\"message\":\"$(echo -e "$message" | sed 's/"/\\"/g')\"}"
+		fi
 	fi
 }
 
