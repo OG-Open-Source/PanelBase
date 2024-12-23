@@ -1114,7 +1114,7 @@
 							}
 							
 							// 如果是完成訊息，則結束執行
-							if (data.message === 'All commands completed') {
+							if (data.message.trim() === 'All commands completed') {
 								isCompleted = true;
 								progressBar.style.width = '100%';
 								console.log('Final response:', data);
