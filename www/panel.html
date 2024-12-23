@@ -713,7 +713,11 @@
 					<div class="terminal-wrapper">
 						<div class="terminal">
 							<div class="terminal-header">
-								<div class="terminal-title">系統更新</div>
+								<div class="terminal-title" data-i18n="terminal-title">系統更新</div>
+								<div class="terminal-form">
+									<input type="text" id="urlInput" placeholder="請輸入網址" style="padding: 4px 8px; margin-right: 8px; border-radius: 4px; border: 1px solid var(--input-border); background: var(--input-background); color: var(--text-color);">
+									<button class="terminal-button" onclick="getUrlContent()">獲取內容</button>
+								</div>
 								<div class="terminal-buttons">
 									<button class="terminal-button" onclick="startUpdate()">開始更新</button>
 									<button class="terminal-button" onclick="clearTerminal()">清除</button>
@@ -1099,27 +1103,27 @@
 						terminal.appendChild(li);
 						terminal.scrollTop = terminal.scrollHeight;
 
-						// 檢查完成狀態
-						if (data.status === 'success' && data.code === '0' && data.message === 'All commands completed') {
-							isCompleted = true;
-							progressBar.style.width = '100%';
-							console.log('Final response:', data);
-							break;
-						}
-
-						// 檢查錯誤狀態
-						if (data.status === 'error') {
+						// 檢查狀態
+						if (data.status === 'success') {
+							// 更新進度條
+							const match = data.message && data.message.match(/Command executed to (\d+)\/(\d+)/);
+							if (match) {
+								const [, current, total] = match;
+								const progress = (current / total) * 100;
+								progressBar.style.width = `${progress}%`;
+							}
+							
+							// 如果是完成訊息，則結束執行
+							if (data.message === 'All commands completed') {
+								isCompleted = true;
+								progressBar.style.width = '100%';
+								console.log('Final response:', data);
+								break;
+							}
+						} else if (data.status === 'error') {
 							li.classList.add('error');
 							console.log('Error response:', data);
 							continue;
-						}
-
-						// 更新進度條
-						const match = data.message && data.message.match(/Command executed to (\d+)\/(\d+)/);
-						if (match) {
-							const [, current, total] = match;
-							const progress = (current / total) * 100;
-							progressBar.style.width = `${progress}%`;
 						}
 
 						// 等待下一次請求
@@ -1138,6 +1142,46 @@
 
 			function clearTerminal() {
 				document.querySelector('.terminal-output').textContent = '';
+			}
+
+			async function getUrlContent() {
+				const terminal = document.querySelector('.terminal-output');
+				const urlInput = document.getElementById('urlInput');
+				const url = encodeURIComponent(urlInput.value.trim());
+
+				if (!url) {
+					const li = document.createElement('li');
+					li.textContent = '請輸入有效的網址';
+					li.classList.add('error');
+					terminal.appendChild(li);
+					terminal.scrollTop = terminal.scrollHeight;
+					return;
+				}
+
+				try {
+					const response = await fetch(`/cgi-bin/panel.cgi/api/panel/get?url=${url}`, {
+						headers: {
+							'Accept': 'text/plain'
+						}
+					});
+
+					if (!response.ok) {
+						throw new Error(`HTTP error! status: ${response.status}`);
+					}
+
+					const content = await response.text();
+					const li = document.createElement('li');
+					li.textContent = content;
+					terminal.appendChild(li);
+					terminal.scrollTop = terminal.scrollHeight;
+				} catch (error) {
+					console.error('Fetch Error:', error);
+					const li = document.createElement('li');
+					li.textContent = `Error: ${error.message}`;
+					li.classList.add('error');
+					terminal.appendChild(li);
+					terminal.scrollTop = terminal.scrollHeight;
+				}
 			}
 		</script>
 	</body>
