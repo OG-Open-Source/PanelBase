@@ -17,8 +17,9 @@ touch "$ACCESS_LOG"
 REQUEST_PATH=$(echo "$REQUEST_URI" | cut -d'?' -f1 | sed 's/\/cgi-bin\/panel\.cgi//')
 QUERY_STRING="${QUERY_STRING:-}"
 ACCEPT_HEADER="${HTTP_ACCEPT:-application/json}"
+SHOULD_LOG=1
 
-log_command() { echo "[${1}] ${2}" >> "$ACCESS_LOG"; }
+log_command() { [ "$SHOULD_LOG" = "1" ] && echo "[${1}] ${2}" >> "$ACCESS_LOG"; }
 
 output_result() {
 	local status="$1" code="$2" message="$3" output="$4" current="$5" total="$6" cmd="$7" duration="$8" start_time="$9"
@@ -117,6 +118,11 @@ while IFS=: read -r route command || [[ -n "$route" ]]; do
 
 	route=$(echo "$route" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 	command=$(echo "$command" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+	if [[ "$route" =~ ^([^@]+)@nolog$ ]]; then
+		SHOULD_LOG=0
+		route="${BASH_REMATCH[1]}"
+	fi
 
 	[ "$REQUEST_PATH" = "$route" ] && {
 		execute_command "$command"
