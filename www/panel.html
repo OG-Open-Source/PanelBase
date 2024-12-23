@@ -1103,18 +1103,20 @@
 						if (data.message && data.message.includes('All commands completed')) {
 							isCompleted = true;
 							progressBar.style.width = '100%';
+							console.log('Final response:', data);
 							break;
 						} else if (data.status === 'error') {
 							li.classList.add('error');
+							console.log('Error response:', data);
 							return;
 						}
 
 						// 更新進度條
-						const match = data.message && data.message.match(/\((\d+)\/(\d+)\)/);
+						const match = data.message && data.message.match(/Command executed to (\d+)\/(\d+)/);
 						if (match) {
 							const [, current, total] = match;
 							const progress = (current / total) * 100;
-							progressBar.style.width = `${progress}%`;
+								progressBar.style.width = `${progress}%`;
 						}
 
 						// 等待下一次請求
