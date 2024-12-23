@@ -5,9 +5,10 @@ source "/opt/panelbase/config/security.conf"
 ROUTES_FILE="/opt/panelbase/config/routes.conf"
 TEMP_DIR="/opt/panelbase/temp"
 ACCESS_LOG="/opt/panelbase/logs/access.log"
+REQUEST_LOG="/opt/panelbase/logs/request.log"
 
 mkdir -p "$TEMP_DIR" "$(dirname "$ACCESS_LOG")"
-touch "$ACCESS_LOG"
+touch "$ACCESS_LOG" "$REQUEST_LOG"
 
 [ ! -f "$ROUTES_FILE" ] && {
 	echo -e "Content-type: application/json\nStatus: 500\n\n{\"status\":\"error\",\"code\":\"500\",\"message\":\"Routes configuration not found\"}"
@@ -18,8 +19,41 @@ REQUEST_PATH=$(echo "$REQUEST_URI" | cut -d'?' -f1 | sed 's/\/cgi-bin\/panel\.cg
 QUERY_STRING="${QUERY_STRING:-}"
 ACCEPT_HEADER="${HTTP_ACCEPT:-application/json}"
 SHOULD_LOG=1
+MAX_LOG_SIZE=10485760
+MAX_REQUESTS=1000
+REQUEST_WINDOW=60
 
-log_command() { [ "$SHOULD_LOG" = "1" ] && echo "[${1}] ${2}" >> "$ACCESS_LOG"; }
+check_request_limit() {
+	local now=$(date +%s)
+	local window_start=$((now - REQUEST_WINDOW))
+	
+	sed -i "/^[0-9]\{10\} /!d" "$REQUEST_LOG"
+	sed -i "/^[$window_start-$now]/!d" "$REQUEST_LOG"
+	
+	echo "$now $REQUEST_PATH" >> "$REQUEST_LOG"
+	
+	local count=$(wc -l < "$REQUEST_LOG")
+	[ "$count" -gt "$MAX_REQUESTS" ] && {
+		echo -e "Content-type: application/json\nStatus: 429\n\n{\"status\":\"error\",\"code\":\"429\",\"message\":\"Too many requests\"}"
+		exit 1
+	}
+}
+
+check_log_size() {
+	local size=$(stat -f%z "$ACCESS_LOG" 2>/dev/null || stat -c%s "$ACCESS_LOG")
+	[ "$size" -gt "$MAX_LOG_SIZE" ] && {
+		local timestamp=$(date '+%Y%m%d_%H%M%S')
+		mv "$ACCESS_LOG" "${ACCESS_LOG}.${timestamp}"
+		touch "$ACCESS_LOG"
+	}
+}
+
+log_command() {
+	[ "$SHOULD_LOG" = "1" ] && {
+		check_log_size
+		echo "[${1}] ${2}" >> "$ACCESS_LOG"
+	}
+}
 
 output_result() {
 	local status="$1" code="$2" message="$3" output="$4" current="$5" total="$6" cmd="$7" duration="$8" start_time="$9"
@@ -112,6 +146,8 @@ execute_command() {
 	fi
 }
 
+check_request_limit
+
 while IFS=: read -r route command || [[ -n "$route" ]]; do
 	[[ "$route" =~ ^[[:space:]]*# ]] && continue
 	[ -z "$route" ] && continue
@@ -119,9 +155,17 @@ while IFS=: read -r route command || [[ -n "$route" ]]; do
 	route=$(echo "$route" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 	command=$(echo "$command" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
-	if [[ "$route" =~ ^([^@]+)@nolog$ ]]; then
-		SHOULD_LOG=0
+	if [[ "$route" =~ ^([^@]+)@([^:]+)$ ]]; then
 		route="${BASH_REMATCH[1]}"
+		local flags=(${BASH_REMATCH[2]/,/ })
+		for flag in "${flags[@]}"; do
+			case "$flag" in
+				nolog) SHOULD_LOG=0 ;;
+				maxlog=*) MAX_LOG_SIZE=$((${flag#maxlog=} * 1024 * 1024)) ;;
+				maxreq=*) MAX_REQUESTS=${flag#maxreq=} ;;
+				window=*) REQUEST_WINDOW=${flag#window=} ;;
+			esac
+		done
 	fi
 
 	[ "$REQUEST_PATH" = "$route" ] && {
