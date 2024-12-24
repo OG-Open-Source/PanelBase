@@ -11,6 +11,14 @@ calculate_elapsed() {
 	echo "$((end - start))s"
 }
 
+send_error_response() {
+	local error_msg="$1"
+	local current_time=$(format_time)
+	echo "Content-type: application/json"
+	echo
+	echo "{\"status\":\"error\",\"data\":{\"command\":\"\",\"start_time\":\"$current_time\",\"end_time\":\"$current_time\",\"elapsed_time\":\"0s\",\"progress\":{\"current\":0,\"total\":0,\"percentage\":0},\"steps\":[],\"errors\":[\"$error_msg\"]}}"
+}
+
 send_response() {
 	local status="$1"
 	local data="$2"
@@ -63,10 +71,10 @@ execute_command() {
 }
 
 main() {
-	[ -z "$REQUEST_PATH" ] && { send_response "error" "{\"error\":\"No request path provided\"}"; exit 1; }
-	[ ! -f "$ROUTES_CONF" ] && { send_response "error" "{\"error\":\"Routes configuration not found\"}"; exit 1; }
+	[ -z "$REQUEST_PATH" ] && { send_error_response "No request path provided"; exit 1; }
+	[ ! -f "$ROUTES_CONF" ] && { send_error_response "Routes configuration not found"; exit 1; }
 	command=$(grep "^$REQUEST_PATH:" "$ROUTES_CONF" | cut -d':' -f2-)
-	[ -z "$command" ] && { send_response "error" "{\"error\":\"Route not found\"}"; exit 1; }
+	[ -z "$command" ] && { send_error_response "Route not found"; exit 1; }
 	execute_command "$command"
 }
 

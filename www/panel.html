@@ -27,13 +27,24 @@
 			.endpoint h3 {
 				margin: 0 0 10px 0;
 			}
+			.endpoint-group {
+				display: flex;
+				gap: 10px;
+				margin-bottom: 10px;
+			}
+			.endpoint-item {
+				flex: 1;
+			}
 			button {
 				background: #4CAF50;
 				color: white;
 				border: none;
 				padding: 8px 16px;
 				border-radius: 4px;
+				
 				cursor: pointer;
+				width: 100%;
+				margin-bottom: 5px;
 			}
 			button:hover {
 				background: #45a049;
@@ -43,7 +54,9 @@
 				padding: 10px;
 				border-radius: 4px;
 				overflow-x: auto;
-				margin: 10px 0;
+				margin: 5px 0;
+				font-size: 12px;
+				max-height: 200px;
 			}
 		</style>
 	</head>
@@ -53,31 +66,55 @@
 			
 			<div class="endpoint">
 				<h3>系統資訊</h3>
-				<button onclick="testEndpoint('/api/system/cpu')">CPU</button>
-				<button onclick="testEndpoint('/api/system/memory')">Memory</button>
-				<button onclick="testEndpoint('/api/system/disk')">Disk</button>
-				<pre id="system-output">點擊按鈕測試 API</pre>
+				<div class="endpoint-group">
+					<div class="endpoint-item">
+						<button onclick="testEndpoint('/api/system/cpu')">CPU</button>
+						<pre id="cpu-output">點擊按鈕測試 API</pre>
+					</div>
+					<div class="endpoint-item">
+						<button onclick="testEndpoint('/api/system/memory')">Memory</button>
+						<pre id="memory-output">點擊按鈕測試 API</pre>
+					</div>
+					<div class="endpoint-item">
+						<button onclick="testEndpoint('/api/system/disk')">Disk</button>
+						<pre id="disk-output">點擊按鈕測試 API</pre>
+					</div>
+				</div>
 			</div>
 
 			<div class="endpoint">
 				<h3>網路資訊</h3>
-				<button onclick="testEndpoint('/api/network/ip')">IP</button>
-				<button onclick="testEndpoint('/api/network/ping')">Ping</button>
-				<pre id="network-output">點擊按鈕測試 API</pre>
+				<div class="endpoint-group">
+					<div class="endpoint-item">
+						<button onclick="testEndpoint('/api/network/ip')">IP</button>
+						<pre id="ip-output">點擊按鈕測試 API</pre>
+					</div>
+					<div class="endpoint-item">
+						<button onclick="testEndpoint('/api/network/ping')">Ping</button>
+						<pre id="ping-output">點擊按鈕測試 API</pre>
+					</div>
+				</div>
 			</div>
 
 			<div class="endpoint">
 				<h3>系統更新</h3>
-				<button onclick="testEndpoint('/api/system/update')">Update</button>
-				<button onclick="testEndpoint('/api/system/clean')">Clean</button>
-				<pre id="update-output">點擊按鈕測試 API</pre>
+				<div class="endpoint-group">
+					<div class="endpoint-item">
+						<button onclick="testEndpoint('/api/system/update')">Update</button>
+						<pre id="update-output">點擊按鈕測試 API</pre>
+					</div>
+					<div class="endpoint-item">
+						<button onclick="testEndpoint('/api/system/clean')">Clean</button>
+						<pre id="clean-output">點擊按鈕測試 API</pre>
+					</div>
+				</div>
 			</div>
 		</div>
 
 		<script>
 			async function testEndpoint(path) {
-				const outputId = path.split('/')[2] + '-output';
-				const outputElement = document.getElementById(outputId);
+				const command = path.split('/').pop();
+				const outputElement = document.getElementById(command + '-output');
 				outputElement.textContent = '執行中...';
 				
 				try {
