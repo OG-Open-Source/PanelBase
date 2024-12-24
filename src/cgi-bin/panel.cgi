@@ -103,6 +103,7 @@ check_and_reset() {
 
 execute_command() {
 	local commands="$1" date_prefix=$(date '+%Y-%m-%d')
+	commands=$(echo "$commands" | sed 's/;\s*/;/g')
 	local api_path=$(echo "$REQUEST_PATH" | sed 's/\//_/g')
 	local temp_file="$TEMP_DIR/${date_prefix}${api_path}.log"
 	local total_commands=0 current_command=0 start_time=$(date +%s)
@@ -114,7 +115,8 @@ execute_command() {
 		printf "2%.0s" $(seq 1 $total_commands) > "$temp_file"
 		echo "" >> "$temp_file"
 		for ((i=0; i<total_commands; i++)); do
-			printf "%d|%s\n" "$((i+1))" "${CMD_ARRAY[i]}" >> "$temp_file"
+			local cmd=$(echo "${CMD_ARRAY[i]}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+			printf "%d|%s\n" "$((i+1))" "$cmd" >> "$temp_file"
 		done
 	fi
 
