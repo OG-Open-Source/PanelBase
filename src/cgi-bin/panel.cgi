@@ -103,38 +103,49 @@ check_and_reset() {
 
 execute_command() {
 	local commands="$1" date_prefix=$(date '+%Y-%m-%d')
-	commands=$(echo "$commands" | awk '
-		BEGIN { RS=""; FS="" }
-		{
-			in_quote=0
-			in_bracket=0
-			result=""
-			for(i=1;i<=length($0);i++) {
-				c=substr($0,i,1)
-				if(c=="\"" && substr($0,i-1,1)!="\\") {
-					in_quote=!in_quote
-				}
-				if(c=="[" && !in_quote) in_bracket++
-				if(c=="]" && !in_quote) in_bracket--
-				if(c==";" && !in_quote && !in_bracket) {
-					result=result ";" substr($0,i+1)
-					i++
-					while(substr($0,i,1) ~ /[[:space:]]/) i++
-					i--
-				} else {
-					result=result c
-				}
-			}
-			print result
-		}
-	')
 	local api_path=$(echo "$REQUEST_PATH" | sed 's/\//_/g')
 	local temp_file="$TEMP_DIR/${date_prefix}${api_path}.log"
 	local total_commands=0 current_command=0 start_time=$(date +%s)
 
 	readarray -t CMD_ARRAY < <(echo "$commands" | awk '
-		BEGIN { RS=";" }
-		NF { gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print }
+		BEGIN { RS="" }
+		{
+			len = length($0)
+			cmd = ""
+			i = 1
+			while (i <= len) {
+				if (substr($0, i, 2) == "s/") {
+					start = i
+					count = 0
+					while (i <= len) {
+						c = substr($0, i, 1)
+						if (c == "/") count++
+						if (count == 3) {
+							if (substr($0, i+1, 1) == "g") i++
+							break
+						}
+						i++
+					}
+					cmd = cmd substr($0, start, i-start+1)
+				}
+				else if (substr($0, i, 1) == ";") {
+					prev = substr($0, i-1, 1)
+					next = substr($0, i+1, 1)
+					if (prev !~ /[\/g]/ && next !~ /[\/s]/) {
+						print cmd
+						cmd = ""
+						while (substr($0, i+1, 1) ~ /^[[:space:]]/) i++
+					} else {
+						cmd = cmd ";"
+					}
+				}
+				else {
+					cmd = cmd substr($0, i, 1)
+				}
+				i++
+			}
+			if (cmd != "") print cmd
+		}
 	')
 	total_commands=${#CMD_ARRAY[@]}
 
@@ -143,6 +154,7 @@ execute_command() {
 		echo "" >> "$temp_file"
 		for ((i=0; i<total_commands; i++)); do
 			local cmd="${CMD_ARRAY[i]}"
+			cmd=$(echo "$cmd" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 			printf "%d|%s\n" "$((i+1))" "$cmd" >> "$temp_file"
 		done
 	fi
