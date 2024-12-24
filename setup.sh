@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta171"
+Version="Beta172"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -227,7 +227,12 @@ alias.url = ( "/cgi-bin/" => "$INSTALL_DIR/cgi-bin/" )
 	cgi.assign = ( "" => "" )
 	setenv.add-response-header = (
 		"Cache-Control" => "no-cache",
-		"X-Accel-Buffering" => "no"
+		"X-Accel-Buffering" => "no",
+		"X-Frame-Options" => "SAMEORIGIN",
+		"X-Content-Type-Options" => "nosniff",
+		"X-XSS-Protection" => "1; mode=block",
+		"Referrer-Policy" => "strict-origin-when-cross-origin",
+		"Content-Security-Policy" => "default-src 'self'"
 	)
 }
 
@@ -247,13 +252,15 @@ mimetype.assign = (
 	".eot"  => "application/vnd.ms-fontobject"
 )
 
-\$HTTP["url"] !~ "^/\$" {
-	\$HTTP["url"] !~ "^/cgi-bin/(auth|panel)\.cgi" {
-		url.rewrite-once = (
-			"^/.*" => "/cgi-bin/check_auth.cgi"
-		)
-	}
-}
+include_shell "echo '\$HTTP[\"url\"] =~ \"\.(' $(grep '^STATIC_RESOURCES=' $INSTALL_DIR/config/security.conf | cut -d'\"' -f2) ')\$\" {}'"
+
+include_shell "echo '\$HTTP[\"url\"] !~ \"' $(grep '^PUBLIC_ROUTES=' $INSTALL_DIR/config/security.conf | cut -d'\"' -f2) '\" {'"
+include_shell "echo '  \$HTTP[\"url\"] !~ \"\.(' $(grep '^STATIC_RESOURCES=' $INSTALL_DIR/config/security.conf | cut -d'\"' -f2) ')\$\" {'"
+echo '    url.rewrite-once = ('
+echo '      "^/.*" => "/cgi-bin/check_auth.cgi"'
+echo '    )'
+echo '  }'
+echo '}'
 
 index-file.names = ( "index.html" )
 

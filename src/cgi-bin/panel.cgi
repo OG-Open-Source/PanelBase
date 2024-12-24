@@ -12,12 +12,17 @@ calculate_elapsed() {
 	echo "$((end - start))s"
 }
 
+escape_json() {
+	local text="$1"
+	echo "$text" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g; s/\r/\\r/g; s/\t/\\t/g'
+}
+
 send_error_response() {
 	local error_msg="$1"
 	local current_time=$(format_time)
 	echo "Content-type: application/json"
 	echo
-	echo "{\"status\":\"error\",\"data\":{\"command\":\"\",\"start_time\":\"$current_time\",\"end_time\":\"$current_time\",\"elapsed_time\":\"0s\",\"progress\":{\"current\":0,\"total\":0,\"percentage\":0},\"steps\":[],\"errors\":[\"$error_msg\"]}}"
+	echo "{\"status\":\"error\",\"data\":{\"command\":\"\",\"start_time\":\"$current_time\",\"end_time\":\"$current_time\",\"elapsed_time\":\"0s\",\"progress\":{\"current\":0,\"total\":0,\"percentage\":0},\"steps\":[],\"errors\":[\"$(escape_json "$error_msg")\"]}}"
 }
 
 send_response() {
@@ -49,11 +54,11 @@ execute_command() {
 		local step_end=$(date +%s)
 		local step_elapsed=$(calculate_elapsed $step_start $step_end)
 		if [ $exit_code -eq 0 ]; then
-			steps+=("{\"command\":\"$cmd\",\"output\":\"$output\",\"status\":\"success\",\"elapsed_time\":\"$step_elapsed\",\"step\":\"$current\",\"total\":\"$total\"}")
-			errors+=("\"\"")
+			steps+=("{\"command\":\"$(escape_json "$cmd")\",\"output\":\"$(escape_json "$output")\",\"status\":\"success\",\"elapsed_time\":\"$step_elapsed\",\"step\":\"$current\",\"total\":\"$total\"}")
+				errors+=("\"\"")
 		else
-			steps+=("{\"command\":\"$cmd\",\"output\":\"$output\",\"status\":\"error\",\"elapsed_time\":\"$step_elapsed\",\"step\":\"$current\",\"total\":\"$total\"}")
-			errors+=("\"$output\"")
+			steps+=("{\"command\":\"$(escape_json "$cmd")\",\"output\":\"$(escape_json "$output")\",\"status\":\"error\",\"elapsed_time\":\"$step_elapsed\",\"step\":\"$current\",\"total\":\"$total\"}")
+			errors+=("\"$(escape_json "$output")\"")
 			break
 		fi
 	done
@@ -63,7 +68,7 @@ execute_command() {
 	local percentage=$((current * 100 / total))
 	local steps_json=$(IFS=,; echo "${steps[*]}")
 	local errors_json=$(IFS=,; echo "${errors[*]}")
-	local data="{\"command\":\"$command\",\"start_time\":\"$start_time_iso\",\"end_time\":\"$end_time_iso\",\"elapsed_time\":\"$elapsed_time\",\"progress\":{\"current\":$current,\"total\":$total,\"percentage\":$percentage},\"steps\":[$steps_json],\"errors\":[$errors_json]}"
+	local data="{\"command\":\"$(escape_json "$command")\",\"start_time\":\"$start_time_iso\",\"end_time\":\"$end_time_iso\",\"elapsed_time\":\"$elapsed_time\",\"progress\":{\"current\":$current,\"total\":$total,\"percentage\":$percentage},\"steps\":[$steps_json],\"errors\":[$errors_json]}"
 	if [ $current -eq $total ]; then
 		send_response "success" "$data"
 	else
