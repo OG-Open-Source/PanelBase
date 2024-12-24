@@ -2,6 +2,7 @@
 
 INSTALL_DIR="/opt/panelbase"
 ROUTES_CONF="$INSTALL_DIR/config/routes.conf"
+REQUEST_PATH="${PATH_INFO}"
 
 format_time() { date -u "+%Y-%m-%dT%H:%M:%SZ"; }
 
