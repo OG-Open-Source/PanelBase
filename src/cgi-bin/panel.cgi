@@ -103,19 +103,46 @@ check_and_reset() {
 
 execute_command() {
 	local commands="$1" date_prefix=$(date '+%Y-%m-%d')
-	commands=$(echo "$commands" | sed 's/;\s*/;/g')
+	commands=$(echo "$commands" | awk '
+		BEGIN { RS=""; FS="" }
+		{
+			in_quote=0
+			in_bracket=0
+			result=""
+			for(i=1;i<=length($0);i++) {
+				c=substr($0,i,1)
+				if(c=="\"" && substr($0,i-1,1)!="\\") {
+					in_quote=!in_quote
+				}
+				if(c=="[" && !in_quote) in_bracket++
+				if(c=="]" && !in_quote) in_bracket--
+				if(c==";" && !in_quote && !in_bracket) {
+					result=result ";" substr($0,i+1)
+					i++
+					while(substr($0,i,1) ~ /[[:space:]]/) i++
+					i--
+				} else {
+					result=result c
+				}
+			}
+			print result
+		}
+	')
 	local api_path=$(echo "$REQUEST_PATH" | sed 's/\//_/g')
 	local temp_file="$TEMP_DIR/${date_prefix}${api_path}.log"
 	local total_commands=0 current_command=0 start_time=$(date +%s)
 
-	IFS=';' read -ra CMD_ARRAY <<< "$commands"
+	readarray -t CMD_ARRAY < <(echo "$commands" | awk '
+		BEGIN { RS=";" }
+		NF { gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print }
+	')
 	total_commands=${#CMD_ARRAY[@]}
 
 	if [ ! -f "$temp_file" ] || grep -q "1" "$temp_file"; then
 		printf "2%.0s" $(seq 1 $total_commands) > "$temp_file"
 		echo "" >> "$temp_file"
 		for ((i=0; i<total_commands; i++)); do
-			local cmd=$(echo "${CMD_ARRAY[i]}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+			local cmd="${CMD_ARRAY[i]}"
 			printf "%d|%s\n" "$((i+1))" "$cmd" >> "$temp_file"
 		done
 	fi
