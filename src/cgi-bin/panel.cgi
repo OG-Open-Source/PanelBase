@@ -70,30 +70,11 @@ send_error_response() {
 
 send_response() {
 	local status="$1"
-	local code="$2"
-	local message="$3"
-	local command="$4"
-	local start_time="$5"
-	local end_time="$6"
-	local elapsed_time="$7"
-	local progress="$8"
-	local steps="$9"
-	local errors="${10}"
+	local data="$2"
 
-	command=$(echo "$command" | sed -E 's/;[[:space:]]*\\+/; \\/g')
-
-	printf "Content-type: application/json\n\n"
-	printf '{"status":"%s","data":{"command":"%s","start_time":"%s","end_time":"%s","elapsed_time":"%s","progress":"%s","steps":%s,"errors":%s},"code":"%s","message":"%s"}\n' \
-		"$status" \
-		"$(echo "$command" | sed 's/\\/\\\\/g')" \
-		"$start_time" \
-		"$end_time" \
-		"$elapsed_time" \
-		"$progress" \
-		"$steps" \
-		"$errors" \
-		"$code" \
-		"$message"
+	echo "Content-type: application/json"
+	echo
+	echo "{\"status\":\"$status\",\"data\":$data}"
 }
 
 split_commands() {
