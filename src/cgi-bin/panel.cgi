@@ -70,11 +70,30 @@ send_error_response() {
 
 send_response() {
 	local status="$1"
-	local data="$2"
+	local code="$2"
+	local message="$3"
+	local command="$4"
+	local start_time="$5"
+	local end_time="$6"
+	local elapsed_time="$7"
+	local progress="$8"
+	local steps="$9"
+	local errors="${10}"
 
-	echo "Content-type: application/json"
-	echo
-	echo "{\"status\":\"$status\",\"data\":$data}"
+	command=$(echo "$command" | sed -E 's/;[[:space:]]*\\+/; \\/g')
+
+	printf "Content-type: application/json\n\n"
+	printf '{"status":"%s","data":{"command":"%s","start_time":"%s","end_time":"%s","elapsed_time":"%s","progress":"%s","steps":%s,"errors":%s},"code":"%s","message":"%s"}\n' \
+		"$status" \
+		"$(echo "$command" | sed 's/\\/\\\\/g')" \
+		"$start_time" \
+		"$end_time" \
+		"$elapsed_time" \
+		"$progress" \
+		"$steps" \
+		"$errors" \
+		"$code" \
+		"$message"
 }
 
 split_commands() {
@@ -151,13 +170,11 @@ main() {
 	[ ! -f "$ROUTES_CONF" ] && { send_error_response "Routes configuration not found"; exit 1; }
 	command=$(grep "^$REQUEST_PATH:" "$ROUTES_CONF" | cut -d':' -f2-)
 	[ -z "$command" ] && { send_error_response "Route not found"; exit 1; }
-	if [[ "$command" =~ \$\{.*\} ]]; then
-		while IFS= read -r param_name; do
-			param_name=${param_name#\$\{}
-			param_name=${param_name%\}}
-			param_value=$(get_query_param "$param_name")
-			command=${command//\$\{$param_name\}/$param_value}
-		done < <(echo "$command" | grep -oP '\$\{[^}]+\}')
+	if [ -n "$QUERY_STRING" ]; then
+		while IFS='=' read -r name value; do
+			[ -n "$name" ] && [ -n "$value" ] && \
+			command=${command//\$\{$name\}/$(decode_url "$value")}
+		done < <(echo "$QUERY_STRING" | tr '&' '\n')
 	fi
 	execute_command "$command"
 }
