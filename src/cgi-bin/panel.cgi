@@ -14,6 +14,7 @@ calculate_elapsed() {
 
 escape_json() {
 	local text="$1"
+	text=$(echo "$text" | perl -pe 's/\x1b\[[0-9;]*[mGKHF]//g')
 	text="${text//\\/\\\\}"
 	text="${text//\"/\\\"}"
 	text="${text//$'\b'/\\b}"
