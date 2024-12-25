@@ -14,7 +14,32 @@ calculate_elapsed() {
 
 escape_json() {
 	local text="$1"
-	echo "$text" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g; s/\r/\\r/g; s/\t/\\t/g'
+	local hex=$(echo -n "$text" | hexdump -v -e '/1 "%02x"')
+	local result=""
+	while [ -n "$hex" ]; do
+		byte="${hex:0:2}"
+		hex="${hex:2}"
+		case "$byte" in
+			0[0-9a-f]|1[0-9a-f])
+				case "$byte" in
+					08) result+='\b';;
+					09) result+='\t';;
+					0a) result+='\n';;
+					0c) result+='\f';;
+					0d) result+='\r';;
+					*)  result+="\\u00$byte";;
+				esac
+				;;
+			22) result+='\\"';;
+			5c) result+='\\\\';;
+			2f) result+='\/';;
+			*)
+				result+="\\x$byte"
+				result+=$(echo -e "\\x$byte" | iconv -f utf-8 -t utf-8 2>/dev/null || echo "?")
+				;;
+		esac
+	done
+	echo "$result"
 }
 
 send_error_response() {
@@ -41,34 +66,44 @@ execute_command() {
 	local errors=()
 	local current=0
 	local total=0
+
 	IFS=';' read -ra COMMANDS <<< "$command"
 	total=${#COMMANDS[@]}
+
 	for cmd in "${COMMANDS[@]}"; do
 		cmd=$(echo "$cmd" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 		((current++))
+		
 		local step_start=$(date +%s)
 		local output
 		local exit_code
+		
 		output=$(eval "$cmd" 2>&1)
 		exit_code=$?
+		
 		local step_end=$(date +%s)
 		local step_elapsed=$(calculate_elapsed $step_start $step_end)
+		
 		if [ $exit_code -eq 0 ]; then
 			steps+=("{\"command\":\"$(escape_json "$cmd")\",\"output\":\"$(escape_json "$output")\",\"status\":\"success\",\"elapsed_time\":\"$step_elapsed\",\"step\":\"$current\",\"total\":\"$total\"}")
-				errors+=("\"\"")
+			errors+=("\"\"")
 		else
 			steps+=("{\"command\":\"$(escape_json "$cmd")\",\"output\":\"$(escape_json "$output")\",\"status\":\"error\",\"elapsed_time\":\"$step_elapsed\",\"step\":\"$current\",\"total\":\"$total\"}")
 			errors+=("\"$(escape_json "$output")\"")
 			break
 		fi
 	done
+
 	local end_time=$(date +%s)
 	local end_time_iso=$(format_time)
 	local elapsed_time=$(calculate_elapsed $start_time $end_time)
 	local percentage=$((current * 100 / total))
+
 	local steps_json=$(IFS=,; echo "${steps[*]}")
 	local errors_json=$(IFS=,; echo "${errors[*]}")
+
 	local data="{\"command\":\"$(escape_json "$command")\",\"start_time\":\"$start_time_iso\",\"end_time\":\"$end_time_iso\",\"elapsed_time\":\"$elapsed_time\",\"progress\":{\"current\":$current,\"total\":$total,\"percentage\":$percentage},\"steps\":[$steps_json],\"errors\":[$errors_json]}"
+
 	if [ $current -eq $total ]; then
 		send_response "success" "$data"
 	else
@@ -79,8 +114,10 @@ execute_command() {
 main() {
 	[ -z "$REQUEST_PATH" ] && { send_error_response "No request path provided"; exit 1; }
 	[ ! -f "$ROUTES_CONF" ] && { send_error_response "Routes configuration not found"; exit 1; }
+
 	command=$(grep "^$REQUEST_PATH:" "$ROUTES_CONF" | cut -d':' -f2-)
 	[ -z "$command" ] && { send_error_response "Route not found"; exit 1; }
+
 	execute_command "$command"
 }
 
