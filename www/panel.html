@@ -42,7 +42,7 @@
 				border: none;
 				padding: 8px 16px;
 				border-radius: 4px;
-				
+
 				cursor: pointer;
 				width: 100%;
 				margin-bottom: 5px;
@@ -68,7 +68,7 @@
 	<body>
 		<div class="container">
 			<h1>PanelBase API 測試</h1>
-			
+
 			<div class="endpoint">
 				<h3>系統資訊</h3>
 				<div class="endpoint-group">
@@ -98,8 +98,8 @@
 						<button onclick="testEndpoint('/api/network/ping')">Ping</button>
 						<pre id="ping-output">點擊按鈕測試 API</pre>
 					</div>
-				</div>
-			</div>
+						</div>
+						</div>
 
 			<div class="endpoint">
 				<h3>系統更新</h3>
@@ -113,7 +113,7 @@
 						<pre id="clean-output">點擊按鈕測試 API</pre>
 					</div>
 				</div>
-			</div>
+							</div>
 
 			<div class="endpoint"></div>
 				<h3>OGOS</h3>
@@ -131,7 +131,7 @@
 				const command = path.split('/').pop();
 				const outputElement = document.getElementById(command + '-output');
 				outputElement.textContent = '執行中...';
-				
+
 				try {
 					const response = await fetch('/cgi-bin/panel.cgi' + path);
 					const data = await response.json();
