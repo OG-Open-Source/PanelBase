@@ -4,6 +4,31 @@ INSTALL_DIR="/opt/panelbase"
 ROUTES_CONF="$INSTALL_DIR/config/routes.conf"
 REQUEST_PATH="${PATH_INFO}"
 
+decode_url() {
+	local encoded="$1"
+	echo "$encoded" | sed -e 's/+/ /g' \
+		-e 's/%20/ /g' \
+		-e 's/%22/"/g' \
+		-e 's/%5B/[/g' \
+		-e 's/%5D/]/g' \
+		-e 's/%2C/,/g' \
+		-e 's/%3A/:/g' \
+		-e 's/%2F/\//g' \
+		-e 's/%3D/=/g' \
+		-e 's/%26/\&/g' \
+		-e 's/%3F/?/g' \
+		-e 's/%25/%/g'
+}
+
+get_query_param() {
+	local param_name="$1"
+	local query_string="$QUERY_STRING"
+	local param_value
+
+	param_value=$(echo "$query_string" | grep -oP "$param_name=\K[^&]+")
+	[ -n "$param_value" ] && decode_url "$param_value" || echo ""
+}
+
 format_time() { date -u "+%Y-%m-%dT%H:%M:%SZ"; }
 
 calculate_elapsed() {
@@ -126,6 +151,14 @@ main() {
 	[ ! -f "$ROUTES_CONF" ] && { send_error_response "Routes configuration not found"; exit 1; }
 	command=$(grep "^$REQUEST_PATH:" "$ROUTES_CONF" | cut -d':' -f2-)
 	[ -z "$command" ] && { send_error_response "Route not found"; exit 1; }
+	if [[ "$command" =~ \$\{.*\} ]]; then
+		while IFS= read -r param_name; do
+			param_name=${param_name#\$\{}
+			param_name=${param_name%\}}
+			param_value=$(get_query_param "$param_name")
+			command=${command//\$\{$param_name\}/$param_value}
+		done < <(echo "$command" | grep -oP '\$\{[^}]+\}')
+	fi
 	execute_command "$command"
 }
 main
