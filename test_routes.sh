@@ -26,9 +26,19 @@ escape_json() {
 	echo "$text"
 }
 
+# 清理命令字符串
+clean_command() {
+	local cmd="$1"
+	# 清理分號後的空格
+	echo "$cmd" | sed 's/;\s\+/;/g'
+}
+
 # 執行命令並返回 JSON 格式結果
 execute_command() {
 	local command="$1"
+	# 預處理命令
+	command=$(clean_command "$command")
+	
 	local start_time=$(date +%s)
 	local start_time_iso=$(format_time)
 	local steps=()
@@ -42,17 +52,17 @@ execute_command() {
 	for cmd in "${COMMANDS[@]}"; do
 		cmd=$(echo "$cmd" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 		((current++))
-
+		
 		local step_start=$(date +%s)
 		local output
 		local exit_code
-
+		
 		output=$(eval "$cmd" 2>&1)
 		exit_code=$?
-
+		
 		local step_end=$(date +%s)
 		local step_elapsed=$(calculate_elapsed $step_start $step_end)
-
+		
 		if [ $exit_code -eq 0 ]; then
 			steps+=("{\"command\":\"$(escape_json "$cmd")\",\"output\":\"$(escape_json "$output")\",\"status\":\"success\",\"elapsed_time\":\"$step_elapsed\",\"step\":\"$current\",\"total\":\"$total\"}")
 			errors+=("\"\"")
@@ -103,6 +113,8 @@ list_routes() {
 	while IFS=: read -r route cmd; do
 		[ -z "$route" ] && continue
 		[[ "$route" =~ ^#.*$ ]] && continue
+		# 清理命令中的多餘空格
+		cmd=$(clean_command "$cmd")
 		printf "%-30s %s\n" "$route" "$cmd"
 	done < "$ROUTES_CONF"
 }

@@ -40,6 +40,11 @@ send_response() {
 	echo "{\"status\":\"$status\",\"data\":$data}"
 }
 
+clean_command() {
+	local cmd="$1"
+	echo "$cmd" | sed 's/;\s\+/;/g'
+}
+
 execute_command() {
 	local command="$1"
 	local start_time=$(date +%s)
@@ -49,23 +54,24 @@ execute_command() {
 	local current=0
 	local total=0
 
+	command=$(clean_command "$command")
 	IFS=';' read -ra COMMANDS <<< "$command"
 	total=${#COMMANDS[@]}
 
 	for cmd in "${COMMANDS[@]}"; do
 		cmd=$(echo "$cmd" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 		((current++))
-		
+
 		local step_start=$(date +%s)
 		local output
 		local exit_code
-		
+
 		output=$(eval "$cmd" 2>&1)
 		exit_code=$?
-		
+
 		local step_end=$(date +%s)
 		local step_elapsed=$(calculate_elapsed $step_start $step_end)
-		
+
 		if [ $exit_code -eq 0 ]; then
 			steps+=("{\"command\":\"$(escape_json "$cmd")\",\"output\":\"$(escape_json "$output")\",\"status\":\"success\",\"elapsed_time\":\"$step_elapsed\",\"step\":\"$current\",\"total\":\"$total\"}")
 			errors+=("\"\"")
