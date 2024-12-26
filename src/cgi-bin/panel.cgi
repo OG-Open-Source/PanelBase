@@ -79,7 +79,8 @@ send_response() {
 
 split_commands() {
 	local input="$1"
-	echo "$input" | sed -e 's/; *\\/\n/g' -e 's/;\\/\n/g'
+	input=$(echo "$input" | sed -E 's/;[[:space:]]*\\/; \\/g')
+	echo "$input" | sed -e 's/; \\/\n/g'
 }
 
 execute_command() {
