@@ -79,7 +79,7 @@ send_response() {
 
 split_commands() {
 	local input="$1"
-	input=$(echo "$input" | sed -E 's/;[[:space:]]*\\/; \\/g')
+	input=$(echo "$input" | sed 's/;\([[:space:]]*\)\\/; \\/g')
 	echo "$input" | sed -e 's/; \\/\n/g'
 }
 
@@ -91,6 +91,8 @@ execute_command() {
 	local current=0 total=0 percentage=0
 	local exit_code step_start step_end step_elapsed
 	local steps_json errors_json data
+
+	command=$(echo "$command" | sed 's/;\([[:space:]]*\)\\/; \\/g')
 
 	start_time=$(date +%s)
 	start_time_iso=$(format_time)

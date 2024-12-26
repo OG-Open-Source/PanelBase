@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta189"
+Version="Beta190"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
