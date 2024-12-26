@@ -196,8 +196,7 @@
 				}
 
 				outputElement.textContent = '執行中...';
-				const depsArray = packages.split(/\s+/).filter(Boolean);
-				const path = `/api/system/utilkit/check_deps?deps=${encodeURIComponent(JSON.stringify(depsArray))}`;
+				const path = `/api/system/utilkit/check_deps?deps=${encodeURIComponent(packages)}`;
 
 				try {
 					const response = await fetch('/cgi-bin/panel.cgi' + path);
