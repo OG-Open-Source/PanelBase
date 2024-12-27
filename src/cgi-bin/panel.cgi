@@ -47,15 +47,14 @@ get_query_param() {
 	local query_string="$QUERY_STRING"
 	local param_value
 
-	param_value=$(perl -MURI::Escape -e '
-		$qs = $ARGV[0];
-		$param = $ARGV[1];
-		if ($qs =~ /(?:^|&)\Q$param\E=([^&]*)/) {
-			print uri_unescape($1);
-		}
-	' "$query_string" "$param_name")
-	
-	echo "$param_value"
+	while IFS='=' read -d '&' key value || [ -n "$key" ]; do
+		if [ "$key" = "$param_name" ]; then
+			param_value="$value"
+			break
+		fi
+	done < <(echo -n "$query_string")
+
+	[ -n "$param_value" ] && decode_url "$param_value" || echo ""
 }
 
 format_time() { date -u "+%Y-%m-%dT%H:%M:%SZ"; }

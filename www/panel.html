@@ -175,7 +175,8 @@
 				}
 
 				outputElement.textContent = '執行中...';
-				const path = `/api/test/message?msg=${encodeURIComponent(message)}`;
+				const encodedMessage = btoa(message);
+				const path = `/api/test/message?msg=${encodeURIComponent(encodedMessage)}`;
 
 				try {
 					const response = await fetch('/cgi-bin/panel.cgi' + path);
@@ -211,7 +212,8 @@
 				}
 
 				outputElement.textContent = '執行中...';
-				const path = `/api/system/utilkit/check_deps?deps=${encodeURIComponent(packages)}`;
+				const encodedPackages = btoa(packages);
+				const path = `/api/system/utilkit/check_deps?deps=${encodeURIComponent(encodedPackages)}`;
 
 				try {
 					const response = await fetch('/cgi-bin/panel.cgi' + path);
@@ -233,7 +235,8 @@
 				}
 
 				outputElement.textContent = '執行中...';
-				const path = `/api/system/execute?cmd=${encodeURIComponent(command)}`;
+				const encodedCommand = btoa(command);
+				const path = `/api/system/execute?cmd=${encodeURIComponent(encodedCommand)}`;
 
 				try {
 					const response = await fetch('/cgi-bin/panel.cgi' + path);
