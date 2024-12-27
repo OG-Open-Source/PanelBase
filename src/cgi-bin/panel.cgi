@@ -44,24 +44,14 @@ decode_url() {
 
 get_query_param() {
 	local param_name="$1"
-	local is_base64="$2"
 	local query_string="$QUERY_STRING"
 	local param_value
 
-	while IFS='=' read -d '&' key value || [ -n "$key" ]; do
-		if [ "$key" = "$param_name" ]; then
-			param_value="$value"
-			break
-		fi
+	while IFS='=' read -d '&' key value; do
+		[ "$key" = "$param_name" ] && param_value="$value" && break
 	done < <(echo -n "$query_string")
 
-	if [ -n "$param_value" ]; then
-		param_value=$(decode_url "$param_value")
-		[ "$is_base64" = "true" ] && param_value=$(echo "$param_value" | base64 -d 2>/dev/null || echo "$param_value")
-		echo "$param_value"
-	else
-		echo ""
-	fi
+	[ -n "$param_value" ] && decode_url "$param_value" || echo ""
 }
 
 format_time() { date -u "+%Y-%m-%dT%H:%M:%SZ"; }
