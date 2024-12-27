@@ -147,6 +147,20 @@
 					</div>
 				</div>
 			</div>
+
+			<div class="endpoint">
+				<h3>命令執行</h3>
+				<div class="endpoint-group">
+					<div class="endpoint-item">
+						<div style="display: flex; gap: 8px; margin-bottom: 5px;">
+							<input type="text" id="command-input" placeholder="輸入要執行的命令" 
+								style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+							<button onclick="executeCommand()" style="width: auto; padding: 8px 16px;">執行</button>
+						</div>
+						<pre id="command-output">輸入命令後點擊執行</pre>
+					</div>
+				</div>
+			</div>
 		</div>
 
 		<script>
@@ -198,6 +212,28 @@
 
 				outputElement.textContent = '執行中...';
 				const path = `/api/system/utilkit/check_deps?deps=${encodeURIComponent(packages)}`;
+
+				try {
+					const response = await fetch('/cgi-bin/panel.cgi' + path);
+					const data = await response.json();
+					outputElement.textContent = JSON.stringify(data, null, 2);
+				} catch (error) {
+					outputElement.textContent = '錯誤：' + error.message;
+				}
+			}
+
+			async function executeCommand() {
+				const commandInput = document.getElementById('command-input');
+				const outputElement = document.getElementById('command-output');
+				const command = commandInput.value.trim();
+				
+				if (!command) {
+					outputElement.textContent = '請輸入命令';
+					return;
+				}
+
+				outputElement.textContent = '執行中...';
+				const path = `/api/system/execute?cmd=${encodeURIComponent(command)}`;
 
 				try {
 					const response = await fetch('/cgi-bin/panel.cgi' + path);
