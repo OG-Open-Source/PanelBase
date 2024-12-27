@@ -44,6 +44,7 @@ decode_url() {
 
 get_query_param() {
 	local param_name="$1"
+	local is_base64="$2"
 	local query_string="$QUERY_STRING"
 	local param_value
 
@@ -54,7 +55,13 @@ get_query_param() {
 		fi
 	done < <(echo -n "$query_string")
 
-	[ -n "$param_value" ] && decode_url "$param_value" || echo ""
+	if [ -n "$param_value" ]; then
+		param_value=$(decode_url "$param_value")
+		[ "$is_base64" = "true" ] && param_value=$(echo "$param_value" | base64 -d 2>/dev/null || echo "$param_value")
+		echo "$param_value"
+	else
+		echo ""
+	fi
 }
 
 format_time() { date -u "+%Y-%m-%dT%H:%M:%SZ"; }
@@ -124,6 +131,14 @@ execute_command() {
 
 	start_time=$(date +%s)
 	start_time_iso=$(format_time)
+
+	if [[ "$command" =~ \$\{[^}]+\} ]]; then
+		while [[ "$command" =~ \$\{([^}]+)\} ]]; do
+			param_name="${BASH_REMATCH[1]}"
+			param_value=$(get_query_param "$param_name" "true")
+			command=${command//${BASH_REMATCH[0]}/$param_value}
+		done
+	fi
 
 	readarray -t COMMANDS < <(split_commands "$command")
 	total=${#COMMANDS[@]}
