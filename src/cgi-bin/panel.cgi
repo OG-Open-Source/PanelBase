@@ -35,7 +35,7 @@ get_query_param() {
 	local query_string="$QUERY_STRING"
 	local param_value
 
-	param_value=$(echo "$query_string" | grep -oP "$param_name=\K[^&]+")
+	param_value=$(echo "$query_string" | awk -F"$param_name=" '{print $2}' | awk -F'&' '{print $1}')
 	[ -n "$param_value" ] && decode_url "$param_value" || echo ""
 }
 
