@@ -136,7 +136,7 @@ execute_command() {
 		while [[ "$command" =~ \$\{([^}]+)\} ]]; do
 			param_name="${BASH_REMATCH[1]}"
 			param_value=$(get_query_param "$param_name" "true")
-			command=${command//${BASH_REMATCH[0]}/$param_value}
+			command=${command//${BASH_REMATCH[0]}/"$param_value"}
 		done
 	fi
 
