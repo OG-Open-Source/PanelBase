@@ -20,14 +20,26 @@ decode_url() {
 		-e 's/%2A/*/g' \
 		-e 's/%2B/+/g' \
 		-e 's/%2C/,/g' \
+		-e 's/%2D/-/g' \
+		-e 's/%2E/./g' \
 		-e 's/%2F/\//g' \
 		-e 's/%3A/:/g' \
 		-e 's/%3B/;/g' \
+		-e 's/%3C/</g' \
 		-e 's/%3D/=/g' \
+		-e 's/%3E/>/g' \
 		-e 's/%3F/?/g' \
 		-e 's/%40/@/g' \
 		-e 's/%5B/[/g' \
-		-e 's/%5D/]/g'
+		-e 's/%5C/\\/g' \
+		-e 's/%5D/]/g' \
+		-e 's/%5E/^/g' \
+		-e 's/%5F/_/g' \
+		-e 's/%60/`/g' \
+		-e 's/%7B/{/g' \
+		-e 's/%7C/|/g' \
+		-e 's/%7D/}/g' \
+		-e 's/%7E/~/g'
 }
 
 get_query_param() {
@@ -35,8 +47,15 @@ get_query_param() {
 	local query_string="$QUERY_STRING"
 	local param_value
 
-	param_value=$(echo "$query_string" | awk -F"$param_name=" '{print $2}' | awk -F'&' '{print $1}')
-	[ -n "$param_value" ] && decode_url "$param_value" || echo ""
+	param_value=$(perl -MURI::Escape -e '
+		$qs = $ARGV[0];
+		$param = $ARGV[1];
+		if ($qs =~ /(?:^|&)\Q$param\E=([^&]*)/) {
+			print uri_unescape($1);
+		}
+	' "$query_string" "$param_name")
+	
+	echo "$param_value"
 }
 
 format_time() { date -u "+%Y-%m-%dT%H:%M:%SZ"; }

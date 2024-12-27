@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta193"
+Version="Beta194"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -193,6 +193,13 @@ if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	rm -rf "$TMP_DIR"
 	text "${CLR2}自定義面板文件安裝完成${CLR0}"
 fi
+
+TASK "安裝 Perl URI::Escape 模組" "
+if command -v cpanm >/dev/null 2>&1; then
+	cpanm URI::Escape
+else
+	ADD liburi-perl perl-URI
+fi"
 
 text "配置 lighttpd..."
 cat > /etc/lighttpd/lighttpd.conf << EOF
