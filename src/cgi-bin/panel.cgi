@@ -132,6 +132,7 @@ split_commands() {
 
 execute_command() {
 	local command="$1"
+	local original_command="$command"
 	local start_time current_time end_time
 	local start_time_iso end_time_iso elapsed_time
 	local steps=() errors=() output
@@ -154,7 +155,7 @@ execute_command() {
 
 	cmd_file="$INSTALL_DIR/cmd_$$.tmp"
 	
-	if echo "$command" | grep -q '; \\'; then
+	if [[ "$original_command" =~ "; \\" ]]; then
 		count=$(echo "$command" | sed 's/; \\/\n/g' | grep -v '^[[:space:]]*$' | wc -l)
 		printf '2%.0s' $(seq 1 $count) > "$cmd_file"
 		echo >> "$cmd_file"
