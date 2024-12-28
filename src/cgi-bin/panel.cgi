@@ -116,6 +116,7 @@ execute_command() {
 	local current=0 total=0 percentage=0
 	local exit_code step_start step_end step_elapsed
 	local steps_json errors_json data
+	local has_error=false
 
 	command=$(echo "$command" | sed 's/;\([[:space:]]*\)\\/; \\/g')
 
@@ -153,6 +154,7 @@ execute_command() {
 \"total\":\"$total\"}")
 			errors+=("\"\"")
 		else
+			has_error=true
 			steps+=("{\"command\":\"$(escape_json "$cmd")\",\
 \"output\":\"$(escape_json "$output")\",\
 \"status\":\"error\",\
@@ -179,7 +181,7 @@ execute_command() {
 \"steps\":[$steps_json],\
 \"errors\":[$errors_json]}"
 
-	[ $current -eq $total ] && send_response "success" "$data" || send_response "error" "$data"
+	[ "$has_error" = true ] && send_response "error" "$data" || send_response "success" "$data"
 }
 
 main() {
