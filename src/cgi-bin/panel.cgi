@@ -145,12 +145,22 @@ execute_command() {
 	if [[ "$command" =~ \$\{[^}]+\} ]]; then
 		while [[ "$command" =~ \$\{([^}]+)\} ]]; do
 			param_name="${BASH_REMATCH[1]}"
-				param_value=$(get_query_param "$param_name" "true")
-				command=${command//${BASH_REMATCH[0]}/"$param_value"}
+			param_value=$(get_query_param "$param_name" "true")
+			command=${command//${BASH_REMATCH[0]}/"$param_value"}
 		done
 	fi
 
-	cmd_file=$(split_commands "$command")
+	cmd_file="$INSTALL_DIR/cmd_$$.tmp"
+	
+	if [[ "$command" =~ "; \\" ]]; then
+		count=$(echo "$command" | sed -e 's/; \\/\n/g' | grep -v '^$' | wc -l)
+		printf '2%.0s' $(seq 1 $count) > "$cmd_file"
+		echo >> "$cmd_file"
+		echo "$command" | sed -e 's/; \\/\n/g' | grep -v '^$' >> "$cmd_file"
+	else
+		echo "2" > "$cmd_file"
+		echo "$command" >> "$cmd_file"
+	fi
 
 	read -r status_line < "$cmd_file"
 	total=${#status_line}
