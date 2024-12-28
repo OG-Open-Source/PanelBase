@@ -140,7 +140,11 @@ execute_command() {
 		((current++))
 
 		step_start=$(date +%s)
-		output=$(eval "$cmd" 2>&1)
+		if [[ $cmd =~ ^eval[[:space:]]*[\"\']?([^\"\']+)[\"\']?$ ]]; then
+			output=$(eval "${BASH_REMATCH[1]}" 2>&1)
+		else
+			output=$(eval "$cmd" 2>&1)
+		fi
 		exit_code=$?
 		step_end=$(date +%s)
 		step_elapsed=$(calculate_elapsed $step_start $step_end)
