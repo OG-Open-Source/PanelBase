@@ -104,8 +104,19 @@ send_response() {
 
 split_commands() {
 	local input="$1"
+	local tmp_file="/tmp/cmd_$$.tmp"
+	local count=0
+
 	input=$(echo "$input" | sed 's/;\([[:space:]]*\)\\/; \\/g')
-	echo "$input" | sed -e 's/; \\/\n/g'
+	
+	count=$(echo "$input" | sed -e 's/; \\/\n/g' | grep -v '^$' | wc -l)
+	
+	printf '2%.0s' $(seq 1 $count) > "$tmp_file"
+	echo >> "$tmp_file"
+	
+	echo "$input" | sed -e 's/; \\/\n/g' | grep -v '^$' >> "$tmp_file"
+
+	echo "$tmp_file"
 }
 
 execute_command() {
@@ -117,8 +128,7 @@ execute_command() {
 	local exit_code step_start step_end step_elapsed
 	local steps_json errors_json data
 	local has_error=false
-
-	command=$(echo "$command" | sed 's/;\([[:space:]]*\)\\/; \\/g')
+	local cmd_file status_line cmd_index
 
 	start_time=$(date +%s)
 	start_time_iso=$(format_time)
@@ -131,25 +141,32 @@ execute_command() {
 		done
 	fi
 
-	readarray -t COMMANDS < <(split_commands "$command")
-	total=${#COMMANDS[@]}
-	[ "$total" -eq 0 ] && total=1 && COMMANDS=("$command")
+	if [[ "$command" =~ "; \\" ]]; then
+		cmd_file=$(split_commands "$command")
+	else
+		cmd_file=$(mktemp)
+		echo "2" > "$cmd_file"
+		echo "$command" >> "$cmd_file"
+	fi
 
-	for cmd in "${COMMANDS[@]}"; do
-		cmd=$(echo "$cmd" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-		((current++))
+	read -r status_line < "$cmd_file"
+	total=${#status_line}
+
+	while true; do
+		cmd_index=$(echo "$status_line" | grep -b "2" | head -1 | cut -d: -f1)
+		[ -z "$cmd_index" ] && break
+
+		current=$((cmd_index + 1))
+		cmd=$(sed -n "$((current + 1))p" "$cmd_file")
 
 		step_start=$(date +%s)
-		if [[ $cmd =~ ^eval[[:space:]]*[\"\']?([^\"\']+)[\"\']?$ ]]; then
-			output=$(eval "${BASH_REMATCH[1]}" 2>&1)
-		else
-			output=$(eval "$cmd" 2>&1)
-		fi
+		output=$(eval "$cmd" 2>&1)
 		exit_code=$?
 		step_end=$(date +%s)
 		step_elapsed=$(calculate_elapsed $step_start $step_end)
 
 		if [ $exit_code -eq 0 ]; then
+			status_line="${status_line:0:$cmd_index}0${status_line:$((cmd_index+1))}"
 			steps+=("{\"command\":\"$(escape_json "$cmd")\",\
 \"output\":\"$(escape_json "$output")\",\
 \"status\":\"success\",\
@@ -158,6 +175,7 @@ execute_command() {
 \"total\":\"$total\"}")
 			errors+=("\"\"")
 		else
+			status_line="${status_line:0:$cmd_index}1${status_line:$((cmd_index+1))}"
 			has_error=true
 			steps+=("{\"command\":\"$(escape_json "$cmd")\",\
 \"output\":\"$(escape_json "$output")\",\
@@ -168,7 +186,11 @@ execute_command() {
 			errors+=("\"$(escape_json "$output")\"")
 			break
 		fi
+
+		sed -i "1c\\$status_line" "$cmd_file"
 	done
+
+	rm -f "$cmd_file"
 
 	end_time=$(date +%s)
 	end_time_iso=$(format_time)
