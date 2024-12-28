@@ -104,8 +104,9 @@ send_response() {
 
 normalize_command() {
 	local input="$1"
-	input=$(echo "$input" | sed 's/;\s*\\/; \\/g')
-	input=$(echo "$input" | sed 's/; \\\s*\([^ ]\)/; \\ \1/g')
+	input=$(echo "$input" | sed 's/;\\\([^ ]\)/; \\\1/g')
+	input=$(echo "$input" | sed 's/;\s*\\/ \\/g')
+	input=$(echo "$input" | sed 's/\\\s*/\\ /g')
 	echo "$input"
 }
 
