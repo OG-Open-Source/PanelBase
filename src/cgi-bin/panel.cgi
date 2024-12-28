@@ -107,6 +107,10 @@ split_commands() {
 	local tmp_file="$INSTALL_DIR/cmd_$$.tmp"
 	local count=0
 
+	if [[ "$input" =~ ^eval[[:space:]]*[\"\']?(.*?)[\"\']?$ ]]; then
+		input="${BASH_REMATCH[1]}"
+	fi
+
 	input=$(echo "$input" | sed 's/;\([[:space:]]*\)\\/; \\/g')
 	
 	count=$(echo "$input" | sed -e 's/; \\/\n/g' | grep -v '^$' | wc -l)
@@ -141,12 +145,16 @@ execute_command() {
 		done
 	fi
 
-	if [[ "$command" =~ "; \\" ]]; then
-		cmd_file=$(split_commands "$command")
-	else
-		cmd_file="$INSTALL_DIR/cmd_$$.tmp"
+	cmd_file="$INSTALL_DIR/cmd_$$.tmp"
+	
+	if [[ ! "$command" =~ "; \\" ]]; then
 		echo "2" > "$cmd_file"
 		echo "$command" >> "$cmd_file"
+	else
+		count=$(echo "$command" | sed -e 's/; \\/\n/g' | grep -v '^$' | wc -l)
+		printf '2%.0s' $(seq 1 $count) > "$cmd_file"
+		echo >> "$cmd_file"
+		echo "$command" | sed -e 's/; \\/\n/g' | grep -v '^$' >> "$cmd_file"
 	fi
 
 	read -r status_line < "$cmd_file"
