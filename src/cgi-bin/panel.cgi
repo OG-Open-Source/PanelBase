@@ -153,7 +153,7 @@ execute_command() {
 		done
 	fi
 
-	command=$(echo "$command" | sed 's/;\\\\*/; \\/g')
+	command=$(echo "$command" | sed 's/\\\\*/\\/g' | sed 's/;\\/; \\/g')
 	original_command="$command"
 
 	cmd_file="$INSTALL_DIR/cmd_$$.tmp"
