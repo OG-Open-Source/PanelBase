@@ -158,23 +158,36 @@ execute_command() {
 
 	cmd_file="$INSTALL_DIR/cmd_$$.tmp"
 	
-	if [[ "$original_command" =~ "; \\" ]]; then
-		count=$(echo "$command" | sed 's/; \\/\n/g' | grep -v '^[[:space:]]*$' | wc -l)
-		printf '2%.0s' $(seq 1 $count) > "$cmd_file"
-		echo >> "$cmd_file"
-		echo "$command" | sed 's/; \\/\n/g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^[[:space:]]*$' >> "$cmd_file"
+	if [ -f "$cmd_file" ]; then
+		read -r status_line < "$cmd_file"
+		if [[ "$status_line" =~ "1" ]]; then
+			if [[ "$original_command" =~ "; \\" ]]; then
+				count=$(echo "$command" | sed 's/; \\/\n/g' | grep -v '^[[:space:]]*$' | wc -l)
+				printf '2%.0s' $(seq 1 $count) > "$cmd_file"
+				echo >> "$cmd_file"
+				echo "$command" | sed 's/; \\/\n/g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^[[:space:]]*$' >> "$cmd_file"
+			else
+				echo "2" > "$cmd_file"
+				echo "$command" >> "$cmd_file"
+			fi
+		fi
 	else
-		echo "2" > "$cmd_file"
-		echo "$command" >> "$cmd_file"
+		if [[ "$original_command" =~ "; \\" ]]; then
+			count=$(echo "$command" | sed 's/; \\/\n/g' | grep -v '^[[:space:]]*$' | wc -l)
+			printf '2%.0s' $(seq 1 $count) > "$cmd_file"
+			echo >> "$cmd_file"
+			echo "$command" | sed 's/; \\/\n/g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^[[:space:]]*$' >> "$cmd_file"
+		else
+			echo "2" > "$cmd_file"
+			echo "$command" >> "$cmd_file"
+		fi
 	fi
 
 	read -r status_line < "$cmd_file"
 	total=${#status_line}
 
-	while true; do
-		cmd_index=$(echo "$status_line" | grep -b "2" | head -1 | cut -d: -f1)
-		[ -z "$cmd_index" ] && break
-
+	cmd_index=$(echo "$status_line" | grep -b "2" | head -1 | cut -d: -f1)
+	if [ -n "$cmd_index" ]; then
 		current=$((cmd_index + 1))
 		cmd=$(sed -n "$((current + 1))p" "$cmd_file")
 
@@ -203,13 +216,10 @@ execute_command() {
 \"step\":\"$current\",\
 \"total\":\"$total\"}")
 			errors+=("\"$(escape_json "$output")\"")
-			break
 		fi
 
 		sed -i "1c\\$status_line" "$cmd_file"
-	done
-
-	# rm -f "$cmd_file"
+	fi
 
 	end_time=$(date +%s)
 	end_time_iso=$(format_time)
@@ -224,7 +234,8 @@ execute_command() {
 \"elapsed_time\":\"$elapsed_time\",\
 \"progress\":{\"current\":$current,\"total\":$total,\"percentage\":$percentage},\
 \"steps\":[$steps_json],\
-\"errors\":[$errors_json]}"
+\"errors\":[$errors_json],\
+\"status_line\":\"$status_line\"}"
 
 	[ "$has_error" = true ] && send_response "error" "$data" || send_response "success" "$data"
 }
