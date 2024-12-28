@@ -154,11 +154,11 @@ execute_command() {
 
 	cmd_file="$INSTALL_DIR/cmd_$$.tmp"
 	
-	if [[ "$command" =~ "; \\" ]]; then
-		count=$(echo "$command" | sed -e 's/; \\/\n/g' | grep -v '^$' | wc -l)
+	if echo "$command" | grep -q '; \\'; then
+		count=$(echo "$command" | sed 's/; \\/\n/g' | grep -v '^[[:space:]]*$' | wc -l)
 		printf '2%.0s' $(seq 1 $count) > "$cmd_file"
 		echo >> "$cmd_file"
-		echo "$command" | sed -e 's/; \\/\n/g' | grep -v '^$' >> "$cmd_file"
+		echo "$command" | sed 's/; \\/\n/g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^[[:space:]]*$' >> "$cmd_file"
 	else
 		echo "2" > "$cmd_file"
 		echo "$command" >> "$cmd_file"
