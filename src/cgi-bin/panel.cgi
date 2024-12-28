@@ -104,9 +104,9 @@ send_response() {
 
 normalize_command() {
 	local input="$1"
-	input=$(echo "$input" | sed 's/;\\\([^ ]\)/; \\\1/g')
-	input=$(echo "$input" | sed 's/;\s*\\/ \\/g')
-	input=$(echo "$input" | sed 's/\\\s*/\\ /g')
+	input=$(echo "$input" | sed 's/;/ ; /g')
+	input=$(echo "$input" | sed 's/\s\+/ /g')
+	input=$(echo "$input" | sed 's/^ *//;s/ *$//')
 	echo "$input"
 }
 
@@ -117,12 +117,12 @@ split_commands() {
 
 	input=$(normalize_command "$input")
 
-	count=$(echo "$input" | sed -e 's/; \\/\n/g' | grep -v '^$' | wc -l)
+	count=$(echo "$input" | sed -e 's/; \\\\/\n/g' | grep -v '^$' | wc -l)
 
 	printf '2%.0s' $(seq 1 $count) > "$tmp_file"
 	echo >> "$tmp_file"
 
-	echo "$input" | sed -e 's/; \\/\n/g' | while read -r cmd; do
+	echo "$input" | sed -e 's/; \\\\/\n/g' | while read -r cmd; do
 		[ -n "$cmd" ] && echo "$cmd" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' >> "$tmp_file"
 	done
 
