@@ -104,7 +104,7 @@ send_response() {
 
 split_commands() {
 	local input="$1"
-	local tmp_file="/tmp/cmd_$$.tmp"
+	local tmp_file="$INSTALL_DIR/cmd_$$.tmp"
 	local count=0
 
 	input=$(echo "$input" | sed 's/;\([[:space:]]*\)\\/; \\/g')
@@ -144,7 +144,7 @@ execute_command() {
 	if [[ "$command" =~ "; \\" ]]; then
 		cmd_file=$(split_commands "$command")
 	else
-		cmd_file=$(mktemp)
+		cmd_file="$INSTALL_DIR/cmd_$$.tmp"
 		echo "2" > "$cmd_file"
 		echo "$command" >> "$cmd_file"
 	fi
@@ -189,8 +189,6 @@ execute_command() {
 
 		sed -i "1c\\$status_line" "$cmd_file"
 	done
-
-	rm -f "$cmd_file"
 
 	end_time=$(date +%s)
 	end_time_iso=$(format_time)
