@@ -1,248 +1,255 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
-	<head>
-		<meta charset="UTF-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<title>PanelBase Test</title>
-		<link rel="icon" type="image/png" href="favicon.png">
-		<style>
-			body {
-				font-family: Arial, sans-serif;
-				margin: 20px;
-				background: #f0f0f0;
-			}
-			.container {
-				max-width: 800px;
-				margin: 0 auto;
-				background: white;
-				padding: 20px;
-				border-radius: 8px;
-				box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-			}
-			.endpoint {
-				margin-bottom: 20px;
-				padding: 10px;
-				border: 1px solid #ddd;
-				border-radius: 4px;
-			}
-			.endpoint h3 {
-				margin: 0 0 10px 0;
-			}
-			.endpoint-group {
-				display: flex;
-				gap: 10px;
-				margin-bottom: 10px;
-			}
-			.endpoint-item {
-				flex: 1;
-				min-width: 0;
-			}
-			button {
-				background: #4CAF50;
-				color: white;
-				border: none;
-				padding: 8px 16px;
-				border-radius: 4px;
 
-				cursor: pointer;
-				width: 100%;
-				margin-bottom: 5px;
-			}
-			button:hover {
-				background: #45a049;
-			}
-			pre {
-				background: #f8f8f8;
-				padding: 10px;
-				border-radius: 4px;
-				overflow-x: auto;
-				margin: 5px 0;
-				font-size: 12px;
-				max-height: 200px;
-				white-space: pre-wrap;
-				word-wrap: break-word;
-				width: 100%;
-				box-sizing: border-box;
-			}
-		</style>
-	</head>
-	<body>
-		<div class="container">
-			<h1>PanelBase API 測試</h1>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PanelBase Test</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f0f0f0;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .endpoint {
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .endpoint h3 {
+            margin: 0 0 10px 0;
+        }
+        
+        .endpoint-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .endpoint-item {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 5px;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+        
+        pre {
+            background: #f8f8f8;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 5px 0;
+            font-size: 12px;
+            max-height: 200px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            width: 100%;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
 
-			<div class="endpoint">
-				<h3>系統資訊</h3>
-				<div class="endpoint-group">
-					<div class="endpoint-item">
-						<button onclick="testEndpoint('/api/system/cpu')">CPU</button>
-						<pre id="cpu-output">點擊按鈕測試 API</pre>
-					</div>
-					<div class="endpoint-item">
-						<button onclick="testEndpoint('/api/system/memory')">Memory</button>
-						<pre id="memory-output">點擊按鈕測試 API</pre>
-					</div>
-					<div class="endpoint-item">
-						<button onclick="testEndpoint('/api/system/disk')">Disk</button>
-						<pre id="disk-output">點擊按鈕測試 API</pre>
-					</div>
-				</div>
-			</div>
+<body>
+    <div class="container">
+        <h1>PanelBase API 測試</h1>
 
-			<div class="endpoint">
-				<h3>網路資訊</h3>
-				<div class="endpoint-group">
-					<div class="endpoint-item">
-						<button onclick="testEndpoint('/api/network/ip')">IP</button>
-						<pre id="ip-output">點擊按鈕測試 API</pre>
-					</div>
-					<div class="endpoint-item">
-						<button onclick="testEndpoint('/api/network/ping')">Ping</button>
-						<pre id="ping-output">點擊按鈕測試 API</pre>
-					</div>
-						</div>
-						</div>
+        <div class="endpoint">
+            <h3>系統資訊</h3>
+            <div class="endpoint-group">
+                <div class="endpoint-item">
+                    <button onclick="testEndpoint('/api/system/cpu')">CPU</button>
+                    <pre id="cpu-output">點擊按鈕測試 API</pre>
+                </div>
+                <div class="endpoint-item">
+                    <button onclick="testEndpoint('/api/system/memory')">Memory</button>
+                    <pre id="memory-output">點擊按鈕測試 API</pre>
+                </div>
+                <div class="endpoint-item">
+                    <button onclick="testEndpoint('/api/system/disk')">Disk</button>
+                    <pre id="disk-output">點擊按鈕測試 API</pre>
+                </div>
+            </div>
+        </div>
 
-			<div class="endpoint">
-				<h3>系統更新</h3>
-				<div class="endpoint-group">
-					<div class="endpoint-item">
-						<button onclick="testEndpoint('/api/system/update')">Update</button>
-						<pre id="update-output">點擊按鈕測試 API</pre>
-					</div>
-					<div class="endpoint-item">
-						<button onclick="testEndpoint('/api/system/clean')">Clean</button>
-						<pre id="clean-output">點擊按鈕測試 API</pre>
-					</div>
-				</div>
-							</div>
+        <div class="endpoint">
+            <h3>網路資訊</h3>
+            <div class="endpoint-group">
+                <div class="endpoint-item">
+                    <button onclick="testEndpoint('/api/network/ip')">IP</button>
+                    <pre id="ip-output">點擊按鈕測試 API</pre>
+                </div>
+                <div class="endpoint-item">
+                    <button onclick="testEndpoint('/api/network/ping')">Ping</button>
+                    <pre id="ping-output">點擊按鈕測試 API</pre>
+                </div>
+            </div>
+        </div>
 
-			<div class="endpoint">
-				<h3>OGOS</h3>
-				<div class="endpoint-group">
-					<div class="endpoint-item">
-						<button onclick="testEndpoint('/api/system/utilkit/sys_info')">INFO</button>
-						<pre id="sys_info-output">點擊按鈕測試 API</pre>
-					</div>
-					<div class="endpoint-item">
-						<div style="display: flex; gap: 8px; margin-bottom: 5px;">
-							<input type="text" id="deps-input" placeholder="輸入套件名稱，用空格分隔" 
-								style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-							<button onclick="checkDeps()" style="width: auto; padding: 8px 16px;">檢查套件</button>
-						</div>
-						<pre id="check_deps-output">輸入套件名稱後點擊檢查</pre>
-					</div>
-				</div>
-			</div>
+        <div class="endpoint">
+            <h3>系統更新</h3>
+            <div class="endpoint-group">
+                <div class="endpoint-item">
+                    <button onclick="testEndpoint('/api/system/update')">Update</button>
+                    <pre id="update-output">點擊按鈕測試 API</pre>
+                </div>
+                <div class="endpoint-item">
+                    <button onclick="testEndpoint('/api/system/clean')">Clean</button>
+                    <pre id="clean-output">點擊按鈕測試 API</pre>
+                </div>
+            </div>
+        </div>
 
-			<div class="endpoint">
-				<h3>參數測試</h3>
-				<div class="endpoint-group">
-					<div class="endpoint-item">
-						<div style="display: flex; gap: 8px; margin-bottom: 5px;">
-							<input type="text" id="message-input" placeholder="輸入要顯示的訊息" 
-								style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-							<button onclick="testMessage()" style="width: auto; padding: 8px 16px;">測試</button>
-						</div>
-						<pre id="test-message-output">輸入訊息後點擊測試</pre>
-					</div>
-				</div>
-			</div>
+        <div class="endpoint">
+            <h3>OGOS</h3>
+            <div class="endpoint-group">
+                <div class="endpoint-item">
+                    <button onclick="testEndpoint('/api/system/utilkit/sys_info')">INFO</button>
+                    <pre id="sys_info-output">點擊按鈕測試 API</pre>
+                </div>
+                <div class="endpoint-item">
+                    <div style="display: flex; gap: 8px; margin-bottom: 5px;">
+                        <input type="text" id="deps-input" placeholder="輸入套件名稱，用空格分隔" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <button onclick="checkDeps()" style="width: auto; padding: 8px 16px;">檢查套件</button>
+                    </div>
+                    <pre id="check_deps-output">輸入套件名稱後點擊檢查</pre>
+                </div>
+            </div>
+        </div>
 
-			<div class="endpoint">
-				<h3>命令執行</h3>
-				<div class="endpoint-group">
-					<div class="endpoint-item">
-						<div style="display: flex; gap: 8px; margin-bottom: 5px;">
-							<input type="text" id="command-input" placeholder="輸入要執行的命令" 
-								style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-							<button onclick="executeCommand()" style="width: auto; padding: 8px 16px;">執行</button>
-						</div>
-						<pre id="command-output">輸入命令後點擊執行</pre>
-					</div>
-				</div>
-			</div>
-		</div>
+        <div class="endpoint">
+            <h3>參數測試</h3>
+            <div class="endpoint-group">
+                <div class="endpoint-item">
+                    <div style="display: flex; gap: 8px; margin-bottom: 5px;">
+                        <input type="text" id="message-input" placeholder="輸入要顯示的訊息" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <button onclick="testMessage()" style="width: auto; padding: 8px 16px;">測試</button>
+                    </div>
+                    <pre id="test-message-output">輸入訊息後點擊測試</pre>
+                </div>
+            </div>
+        </div>
 
-		<script>
-			async function testMessage() {
-				const messageInput = document.getElementById('message-input');
-				const outputElement = document.getElementById('test-message-output');
-				const message = messageInput.value.trim();
-				
-				if (!message) {
-					outputElement.textContent = '請輸入訊息';
-					return;
-				}
+        <div class="endpoint">
+            <h3>命令執行</h3>
+            <div class="endpoint-group">
+                <div class="endpoint-item">
+                    <div style="display: flex; gap: 8px; margin-bottom: 5px;">
+                        <input type="text" id="command-input" placeholder="輸入要執行的命令" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <button onclick="executeCommand()" style="width: auto; padding: 8px 16px;">執行</button>
+                    </div>
+                    <pre id="command-output">輸入命令後點擊執行</pre>
+                </div>
+            </div>
+        </div>
+    </div>
 
-				outputElement.textContent = '執行中...';
-				const path = `/api/test/message?msg=${encodeURIComponent(message)}`;
+    <script>
+        async function testMessage() {
+            const messageInput = document.getElementById('message-input');
+            const outputElement = document.getElementById('test-message-output');
+            const message = messageInput.value.trim();
 
-				try {
-					const response = await fetch('/cgi-bin/panel.cgi' + path);
-					const data = await response.json();
-					outputElement.textContent = JSON.stringify(data, null, 2);
-				} catch (error) {
-					outputElement.textContent = '錯誤：' + error.message;
-				}
-			}
+            if (!message) {
+                outputElement.textContent = '請輸入訊息';
+                return;
+            }
 
-			async function testEndpoint(path) {
-				const command = path.split('/').pop();
-				const outputElement = document.getElementById(command + '-output');
-				outputElement.textContent = '執行中...';
+            outputElement.textContent = '執行中...';
+            const path = `/api/test/message?msg=${encodeURIComponent(message)}`;
 
-				try {
-					const response = await fetch('/cgi-bin/panel.cgi' + path);
-					const data = await response.json();
-					outputElement.textContent = JSON.stringify(data, null, 2);
-				} catch (error) {
-					outputElement.textContent = '錯誤：' + error.message;
-				}
-			}
+            try {
+                const response = await fetch('/cgi-bin/panel.cgi' + path);
+                const data = await response.json();
+                outputElement.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                outputElement.textContent = '錯誤：' + error.message;
+            }
+        }
 
-			async function checkDeps() {
-				const depsInput = document.getElementById('deps-input');
-				const outputElement = document.getElementById('check_deps-output');
-				const packages = depsInput.value.trim();
-				
-				if (!packages) {
-					outputElement.textContent = '請輸入套件名稱';
-					return;
-				}
+        async function testEndpoint(path) {
+            const command = path.split('/').pop();
+            const outputElement = document.getElementById(command + '-output');
+            outputElement.textContent = '執行中...';
 
-				outputElement.textContent = '執行中...';
-				const path = `/api/system/utilkit/check_deps?deps=${encodeURIComponent(packages)}`;
+            try {
+                const response = await fetch('/cgi-bin/panel.cgi' + path);
+                const data = await response.json();
+                outputElement.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                outputElement.textContent = '錯誤：' + error.message;
+            }
+        }
 
-				try {
-					const response = await fetch('/cgi-bin/panel.cgi' + path);
-					const data = await response.json();
-					outputElement.textContent = JSON.stringify(data, null, 2);
-				} catch (error) {
-					outputElement.textContent = '錯誤：' + error.message;
-				}
-			}
+        async function checkDeps() {
+            const depsInput = document.getElementById('deps-input');
+            const outputElement = document.getElementById('check_deps-output');
+            const packages = depsInput.value.trim();
 
-			async function executeCommand() {
-				const commandInput = document.getElementById('command-input');
-				const outputElement = document.getElementById('command-output');
-				const command = commandInput.value.trim();
-				
-				if (!command) {
-					outputElement.textContent = '請輸入命令';
-					return;
-				}
+            if (!packages) {
+                outputElement.textContent = '請輸入套件名稱';
+                return;
+            }
 
-				outputElement.textContent = '執行中...';
-				const path = `/api/system/execute?cmd=${encodeURIComponent(command)}`;
+            outputElement.textContent = '執行中...';
+            const path = `/api/system/utilkit/check_deps?deps=${encodeURIComponent(packages)}`;
 
-				try {
-					const response = await fetch('/cgi-bin/panel.cgi' + path);
-					const data = await response.json();
-					outputElement.textContent = JSON.stringify(data, null, 2);
-				} catch (error) {
-					outputElement.textContent = '錯誤：' + error.message;
-				}
-			}
-		</script>
-	</body>
+            try {
+                const response = await fetch('/cgi-bin/panel.cgi' + path);
+                const data = await response.json();
+                outputElement.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                outputElement.textContent = '錯誤：' + error.message;
+            }
+        }
+
+        async function executeCommand() {
+            const commandInput = document.getElementById('command-input');
+            const outputElement = document.getElementById('command-output');
+            const command = commandInput.value.trim();
+
+            if (!command) {
+                outputElement.textContent = '請輸入命令';
+                return;
+            }
+
+            outputElement.textContent = '執行中...';
+            const path = `/api/system/execute?cmd=${encodeURIComponent(command)}`;
+
+            try {
+                const response = await fetch('/cgi-bin/panel.cgi' + path);
+                const data = await response.json();
+                outputElement.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                outputElement.textContent = '錯誤：' + error.message;
+            }
+        }
+    </script>
+</body>
+
 </html>

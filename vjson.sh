@@ -8,9 +8,9 @@ vcmd() {
 	STEP_OUTPUTS=()
 	ERRORS=()
 	if [[ "$COMMAND" == *";"* ]]; then
-		IFS=';' read -ra STEPS <<< "$COMMAND"
+		IFS=';' read -ra STEPS <<<"$COMMAND"
 		TOTAL_STEPS=${#STEPS[@]}
-		for ((i=0; i<TOTAL_STEPS; i++)); do
+		for ((i = 0; i < TOTAL_STEPS; i++)); do
 			CURRENT_STEP=$((i + 1))
 			STEP_CMD="${STEPS[$i]}"
 			STEP_CMD=$(echo "$STEP_CMD" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')

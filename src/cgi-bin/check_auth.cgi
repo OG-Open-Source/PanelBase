@@ -13,7 +13,7 @@ fi
 log_auth_event() {
 	local level="$1"
 	local message="$2"
-	echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $message" >> "$LOG_FILE"
+	echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $message" >>"$LOG_FILE"
 }
 
 WHITELIST_REGEX=$(echo "$WHITELIST_FILES" | sed 's/\./\\./g' | sed 's/\*/.*/g' | tr ' ' '|')
@@ -26,24 +26,24 @@ check_file_access() {
 	local is_allowed=false
 
 	case "$ACCESS_CONTROL_MODE" in
-		"whitelist")
-			if echo "$filename" | grep -qE "^($WHITELIST_REGEX)$"; then
-				is_allowed=true
-			elif [ "$ALLOW_HTML_REFERENCE" = "true" ] && [ -n "$referer" ] && echo "$referer" | grep -q "^/.*\.html"; then
-				is_allowed=true
-			fi
-			;;
-		"blacklist")
-			if ! echo "$filename" | grep -qE "^($BLACKLIST_REGEX)$"; then
-				is_allowed=true
-			elif [ "$ALLOW_HTML_REFERENCE" = "true" ] && [ -n "$referer" ] && echo "$referer" | grep -q "^/.*\.html"; then
-				is_allowed=true
-			fi
-			;;
-		*)
-			log_auth_event "ERROR" "Invalid ACCESS_CONTROL_MODE: $ACCESS_CONTROL_MODE"
-			is_allowed=false
-			;;
+	"whitelist")
+		if echo "$filename" | grep -qE "^($WHITELIST_REGEX)$"; then
+			is_allowed=true
+		elif [ "$ALLOW_HTML_REFERENCE" = "true" ] && [ -n "$referer" ] && echo "$referer" | grep -q "^/.*\.html"; then
+			is_allowed=true
+		fi
+		;;
+	"blacklist")
+		if ! echo "$filename" | grep -qE "^($BLACKLIST_REGEX)$"; then
+			is_allowed=true
+		elif [ "$ALLOW_HTML_REFERENCE" = "true" ] && [ -n "$referer" ] && echo "$referer" | grep -q "^/.*\.html"; then
+			is_allowed=true
+		fi
+		;;
+	*)
+		log_auth_event "ERROR" "Invalid ACCESS_CONTROL_MODE: $ACCESS_CONTROL_MODE"
+		is_allowed=false
+		;;
 	esac
 
 	[ "$is_allowed" = "true" ]
@@ -116,12 +116,12 @@ REDIRECT_TO_LOGIN() {
 is_public_resource() {
 	local url="$1"
 	case "$url" in
-		"/"|"/index.html"|"/403.html"|"/404.html"|"/favicon.ico"|"/auth.cgi"|"/cgi-bin/auth.cgi")
-			return 0
-			;;
-		*)
-			return 1
-			;;
+	"/" | "/index.html" | "/403.html" | "/404.html" | "/favicon.ico" | "/auth.cgi" | "/cgi-bin/auth.cgi")
+		return 0
+		;;
+	*)
+		return 1
+		;;
 	esac
 }
 
@@ -183,32 +183,32 @@ fi
 
 EXTENSION="${REQUESTED_FILE##*.}"
 case "$EXTENSION" in
-	"html")
-		SECURITY_HEADERS
-		;;
-	"css")
-		SECURITY_HEADERS "text/css"
-		echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
-		;;
-	"js")
-		SECURITY_HEADERS "application/javascript"
-		echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
-		;;
-	"png"|"jpg"|"jpeg"|"gif")
-		SECURITY_HEADERS "image/${EXTENSION}"
-		echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
-		;;
-	"svg")
-		SECURITY_HEADERS "image/svg+xml"
-		echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
-		;;
-	"woff"|"woff2"|"ttf"|"eot")
-		SECURITY_HEADERS "font/${EXTENSION}"
-		echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
-		;;
-	*)
-		SECURITY_HEADERS "application/octet-stream"
-		;;
+"html")
+	SECURITY_HEADERS
+	;;
+"css")
+	SECURITY_HEADERS "text/css"
+	echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
+	;;
+"js")
+	SECURITY_HEADERS "application/javascript"
+	echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
+	;;
+"png" | "jpg" | "jpeg" | "gif")
+	SECURITY_HEADERS "image/${EXTENSION}"
+	echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
+	;;
+"svg")
+	SECURITY_HEADERS "image/svg+xml"
+	echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
+	;;
+"woff" | "woff2" | "ttf" | "eot")
+	SECURITY_HEADERS "font/${EXTENSION}"
+	echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
+	;;
+*)
+	SECURITY_HEADERS "application/octet-stream"
+	;;
 esac
 
 cat "$REQUESTED_FILE"

@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase-install.sh"
-Version="Beta214"
+Version="Beta215"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -100,13 +100,22 @@ USE_CUSTOM_HTML=${USE_CUSTOM_HTML:-n}
 
 if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	INPUT "請輸入自定義面板壓縮檔的路徑：" CUSTOM_ARCHIVE_PATH
-	[ ! -f "$CUSTOM_ARCHIVE_PATH" ] && { error "找不到指定的壓縮檔"; exit 1; }
+	[ ! -f "$CUSTOM_ARCHIVE_PATH" ] && {
+		error "找不到指定的壓縮檔"
+		exit 1
+	}
 	FILE_EXT="${CUSTOM_ARCHIVE_PATH##*.}"
 	deps=(unzip tar)
 	CHECK_DEPS -a
 fi
 
-[ -f /etc/os-release ] && { source /etc/os-release; OS=$NAME; } || { error "無法確定操作系統類型"; exit 1; }
+[ -f /etc/os-release ] && {
+	source /etc/os-release
+	OS=$NAME
+} || {
+	error "無法確定操作系統類型"
+	exit 1
+}
 
 TASK "正在安裝必要的套件" "deps=(curl wget lighttpd expect); CHECK_DEPS -a;"
 
@@ -161,18 +170,18 @@ if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 	text "臨時目錄：$TMP_DIR"
 
 	case "${CUSTOM_ARCHIVE_PATH##*.}" in
-		"zip")
-			text "解壓縮 ZIP 文件..."
-			unzip -q "$CUSTOM_ARCHIVE_PATH" -d "$TMP_DIR"
-			;;
-		"tar")
-			text "解壓縮 TAR 文件..."
-			tar xf "$CUSTOM_ARCHIVE_PATH" -C "$TMP_DIR"
-			;;
-		"gz"|"tgz")
-			text "解壓縮 GZIP 文件..."
-			tar xzf "$CUSTOM_ARCHIVE_PATH" -C "$TMP_DIR"
-			;;
+	"zip")
+		text "解壓縮 ZIP 文件..."
+		unzip -q "$CUSTOM_ARCHIVE_PATH" -d "$TMP_DIR"
+		;;
+	"tar")
+		text "解壓縮 TAR 文件..."
+		tar xf "$CUSTOM_ARCHIVE_PATH" -C "$TMP_DIR"
+		;;
+	"gz" | "tgz")
+		text "解壓縮 GZIP 文件..."
+		tar xzf "$CUSTOM_ARCHIVE_PATH" -C "$TMP_DIR"
+		;;
 	esac
 
 	PANEL_HTML=$(find "$TMP_DIR" -name "panel.html" -type f)
@@ -202,7 +211,7 @@ else
 fi"
 
 text "配置 lighttpd..."
-cat > /etc/lighttpd/lighttpd.conf << EOF
+cat >/etc/lighttpd/lighttpd.conf <<EOF
 server.modules = (
 	"mod_access",
 	"mod_alias",

@@ -120,11 +120,11 @@ split_commands() {
 	count=$(echo "$input" | grep -o '; \\' | wc -l)
 	count=$((count + 1))
 
-	printf '2%.0s' $(seq 1 $count) > "$tmp_file"
-	echo >> "$tmp_file"
+	printf '2%.0s' $(seq 1 $count) >"$tmp_file"
+	echo >>"$tmp_file"
 
 	echo "$input" | sed 's/; \\/\n/g' | while read -r cmd; do
-		[ -n "$cmd" ] && echo "$cmd" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' >> "$tmp_file"
+		[ -n "$cmd" ] && echo "$cmd" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' >>"$tmp_file"
 	done
 
 	echo "$tmp_file"
@@ -157,33 +157,33 @@ execute_command() {
 	original_command="$command"
 
 	cmd_file="$INSTALL_DIR/cmd_$$.tmp"
-	
+
 	if [ -f "$cmd_file" ]; then
-		read -r status_line < "$cmd_file"
+		read -r status_line <"$cmd_file"
 		if [[ "$status_line" =~ "1" ]]; then
 			if [[ "$original_command" =~ "; \\" ]]; then
 				count=$(echo "$command" | sed 's/; \\/\n/g' | grep -v '^[[:space:]]*$' | wc -l)
-				printf '2%.0s' $(seq 1 $count) > "$cmd_file"
-				echo >> "$cmd_file"
-				echo "$command" | sed 's/; \\/\n/g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^[[:space:]]*$' >> "$cmd_file"
+				printf '2%.0s' $(seq 1 $count) >"$cmd_file"
+				echo >>"$cmd_file"
+				echo "$command" | sed 's/; \\/\n/g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^[[:space:]]*$' >>"$cmd_file"
 			else
-				echo "2" > "$cmd_file"
-				echo "$command" >> "$cmd_file"
+				echo "2" >"$cmd_file"
+				echo "$command" >>"$cmd_file"
 			fi
 		fi
 	else
 		if [[ "$original_command" =~ "; \\" ]]; then
 			count=$(echo "$command" | sed 's/; \\/\n/g' | grep -v '^[[:space:]]*$' | wc -l)
-			printf '2%.0s' $(seq 1 $count) > "$cmd_file"
-			echo >> "$cmd_file"
-			echo "$command" | sed 's/; \\/\n/g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^[[:space:]]*$' >> "$cmd_file"
+			printf '2%.0s' $(seq 1 $count) >"$cmd_file"
+			echo >>"$cmd_file"
+			echo "$command" | sed 's/; \\/\n/g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^[[:space:]]*$' >>"$cmd_file"
 		else
-			echo "2" > "$cmd_file"
-			echo "$command" >> "$cmd_file"
+			echo "2" >"$cmd_file"
+			echo "$command" >>"$cmd_file"
 		fi
 	fi
 
-	read -r status_line < "$cmd_file"
+	read -r status_line <"$cmd_file"
 	total=${#status_line}
 
 	cmd_index=$(echo "$status_line" | grep -b "2" | head -1 | cut -d: -f1)
@@ -198,7 +198,7 @@ execute_command() {
 		step_elapsed=$(calculate_elapsed $step_start $step_end)
 
 		if [ $exit_code -eq 0 ]; then
-			status_line="${status_line:0:$cmd_index}0${status_line:$((cmd_index+1))}"
+			status_line="${status_line:0:$cmd_index}0${status_line:$((cmd_index + 1))}"
 			steps+=("{\"command\":\"$(escape_json "$cmd")\",\
 \"output\":\"$(escape_json "$output")\",\
 \"status\":\"success\",\
@@ -207,7 +207,7 @@ execute_command() {
 \"total\":\"$total\"}")
 			errors+=("\"\"")
 		else
-			status_line="${status_line:0:$cmd_index}1${status_line:$((cmd_index+1))}"
+			status_line="${status_line:0:$cmd_index}1${status_line:$((cmd_index + 1))}"
 			has_error=true
 			steps+=("{\"command\":\"$(escape_json "$cmd")\",\
 \"output\":\"$(escape_json "$output")\",\
@@ -226,8 +226,14 @@ execute_command() {
 	elapsed_time=$(calculate_elapsed $start_time $end_time)
 	percentage=$((current * 100 / total))
 
-	steps_json=$(IFS=,; echo "${steps[*]}")
-	errors_json=$(IFS=,; echo "${errors[*]}")
+	steps_json=$(
+		IFS=,
+		echo "${steps[*]}"
+	)
+	errors_json=$(
+		IFS=,
+		echo "${errors[*]}"
+	)
 	data="{\"command\":\"$(escape_json "$command")\",\
 \"start_time\":\"$start_time_iso\",\
 \"end_time\":\"$end_time_iso\",\
@@ -241,14 +247,23 @@ execute_command() {
 }
 
 main() {
-	[ -z "$REQUEST_PATH" ] && { send_error_response "No request path provided"; exit 1; }
-	[ ! -f "$ROUTES_CONF" ] && { send_error_response "Routes configuration not found"; exit 1; }
+	[ -z "$REQUEST_PATH" ] && {
+		send_error_response "No request path provided"
+		exit 1
+	}
+	[ ! -f "$ROUTES_CONF" ] && {
+		send_error_response "Routes configuration not found"
+		exit 1
+	}
 	command=$(grep "^$REQUEST_PATH:" "$ROUTES_CONF" | cut -d':' -f2-)
-	[ -z "$command" ] && { send_error_response "Route not found"; exit 1; }
+	[ -z "$command" ] && {
+		send_error_response "Route not found"
+		exit 1
+	}
 	if [ -n "$QUERY_STRING" ]; then
 		while IFS='=' read -r name value; do
-			[ -n "$name" ] && [ -n "$value" ] && \
-			command=${command//\$\{$name\}/$(decode_url "$value")}
+			[ -n "$name" ] && [ -n "$value" ] &&
+				command=${command//\$\{$name\}/$(decode_url "$value")}
 		done < <(echo "$QUERY_STRING" | tr '&' '\n')
 	fi
 	execute_command "$command"
