@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase_setup.sh"
-Version="Beta217"
+Version="Beta218"
 License="Apache License 2.0"
 
 REPO_URL="https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main"
@@ -68,7 +68,7 @@ chmod 700 /tmp/sessions /tmp/resets
 text "${CLR2}生成 SSL 證書...${CLR0}"
 DOMAIN=${1:-$(hostname)}
 openssl req -x509 -newkey rsa:4096 -keyout /etc/lighttpd/certs/server.key -out /etc/lighttpd/certs/server.crt -days 365 -nodes -subj "/CN=${DOMAIN}"
-cat /etc/lighttpd/certs/server.key /etc/lighttpd/certs/server.crt > /etc/lighttpd/certs/server.pem
+cat /etc/lighttpd/certs/server.key /etc/lighttpd/certs/server.crt >/etc/lighttpd/certs/server.pem
 chmod 600 /etc/lighttpd/certs/server.pem
 
 # 下載並安裝 CGI 腳本

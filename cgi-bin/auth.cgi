@@ -9,7 +9,7 @@ echo "Pragma: no-cache"
 BLOCKED_IPS_FILE="/var/tmp/blocked_ips"
 FAILED_ATTEMPTS_DIR="/var/tmp/failed_attempts"
 MAX_ATTEMPTS=5
-BLOCK_TIME=600  # 10分鐘（秒）
+BLOCK_TIME=600 # 10分鐘（秒）
 
 # 確保目錄和文件存在
 mkdir -p "$FAILED_ATTEMPTS_DIR"
@@ -22,15 +22,15 @@ validate_session() {
     local session_id="$1"
     local session_file="$SESSION_DIR/$session_id"
     local current_time=$(date +%s)
-    
+
     # 檢查會話是否存在且有效
     if [[ -n "$session_id" ]] && [[ -f "$session_file" ]]; then
         # 讀取會話創建時間
         local created_time=$(stat -c %Y "$session_file")
         local session_age=$((current_time - created_time))
-        
+
         # 檢查會話是否過期（7天）
-        if (( session_age < 604800 )); then
+        if ((session_age < 604800)); then
             # 更新會話文件的訪問時間
             touch "$session_file"
             return 0
@@ -48,9 +48,9 @@ parse_cookies() {
     if [[ -n "$HTTP_COOKIE" ]]; then
         local cookies
         declare -gA COOKIES
-        IFS=';' read -ra cookies <<< "$HTTP_COOKIE"
+        IFS=';' read -ra cookies <<<"$HTTP_COOKIE"
         for cookie in "${cookies[@]}"; do
-            cookie=$(echo "$cookie" | xargs)  # 去除空白
+            cookie=$(echo "$cookie" | xargs) # 去除空白
             local key="${cookie%%=*}"
             local value="${cookie#*=}"
             COOKIES["$key"]="$value"
@@ -63,22 +63,22 @@ check_ip_blocked() {
     local ip="$1"
     local current_time=$(date +%s)
     local block_info
-    
+
     # 清理過期的封禁記錄
     local tmp_file=$(mktemp)
     while IFS=':' read -r blocked_ip block_time; do
-        if [[ -n "$blocked_ip" ]] && (( current_time - block_time < BLOCK_TIME )); then
-            echo "$blocked_ip:$block_time" >> "$tmp_file"
+        if [[ -n "$blocked_ip" ]] && ((current_time - block_time < BLOCK_TIME)); then
+            echo "$blocked_ip:$block_time" >>"$tmp_file"
         fi
-    done < "$BLOCKED_IPS_FILE"
+    done <"$BLOCKED_IPS_FILE"
     mv "$tmp_file" "$BLOCKED_IPS_FILE"
-    
+
     # 檢查當前 IP 是否被封禁
     block_info=$(grep "^$ip:" "$BLOCKED_IPS_FILE")
     if [[ -n "$block_info" ]]; then
         block_time=$(echo "$block_info" | cut -d':' -f2)
         remaining_time=$((BLOCK_TIME - (current_time - block_time)))
-        if (( remaining_time > 0 )); then
+        if ((remaining_time > 0)); then
             return "$remaining_time"
         fi
     fi
@@ -90,18 +90,18 @@ record_failed_attempt() {
     local ip="$1"
     local ip_file="$FAILED_ATTEMPTS_DIR/$ip"
     local current_time=$(date +%s)
-    
+
     # 創建或更新失敗記錄
-    echo "$current_time" >> "$ip_file"
-    
+    echo "$current_time" >>"$ip_file"
+
     # 只保留最近的失敗記錄
     local attempts=$(tail -n "$MAX_ATTEMPTS" "$ip_file" | wc -l)
-    if (( attempts >= MAX_ATTEMPTS )); then
+    if ((attempts >= MAX_ATTEMPTS)); then
         local oldest_time=$(head -n 1 "$ip_file")
-        if (( current_time - oldest_time < BLOCK_TIME )); then
+        if ((current_time - oldest_time < BLOCK_TIME)); then
             # 封禁 IP
-            echo "$ip:$current_time" >> "$BLOCKED_IPS_FILE"
-            rm -f "$ip_file"  # 清除失敗記錄
+            echo "$ip:$current_time" >>"$BLOCKED_IPS_FILE"
+            rm -f "$ip_file" # 清除失敗記錄
             return 1
         fi
     fi
@@ -121,17 +121,17 @@ log_security() {
     local message="$3"
     local log_file="/var/log/security.log"
     local log_dir="/var/log"
-    
+
     # 確保日誌目錄存在且權限正確
     [ ! -d "$log_dir" ] && mkdir -p "$log_dir"
     [ ! -f "$log_file" ] && touch "$log_file"
     chmod 640 "$log_file"
-    
+
     # 獲取當前月份
     local current_month=$(date +%Y%m)
     local log_month=""
     [ -f "$log_file" ] && log_month=$(date -r "$log_file" +%Y%m)
-    
+
     # 如果是新的月份，進行日誌輪替
     if [ "$current_month" != "$log_month" ] && [ -f "$log_file" ]; then
         mv "$log_file" "${log_file}.${log_month}"
@@ -139,7 +139,7 @@ log_security() {
         touch "$log_file"
         chmod 640 "$log_file"
     fi
-    
+
     # 格式化日誌條目
     printf "[%s] %s - %s - \"%s %s\" - \"%s\" - %s - %s\n" \
         "$(date '+%Y-%m-%d %H:%M:%S')" \
@@ -150,7 +150,7 @@ log_security() {
         "${HTTP_USER_AGENT:-unknown}" \
         "${status}" \
         "${message}" \
-        >> "$log_file"
+        >>"$log_file"
 }
 
 # 設置安全的 Cookie
@@ -160,14 +160,14 @@ set_secure_cookie() {
     local max_age="$3"
     local domain="${4:-}"
     local same_site="${5:-Strict}"
-    
+
     local cookie="Set-Cookie: ${name}=${value}; Path=/; HttpOnly; Secure"
-    
+
     # 添加可選參數
     [[ -n "$max_age" ]] && cookie+="; Max-Age=${max_age}"
     [[ -n "$domain" ]] && cookie+="; Domain=${domain}"
     cookie+="; SameSite=${same_site}"
-    
+
     echo "$cookie"
 }
 
@@ -197,7 +197,7 @@ check_security() {
     local remaining_time
     check_ip_blocked "$REMOTE_ADDR"
     remaining_time=$?
-    if (( remaining_time > 0 )); then
+    if ((remaining_time > 0)); then
         log_security "$action" "error" "IP 已被封禁，剩餘時間: ${remaining_time} 秒"
         echo "{"
         echo "  \"status\": \"error\","
@@ -212,35 +212,35 @@ check_security() {
 check_session_status() {
     local session_id="$1"
     local result
-    
+
     validate_session "$session_id"
     result=$?
-    
+
     case $result in
-        0)  # 會話有效
-            log_security "validate" "success" "會話有效: ${session_id}"
-            echo "{"
-            echo "  \"status\": \"valid\","
-            echo "  \"message\": \"Session is valid.\""
-            echo "}"
-            ;;
-        2)  # 會話過期
-            log_security "validate" "error" "會話已過期: ${session_id}"
-            # 清除過期的 Cookie
-            set_secure_cookie "SESSION_ID" "" "0"
-            echo
-            echo "{"
-            echo "  \"status\": \"invalid\","
-            echo "  \"message\": \"Session has expired.\""
-            echo "}"
-            ;;
-        *)  # 會話無效
-            log_security "validate" "error" "會話無效或不存在"
-            echo "{"
-            echo "  \"status\": \"invalid\","
-            echo "  \"message\": \"Not logged in.\""
-            echo "}"
-            ;;
+    0) # 會話有效
+        log_security "validate" "success" "會話有效: ${session_id}"
+        echo "{"
+        echo "  \"status\": \"valid\","
+        echo "  \"message\": \"Session is valid.\""
+        echo "}"
+        ;;
+    2) # 會話過期
+        log_security "validate" "error" "會話已過期: ${session_id}"
+        # 清除過期的 Cookie
+        set_secure_cookie "SESSION_ID" "" "0"
+        echo
+        echo "{"
+        echo "  \"status\": \"invalid\","
+        echo "  \"message\": \"Session has expired.\""
+        echo "}"
+        ;;
+    *) # 會話無效
+        log_security "validate" "error" "會話無效或不存在"
+        echo "{"
+        echo "  \"status\": \"invalid\","
+        echo "  \"message\": \"Not logged in.\""
+        echo "}"
+        ;;
     esac
 }
 
@@ -272,20 +272,20 @@ case "$action" in
     # 檢查登入憑證
     username="${query[username]}"
     password="${query[password]}"
-    
+
     # 模擬登入驗證（實際應用中應該進行真實的驗證）
     if [[ "$username" == "admin" ]] && [[ "$password" == "password" ]]; then
         # 登入成功，清除失敗記錄
         clear_failed_attempts "$REMOTE_ADDR"
-        
+
         # 生成新會話ID
         new_session_id=$(head -c 16 /dev/urandom | xxd -p)
         touch "$SESSION_DIR/$new_session_id"
-        
+
         # 設置安全的 Cookie（7天過期）
         set_secure_cookie "SESSION_ID" "$new_session_id" "604800"
         echo
-        
+
         if [[ -n "$redirect" ]]; then
             log_security "login" "success" "登入成功，重定向到 ${redirect}"
             echo "{"
@@ -324,11 +324,11 @@ case "$action" in
     if [[ -n "${COOKIES[SESSION_ID]}" ]]; then
         rm -f "$SESSION_DIR/${COOKIES[SESSION_ID]}"
     fi
-    
+
     # 清除 Cookie
     set_secure_cookie "SESSION_ID" "" "0"
     echo
-    
+
     log_security "logout" "success" "登出成功"
     echo "{"
     echo "  \"status\": \"success\","
@@ -367,4 +367,4 @@ case "$action" in
     echo "  \"message\": \"無效的操作\""
     echo "}"
     ;;
-esac 
+esac
