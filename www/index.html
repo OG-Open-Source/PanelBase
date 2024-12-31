@@ -331,7 +331,7 @@
             }
         }
         
-        :root.dark-mode {
+         :root.dark-mode {
             --background-color: #000000;
             --input-background: #1C1C1E;
             --text-color: #FFFFFF;
@@ -343,28 +343,28 @@
             --primary-rgb: 10, 132, 255;
         }
         
-        :root.dark-mode body {
+         :root.dark-mode body {
             background: var(--body-gradient);
         }
         
-        :root.dark-mode .container {
+         :root.dark-mode .container {
             background: var(--container-bg);
             color: var(--text-color);
         }
         
-        :root.dark-mode p,
-        :root.dark-mode label {
+         :root.dark-mode p,
+         :root.dark-mode label {
             color: var(--text-color);
         }
         
-        :root.dark-mode input {
+         :root.dark-mode input {
             color: var(--text-color);
             background: var(--input-background);
             border-color: var(--input-border);
         }
         
         @media (prefers-color-scheme: dark) {
-            :root:not(.light-mode) {
+             :root:not(.light-mode) {
                 --background-color: #000000;
                 --input-background: #1C1C1E;
                 --text-color: #FFFFFF;
@@ -375,18 +375,18 @@
                 --body-gradient: linear-gradient(135deg, #1C1C1E, #2C2C2E);
                 --primary-rgb: 10, 132, 255;
             }
-            :root:not(.light-mode) body {
+             :root:not(.light-mode) body {
                 background: var(--body-gradient);
             }
-            :root:not(.light-mode) .container {
+             :root:not(.light-mode) .container {
                 background: var(--container-bg);
                 color: var(--text-color);
             }
-            :root:not(.light-mode) p,
-            :root:not(.light-mode) label {
+             :root:not(.light-mode) p,
+             :root:not(.light-mode) label {
                 color: var(--text-color);
             }
-            :root:not(.light-mode) input {
+             :root:not(.light-mode) input {
                 color: var(--text-color);
                 background: var(--input-background);
                 border-color: var(--input-border);
@@ -558,7 +558,7 @@
             }
         }
         
-        :root.dark-mode body::before {
+         :root.dark-mode body::before {
             background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 70%);
         }
     </style>
