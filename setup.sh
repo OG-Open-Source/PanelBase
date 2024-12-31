@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase_setup.sh"
-Version="Beta216"
+Version="Beta217"
 License="Apache License 2.0"
 
 REPO_URL="https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main"
