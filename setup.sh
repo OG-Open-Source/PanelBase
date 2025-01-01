@@ -4,10 +4,8 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase_setup.sh"
-Version="Beta218"
+Version="Beta219"
 License="Apache License 2.0"
-
-REPO_URL="https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main"
 
 CLR1="\033[0;31m"
 CLR2="\033[0;32m"
@@ -20,110 +18,306 @@ CLR8="\033[0;96m"
 CLR9="\033[0;97m"
 CLR0="\033[0m"
 
+DIR_MODE="755"
+WWW_MODE="644"
+CGI_MODE="755"
+CONFIG_MODE="600"
+
+declare -A FILES=(
+    ["cgi-bin"]="auth.cgi panel.cgi"
+    ["www"]="panel.html favicon.png"
+    ["config"]="routes.conf security.conf"
+)
+
+declare -A FILE_PERMISSIONS=(
+    ["cgi-bin"]="$CGI_MODE"
+    ["www"]="$WWW_MODE"
+    ["config"]="$CONFIG_MODE"
+)
+
+declare -A FILE_PATHS=(
+    ["cgi-bin"]="cgi-bin"
+    ["www"]="www"
+    ["config"]="config"
+)
+
+CLEAN
+text "╭────────────────────────────────╮"
+text "│  ${CLR3}$Version${CLR0}"
+text "│────────────────────────────────╮"
+text "│                                │"
+text "│       PanelBase 安裝程序       │"
+text "│                                │"
+text "╰────────────────────────────────╯"
+
 CHECK_ROOT
 
-# 下載檔案函數
-download_file() {
-    local file_path="$1"
-    local target_path="$2"
-    text "${CLR2}下載 ${file_path}...${CLR0}"
-    curl -sSLO "${REPO_URL}/${file_path}"
-    if [ $? -eq 0 ]; then
-        mkdir -p "$(dirname "${target_path}")"
-        mv "$(basename ${file_path})" "${target_path}"
-        chmod +x "${target_path}"
-        text "${CLR2}成功下載 ${file_path}${CLR0}"
-    else
-        error "下載 ${file_path} 失敗"
-        exit 1
-    fi
-}
+text "${CLR8}►${CLR0} 基本設置"
+text "──────────────"
+INPUT "管理員用戶名: " ADMIN_NAME
+ADMIN_NAME=${ADMIN_NAME:-admin}
 
-text "${CLR2}開始安裝必要套件...${CLR0}"
-
-# 檢測包管理器並安裝必要套件
-if command -v apt-get &>/dev/null; then
-    apt-get update
-    apt-get install -y lighttpd xxd openssl curl
-elif command -v yum &>/dev/null; then
-    yum update -y
-    yum install -y lighttpd vim-common openssl curl
-elif command -v pacman &>/dev/null; then
-    pacman -Syu --noconfirm
-    pacman -S --noconfirm lighttpd vim openssl curl
-else
-    error "不支援的系統，請手動安裝 lighttpd"
+if ! [[ $ADMIN_NAME =~ ^[A-Za-z0-9]+$ ]]; then
+    error "用戶名只能包含英文字母和數字"
     exit 1
 fi
 
-# 創建必要目錄
-text "${CLR2}創建必要目錄...${CLR0}"
-mkdir -p /var/www/panelbase/cgi-bin
-mkdir -p /tmp/sessions
-mkdir -p /tmp/resets
-mkdir -p /etc/lighttpd/certs
-chmod 700 /tmp/sessions /tmp/resets
+while true; do
+    read -s -p "管理員密碼: " ADMIN_PASS
+    ADMIN_PASS=${ADMIN_PASS:-1917159}
+    echo
+    read -s -p "確認密碼: " ADMIN_PASS_CONFIRM
+    ADMIN_PASS_CONFIRM=${ADMIN_PASS_CONFIRM:-1917159}
+    echo
+    [ "$ADMIN_PASS" = "$ADMIN_PASS_CONFIRM" ] && break
+    error "密碼不匹配，請重試"
+done
 
-# 生成 SSL 證書
-text "${CLR2}生成 SSL 證書...${CLR0}"
-DOMAIN=${1:-$(hostname)}
-openssl req -x509 -newkey rsa:4096 -keyout /etc/lighttpd/certs/server.key -out /etc/lighttpd/certs/server.crt -days 365 -nodes -subj "/CN=${DOMAIN}"
-cat /etc/lighttpd/certs/server.key /etc/lighttpd/certs/server.crt >/etc/lighttpd/certs/server.pem
-chmod 600 /etc/lighttpd/certs/server.pem
+while true; do
+    INPUT "請輸入面板端口 (1024-65535)：" PANEL_PORT
+    PANEL_PORT=${PANEL_PORT:-8080}
 
-# 下載並安裝 CGI 腳本
-text "${CLR2}下載並安裝 CGI 腳本...${CLR0}"
-download_file "cgi-bin/auth.cgi" "/var/www/panelbase/cgi-bin/auth.cgi"
+    if ! [[ $PANEL_PORT =~ ^[0-9]+$ ]]; then
+        error "端口必須是數字"
+        continue
+    fi
 
-# 配置 lighttpd
-text "${CLR2}配置 lighttpd...${CLR0}"
+    if [ $PANEL_PORT -lt 1024 ] || [ $PANEL_PORT -gt 65535 ]; then
+        error "端口必須在 1024-65535 之間"
+        continue
+    fi
 
-# 下載配置文件
-text "${CLR2}下載 lighttpd 配置文件...${CLR0}"
-mkdir -p /etc/lighttpd/conf.d
-download_file "config/lighttpd/conf.d/10-cgi.conf" "/etc/lighttpd/conf.d/10-cgi.conf"
-download_file "config/lighttpd/conf.d/20-rewrite.conf" "/etc/lighttpd/conf.d/20-rewrite.conf"
+    if netstat -tuln | grep -q ":$PANEL_PORT "; then
+        error "端口 $PANEL_PORT 已被占用"
+        continue
+    fi
 
-# 確保 conf.d 目錄被包含
-if ! grep -q "conf.d" /etc/lighttpd/lighttpd.conf; then
-    echo 'include "conf.d/*.conf"' >>/etc/lighttpd/lighttpd.conf
+    break
+done
+
+INPUT "是否使用自定義的面板頁面？(y/N) " USE_CUSTOM_HTML
+USE_CUSTOM_HTML=${USE_CUSTOM_HTML:-n}
+
+if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
+    INPUT "請輸入自定義面板壓縮檔的路徑：" CUSTOM_ARCHIVE_PATH
+    [ ! -f "$CUSTOM_ARCHIVE_PATH" ] && {
+        error "找不到指定的壓縮檔"
+        exit 1
+    }
+    FILE_EXT="${CUSTOM_ARCHIVE_PATH##*.}"
+    deps=(unzip tar)
+    CHECK_DEPS -a
 fi
 
-# 重啟 lighttpd
-text "${CLR2}重啟 lighttpd 服務...${CLR0}"
-if command -v systemctl &>/dev/null; then
-    systemctl enable lighttpd
-    systemctl restart lighttpd
-else
-    service lighttpd restart
-fi
+[ -f /etc/os-release ] && {
+    source /etc/os-release
+    OS=$NAME
+} || {
+    error "無法確定操作系統類型"
+    exit 1
+}
 
-# 檢查服務狀態
-if command -v systemctl &>/dev/null; then
-    if systemctl is-active --quiet lighttpd; then
-        text "${CLR2}安裝完成！${CLR0}"
-        text "${CLR3}CGI 腳本可通過以下 URL 訪問：${CLR0}"
-        text "https://${DOMAIN}/panelbase/s/login"
-        text "https://${DOMAIN}/panelbase/s/check"
-        text "https://${DOMAIN}/panelbase/s/logout"
-        text "https://${DOMAIN}/panelbase/s/validate"
-    else
-        error "lighttpd 服務啟動失敗，請檢查日誌"
+TASK "正在安裝必要的套件" "deps=(curl wget lighttpd expect); CHECK_DEPS -a;"
+
+INSTALL_DIR="/opt/panelbase"
+TASK "創建必要的目錄" "ADD -d $INSTALL_DIR/{www,cgi-bin,config,logs}"
+
+text "下載面板文件..."
+BASE_URL="https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main"
+TMP_DIR=$(mktemp -d)
+
+download_files() {
+    local dir="$1"
+    local files="$2"
+    local target_dir="$INSTALL_DIR/$dir"
+    local source_path="${FILE_PATHS[$dir]}"
+
+    for file in $files; do
+        text "下載 $dir/$file..."
+        local source_url="$BASE_URL/$source_path/$file"
+
+        if ! curl -sSL -o "$TMP_DIR/$file" "$source_url"; then
+            error "無法下載 $file"
+            return 1
+        fi
+
+        chmod ${FILE_PERMISSIONS[$dir]} "$TMP_DIR/$file"
+    done
+
+    mv $TMP_DIR/* "$target_dir/"
+    return 0
+}
+
+for dir in "${!FILES[@]}"; do
+    if [[ "$dir" = "www" ]] && [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]] && [[ "${FILES[$dir]}" =~ "panel.html" ]]; then
+        FILES[$dir]=${FILES[$dir]/panel.html/}
+    fi
+
+    if [ -n "${FILES[$dir]}" ]; then
+        if ! download_files "$dir" "${FILES[$dir]}"; then
+            rm -rf "$TMP_DIR"
+            error "安裝失敗"
+            exit 1
+        fi
+    fi
+done
+
+rm -rf "$TMP_DIR"
+
+if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
+    text "正在處理自定義面板文件..."
+    TMP_DIR=$(mktemp -d)
+    text "臨時目錄：$TMP_DIR"
+
+    case "${CUSTOM_ARCHIVE_PATH##*.}" in
+    "zip")
+        text "解壓縮 ZIP 文件..."
+        unzip -q "$CUSTOM_ARCHIVE_PATH" -d "$TMP_DIR"
+        ;;
+    "tar")
+        text "解壓縮 TAR 文件..."
+        tar xf "$CUSTOM_ARCHIVE_PATH" -C "$TMP_DIR"
+        ;;
+    "gz" | "tgz")
+        text "解壓縮 GZIP 文件..."
+        tar xzf "$CUSTOM_ARCHIVE_PATH" -C "$TMP_DIR"
+        ;;
+    esac
+
+    PANEL_HTML=$(find "$TMP_DIR" -name "panel.html" -type f)
+
+    if [ -z "$PANEL_HTML" ]; then
+        error "在壓縮檔中找不到 panel.html 文件"
+        error "請確保文件名稱正確（區分大小寫）"
+        rm -rf "$TMP_DIR"
         exit 1
     fi
-else
-    text "${CLR2}安裝完成！${CLR0}"
-    text "${CLR3}請手動檢查 lighttpd 服務狀態${CLR0}"
+
+    PANEL_DIR=$(dirname "$PANEL_HTML")
+    cp -f "$PANEL_HTML" "$INSTALL_DIR/www/panel.html"
+
+    find "$PANEL_DIR" -type f ! -name "panel.html" ! -name "index.html" -exec cp -f {} "$INSTALL_DIR/www/" \;
+    find "$PANEL_DIR" -type d ! -path "$PANEL_DIR" -exec cp -rf {} "$INSTALL_DIR/www/" \;
+
+    rm -rf "$TMP_DIR"
+    text "${CLR2}自定義面板文件安裝完成${CLR0}"
 fi
 
-# 顯示測試命令
-text "\n${CLR3}測試命令示例：${CLR0}"
-text "curl -k 'https://localhost/panelbase/s/login?redirect=/dashboard' -d 'username=admin&password=password'"
-text "curl -k 'https://localhost/panelbase/s/check' -H 'Cookie: SESSION_ID=your_session_id'"
-text "curl -k 'https://localhost/panelbase/s/validate' -H 'Cookie: SESSION_ID=your_session_id'"
-text "curl -k 'https://localhost/panelbase/s/logout'"
+text "配置 Lighttpd..."
+cat >/etc/lighttpd/lighttpd.conf <<EOF
+server.modules = (
+    "mod_access",
+    "mod_alias",
+    "mod_compress",
+    "mod_redirect",
+    "mod_rewrite",
+    "mod_cgi"
+)
 
-text "\n${CLR3}注意：${CLR0}"
-text "1. 使用 -k 參數是因為使用自簽名證書"
-text "2. 在生產環境中，建議使用正式的 SSL 證書"
-text "3. 默認使用自簽名證書，如需使用正式證書，請替換 /etc/lighttpd/certs/server.pem"
+server.document-root        = "$INSTALL_DIR/www"
+server.upload-dirs         = ( "/var/cache/lighttpd/uploads" )
+server.errorlog            = "/var/log/lighttpd/error.log"
+server.pid-file           = "/var/run/lighttpd.pid"
+server.username           = "www-data"
+server.groupname          = "www-data"
+server.port               = $PANEL_PORT
+
+# 啟用 CGI
+cgi.assign = (
+    ".cgi" => ""
+)
+
+# 設置 MIME 類型
+mimetype.assign = (
+    ".html" => "text/html",
+    ".txt" => "text/plain",
+    ".css" => "text/css",
+    ".js" => "application/javascript",
+    ".jpg" => "image/jpeg",
+    ".jpeg" => "image/jpeg",
+    ".gif" => "image/gif",
+    ".png" => "image/png",
+    ".svg" => "image/svg+xml",
+    ".ico" => "image/x-icon"
+)
+
+# 設置目錄訪問權限
+\$HTTP["url"] =~ "^/cgi-bin/" {
+    dir-listing.activate = "disable"
+    cgi.assign = ( "" => "" )
+}
+
+\$HTTP["url"] =~ "^/config/" {
+    url.access-deny = ( "" )
+}
+
+# 設置 /s 路徑重寫規則
+url.rewrite-once = (
+    "^/s/(.+)" => "/cgi-bin/auth.cgi/\$1"
+)
+
+# 設置 index 檔案
+index-file.names = ( "index.html" )
+
+# 啟用壓縮
+compress.cache-dir          = "/var/cache/lighttpd/compress/"
+compress.filetype          = ( "application/javascript", "text/css", "text/html", "text/plain" )
+
+# 設置訪問日誌
+server.errorlog-use-syslog = "enable"
+
+# 設置檔案上傳限制
+server.max-request-size    = 1048576
+
+# 設置連接超時
+server.max-keep-alive-requests = 100
+server.max-keep-alive-idle = 30
+
+# 設置 etag
+static-file.etags         = "enable"
+
+# 設置目錄列表
+dir-listing.activate      = "disable"
+
+# 設置字符集
+server.stream-response-body = 1
+server.range-requests     = "enable"
+
+EOF
+
+TASK "創建用戶配置" "echo '${ADMIN_NAME}:$(echo -n "${ADMIN_PASS}" | md5sum | cut -d' ' -f1)' > $INSTALL_DIR/config/user.conf && touch $INSTALL_DIR/config/sessions.conf"
+
+TASK "設置權限" "if ! id -u www-data >/dev/null 2>&1; then useradd -r -s /usr/sbin/nologin www-data; fi"
+find "$INSTALL_DIR" -type d -exec chmod "$DIR_MODE" {} \;
+for dir in "${!FILE_PERMISSIONS[@]}"; do
+    if [ -d "$INSTALL_DIR/$dir" ]; then
+        find "$INSTALL_DIR/$dir" -type f -exec chmod "${FILE_PERMISSIONS[$dir]}" {} \;
+    fi
+done
+chmod "$CONFIG_MODE" "$INSTALL_DIR/config/user.conf"
+chmod "$CONFIG_MODE" "$INSTALL_DIR/config/sessions.conf"
+chmod "$CONFIG_MODE" "$INSTALL_DIR/config/security.conf"
+
+chown -R www-data:www-data "$INSTALL_DIR"
+chown -R www-data:www-data /etc/lighttpd
+
+mkdir -p /var/log/lighttpd
+chown -R www-data:www-data /var/log/lighttpd
+chmod "$DIR_MODE" /var/log/lighttpd
+
+TASK "配置 sudo 權限" "cat > /etc/sudoers.d/panelbase << EOF
+www-data ALL=(ALL) NOPASSWD: ALL
+EOF
+chmod 440 /etc/sudoers.d/panelbase"
+
+TASK "重啟 lighttpd 服務" "systemctl restart lighttpd"
+
+SERVER_IP=$(hostname -I | awk '{print $1}')
+text "╭────────────────────────────────╮"
+text "│            安裝完成            │"
+text "╰────────────────────────────────╯"
+text "${CLR8}►${CLR0} 訪問地址: ${GREEN}http://${SERVER_IP}:${PANEL_PORT}${CLR0}"
+text "${CLR8}►${CLR0} 登入信息:"
+text "- 用戶: ${GREEN}${ADMIN_NAME}${CLR0}"
+text "- 密碼: ${GREEN}${ADMIN_PASS}${CLR0}"
+[[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]] && text "${CLR8}►${CLR0} 使用自定義面板頁面"
