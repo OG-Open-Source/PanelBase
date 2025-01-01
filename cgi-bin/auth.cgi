@@ -8,7 +8,7 @@ SECURITY_CONF="$CONFIG_DIR/security.conf"
 
 # 如果 security.conf 不存在，創建默認配置
 if [ ! -f "$SECURITY_CONF" ]; then
-    cat > "$SECURITY_CONF" <<EOF
+	cat >"$SECURITY_CONF" <<EOF
 # 安全配置
 SECURITY_HEADERS_CSP="default-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://raw.githubusercontent.com; img-src 'self' data: https:; font-src 'self' https://cdnjs.cloudflare.com; connect-src 'self'"
 SESSION_LIFETIME=86400
@@ -19,7 +19,7 @@ ALLOW_HTML_REFERENCE="true"
 CACHE_MAX_AGE=3600
 LOG_FILE="/opt/panelbase/logs/auth.log"
 EOF
-    chmod 600 "$SECURITY_CONF"
+	chmod 600 "$SECURITY_CONF"
 fi
 
 # 載入安全配置
@@ -31,74 +31,74 @@ touch "$LOG_FILE"
 chmod 600 "$LOG_FILE"
 
 log_auth_event() {
-    local level="$1"
-    local message="$2"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $message" >>"$LOG_FILE"
+	local level="$1"
+	local message="$2"
+	echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $message" >>"$LOG_FILE"
 }
 
 WHITELIST_REGEX=$(echo "$WHITELIST_FILES" | sed 's/\./\\./g' | sed 's/\*/.*/g' | tr ' ' '|')
 BLACKLIST_REGEX=$(echo "$BLACKLIST_FILES" | sed 's/\./\\./g' | sed 's/\*/.*/g' | tr ' ' '|')
 
 check_file_access() {
-    local file="$1"
-    local referer="$2"
-    local filename=$(basename "$file")
-    local is_allowed=false
+	local file="$1"
+	local referer="$2"
+	local filename=$(basename "$file")
+	local is_allowed=false
 
-    case "$ACCESS_CONTROL_MODE" in
-    "whitelist")
-        if echo "$filename" | grep -qE "^($WHITELIST_REGEX)$"; then
-            is_allowed=true
-        elif [ "$ALLOW_HTML_REFERENCE" = "true" ] && [ -n "$referer" ] && echo "$referer" | grep -q "^/.*\.html"; then
-            is_allowed=true
-        fi
-        ;;
-    "blacklist")
-        if ! echo "$filename" | grep -qE "^($BLACKLIST_REGEX)$"; then
-            is_allowed=true
-        elif [ "$ALLOW_HTML_REFERENCE" = "true" ] && [ -n "$referer" ] && echo "$referer" | grep -q "^/.*\.html"; then
-            is_allowed=true
-        fi
-        ;;
-    *)
-        log_auth_event "ERROR" "Invalid ACCESS_CONTROL_MODE: $ACCESS_CONTROL_MODE"
-        is_allowed=false
-        ;;
-    esac
+	case "$ACCESS_CONTROL_MODE" in
+	"whitelist")
+		if echo "$filename" | grep -qE "^($WHITELIST_REGEX)$"; then
+			is_allowed=true
+		elif [ "$ALLOW_HTML_REFERENCE" = "true" ] && [ -n "$referer" ] && echo "$referer" | grep -q "^/.*\.html"; then
+			is_allowed=true
+		fi
+		;;
+	"blacklist")
+		if ! echo "$filename" | grep -qE "^($BLACKLIST_REGEX)$"; then
+			is_allowed=true
+		elif [ "$ALLOW_HTML_REFERENCE" = "true" ] && [ -n "$referer" ] && echo "$referer" | grep -q "^/.*\.html"; then
+			is_allowed=true
+		fi
+		;;
+	*)
+		log_auth_event "ERROR" "Invalid ACCESS_CONTROL_MODE: $ACCESS_CONTROL_MODE"
+		is_allowed=false
+		;;
+	esac
 
-    [ "$is_allowed" = "true" ]
+	[ "$is_allowed" = "true" ]
 }
 
 SECURITY_HEADERS() {
-    local content_type="${1:-text/html}"
-    local status="$2"
+	local content_type="${1:-text/html}"
+	local status="$2"
 
-    echo "Content-type: $content_type"
-    echo "X-Content-Type-Options: nosniff"
-    echo "X-Frame-Options: SAMEORIGIN"
-    echo "X-XSS-Protection: 1; mode=block"
-    echo "Referrer-Policy: strict-origin-when-cross-origin"
-    echo "Permissions-Policy: geolocation=(), microphone=(), camera=()"
-    echo "Content-Security-Policy: $SECURITY_HEADERS_CSP"
-    [ -n "$status" ] && echo "Status: $status"
-    echo
+	echo "Content-type: $content_type"
+	echo "X-Content-Type-Options: nosniff"
+	echo "X-Frame-Options: SAMEORIGIN"
+	echo "X-XSS-Protection: 1; mode=block"
+	echo "Referrer-Policy: strict-origin-when-cross-origin"
+	echo "Permissions-Policy: geolocation=(), microphone=(), camera=()"
+	echo "Content-Security-Policy: $SECURITY_HEADERS_CSP"
+	[ -n "$status" ] && echo "Status: $status"
+	echo
 }
 
 SHOW_ERROR() {
-    local status="$1"
-    local code="$2"
-    local message="$3"
+	local status="$1"
+	local code="$2"
+	local message="$3"
 
-    log_auth_event "WARN" "$message"
+	log_auth_event "WARN" "$message"
 
-    if [ -n "$IS_CURL" ]; then
-        SECURITY_HEADERS "application/json" "$status"
-        echo "{\"status\":\"error\",\"code\":\"$status\",\"message\":\"$message\"}"
-    else
-        SECURITY_HEADERS "text/html" "$status"
-        case "$code" in
-        "403")
-            cat << 'ERROR_403_HTML'
+	if [ -n "$IS_CURL" ]; then
+		SECURITY_HEADERS "application/json" "$status"
+		echo "{\"status\":\"error\",\"code\":\"$status\",\"message\":\"$message\"}"
+	else
+		SECURITY_HEADERS "text/html" "$status"
+		case "$code" in
+		"403")
+			cat <<'ERROR_403_HTML'
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -675,9 +675,9 @@ SHOW_ERROR() {
 </body>
 </html>
 ERROR_403_HTML
-            ;;
-        "404")
-            cat << 'ERROR_404_HTML'
+			;;
+		"404")
+			cat <<'ERROR_404_HTML'
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1303,59 +1303,59 @@ ERROR_403_HTML
 </body>
 </html>
 ERROR_404_HTML
-            ;;
-        esac
-    fi
-    exit 0
+			;;
+		esac
+	fi
+	exit 0
 }
 
 SHOW_FORBIDDEN() {
-    local message="$1"
-    SHOW_ERROR "403" "403" "$message"
+	local message="$1"
+	SHOW_ERROR "403" "403" "$message"
 }
 
 SHOW_NOT_FOUND() {
-    local message="$1"
-    SHOW_ERROR "404" "404" "$message"
+	local message="$1"
+	SHOW_ERROR "404" "404" "$message"
 }
 
 REDIRECT_TO_LOGIN() {
-    local original_url="$1"
-    local message="$2"
-    [ -n "$message" ] && log_auth_event "INFO" "$message"
+	local original_url="$1"
+	local message="$2"
+	[ -n "$message" ] && log_auth_event "INFO" "$message"
 
-    if [ -n "$IS_CURL" ]; then
-        SECURITY_HEADERS "application/json" "401"
-        echo "{\"status\":\"error\",\"code\":\"401\",\"message\":\"Authentication required\"}"
-    else
-        echo "Content-type: text/html"
-        echo "Status: 302"
-        echo "Location: /s/login?redirect=$(urlencode "$original_url")"
-        echo
-    fi
-    exit 0
+	if [ -n "$IS_CURL" ]; then
+		SECURITY_HEADERS "application/json" "401"
+		echo "{\"status\":\"error\",\"code\":\"401\",\"message\":\"Authentication required\"}"
+	else
+		echo "Content-type: text/html"
+		echo "Status: 302"
+		echo "Location: /s/login?redirect=$(urlencode "$original_url")"
+		echo
+	fi
+	exit 0
 }
 
 urlencode() {
-    local string="$1"
-    echo -n "$string" | xxd -plain | tr -d '\n' | sed 's/\(..\)/%\1/g'
+	local string="$1"
+	echo -n "$string" | xxd -plain | tr -d '\n' | sed 's/\(..\)/%\1/g'
 }
 
 urldecode() {
-    local encoded="$1"
-    echo -n "$encoded" | sed 's/%/\\x/g' | xargs -0 printf "%b"
+	local encoded="$1"
+	echo -n "$encoded" | sed 's/%/\\x/g' | xargs -0 printf "%b"
 }
 
 cleanup_sessions() {
-    local current_time=$(date +%s)
-    local temp_file=$(mktemp)
-    
-    # 清理過期的 session
-    awk -F: -v time="$current_time" -v max_age="$SESSION_LIFETIME" \
-        '(time - $3) < max_age {print $0}' "$SESSION_FILE" > "$temp_file"
-    
-    mv "$temp_file" "$SESSION_FILE"
-    chmod 600 "$SESSION_FILE"
+	local current_time=$(date +%s)
+	local temp_file=$(mktemp)
+
+	# 清理過期的 session
+	awk -F: -v time="$current_time" -v max_age="$SESSION_LIFETIME" \
+		'(time - $3) < max_age {print $0}' "$SESSION_FILE" >"$temp_file"
+
+	mv "$temp_file" "$SESSION_FILE"
+	chmod 600 "$SESSION_FILE"
 }
 
 # 獲取請求信息
@@ -1370,52 +1370,52 @@ cleanup_sessions
 
 # 處理根路徑訪問
 if [ "$ORIGINAL_URL" = "/" ]; then
-    REDIRECT_TO_LOGIN "/" "Root path access"
-    exit 0
+	REDIRECT_TO_LOGIN "/" "Root path access"
+	exit 0
 fi
 
 # 處理登入相關的請求
 if [ "$PATH_INFO" = "/login" ]; then
-    if [ "$REQUEST_METHOD" = "POST" ]; then
-        read -n $CONTENT_LENGTH POST_DATA
-        USERNAME=$(echo "$POST_DATA" | grep -oP 'username=\K[^&]+' | sed 's/%40/@/g' | sed 's/%2B/+/g' | sed 's/%20/ /g')
-        PASSWORD=$(echo "$POST_DATA" | grep -oP 'password=\K[^&]+' | sed 's/%40/@/g' | sed 's/%2B/+/g' | sed 's/%20/ /g')
-        REDIRECT_URL=$(echo "$QUERY_STRING" | grep -oP 'redirect=\K[^&]+' | urldecode)
+	if [ "$REQUEST_METHOD" = "POST" ]; then
+		read -n $CONTENT_LENGTH POST_DATA
+		USERNAME=$(echo "$POST_DATA" | grep -oP 'username=\K[^&]+' | sed 's/%40/@/g' | sed 's/%2B/+/g' | sed 's/%20/ /g')
+		PASSWORD=$(echo "$POST_DATA" | grep -oP 'password=\K[^&]+' | sed 's/%40/@/g' | sed 's/%2B/+/g' | sed 's/%20/ /g')
+		REDIRECT_URL=$(echo "$QUERY_STRING" | grep -oP 'redirect=\K[^&]+' | urldecode)
 
-        if ! [[ "$USERNAME" =~ ^[A-Za-z0-9]+$ ]]; then
-            SECURITY_HEADERS "application/json" "400"
-            echo '{"status":"error","code":"400","message":"Invalid username format"}'
-            exit 0
-        fi
+		if ! [[ "$USERNAME" =~ ^[A-Za-z0-9]+$ ]]; then
+			SECURITY_HEADERS "application/json" "400"
+			echo '{"status":"error","code":"400","message":"Invalid username format"}'
+			exit 0
+		fi
 
-        if ! [[ "$PASSWORD" =~ ^[A-Za-z0-9!@$]+$ ]]; then
-            SECURITY_HEADERS "application/json" "400"
-            echo '{"status":"error","code":"400","message":"Invalid password format"}'
-            exit 0
-        fi
+		if ! [[ "$PASSWORD" =~ ^[A-Za-z0-9!@$]+$ ]]; then
+			SECURITY_HEADERS "application/json" "400"
+			echo '{"status":"error","code":"400","message":"Invalid password format"}'
+			exit 0
+		fi
 
-        STORED_HASH=$(grep "^$USERNAME:" "$CONFIG_FILE" | cut -d: -f2)
-        INPUT_HASH=$(echo -n "$PASSWORD" | md5sum | cut -d' ' -f1)
+		STORED_HASH=$(grep "^$USERNAME:" "$CONFIG_FILE" | cut -d: -f2)
+		INPUT_HASH=$(echo -n "$PASSWORD" | md5sum | cut -d' ' -f1)
 
-        if [ "$STORED_HASH" = "$INPUT_HASH" ]; then
-            current_time=$(date +%s)
-            token=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
-            echo "$token:$USERNAME:$current_time" >> "$SESSION_FILE"
-            chmod 600 "$SESSION_FILE"
+		if [ "$STORED_HASH" = "$INPUT_HASH" ]; then
+			current_time=$(date +%s)
+			token=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
+			echo "$token:$USERNAME:$current_time" >>"$SESSION_FILE"
+			chmod 600 "$SESSION_FILE"
 
-            SECURITY_HEADERS "application/json" "200"
-            echo "Set-Cookie: auth_token=$token; Path=/; HttpOnly; SameSite=Strict; Max-Age=$SESSION_LIFETIME"
-            echo
-            echo "{\"status\":\"success\",\"code\":\"200\",\"redirect\":\"$REDIRECT_URL\"}"
-        else
-            sleep 1
-            SECURITY_HEADERS "application/json" "401"
-            echo '{"status":"error","code":"401","message":"Invalid username or password"}'
-        fi
-    else
-        # 顯示登入頁面
-        SECURITY_HEADERS
-        cat << 'LOGIN_HTML'
+			SECURITY_HEADERS "application/json" "200"
+			echo "Set-Cookie: auth_token=$token; Path=/; HttpOnly; SameSite=Strict; Max-Age=$SESSION_LIFETIME"
+			echo
+			echo "{\"status\":\"success\",\"code\":\"200\",\"redirect\":\"$REDIRECT_URL\"}"
+		else
+			sleep 1
+			SECURITY_HEADERS "application/json" "401"
+			echo '{"status":"error","code":"401","message":"Invalid username or password"}'
+		fi
+	else
+		# 顯示登入頁面
+		SECURITY_HEADERS
+		cat <<'LOGIN_HTML'
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1482,89 +1482,89 @@ if [ "$PATH_INFO" = "/login" ]; then
 </body>
 </html>
 LOGIN_HTML
-    fi
-    exit 0
+	fi
+	exit 0
 fi
 
 # 檢查是否需要驗證
 is_public_resource() {
-    local url="$1"
-    case "$url" in
-    "/s/login" | "/favicon.ico")
-        return 0
-        ;;
-    *)
-        return 1
-        ;;
-    esac
+	local url="$1"
+	case "$url" in
+	"/s/login" | "/favicon.ico")
+		return 0
+		;;
+	*)
+		return 1
+		;;
+	esac
 }
 
 if is_public_resource "$ORIGINAL_URL"; then
-    if [ "$ORIGINAL_URL" = "/favicon.ico" ]; then
-        SECURITY_HEADERS "image/x-icon"
-        cat "$DOCUMENT_ROOT/favicon.ico"
-    fi
-    exit 0
+	if [ "$ORIGINAL_URL" = "/favicon.ico" ]; then
+		SECURITY_HEADERS "image/x-icon"
+		cat "$DOCUMENT_ROOT/favicon.ico"
+	fi
+	exit 0
 fi
 
 # 驗證 session
 CURRENT_TIME=$(date +%s)
 VALID_SESSION=$(awk -F: -v token="$AUTH_TOKEN" -v time="$CURRENT_TIME" -v max_age="$SESSION_LIFETIME" \
-    '$1 == token && (time - $3) < max_age {print $2}' "$SESSION_FILE")
+	'$1 == token && (time - $3) < max_age {print $2}' "$SESSION_FILE")
 
 if [ -z "$VALID_SESSION" ]; then
-    log_auth_event "WARN" "Invalid session token: $AUTH_TOKEN"
-    echo "Set-Cookie: auth_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
-    REDIRECT_TO_LOGIN "$ORIGINAL_URL" "Invalid session"
-    exit 0
+	log_auth_event "WARN" "Invalid session token: $AUTH_TOKEN"
+	echo "Set-Cookie: auth_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
+	REDIRECT_TO_LOGIN "$ORIGINAL_URL" "Invalid session"
+	exit 0
 fi
 
 # 處理檔案請求
 REQUESTED_FILE="${DOCUMENT_ROOT}${ORIGINAL_URL}"
 
 if echo "$REQUESTED_FILE" | grep -q "\.\."; then
-    SHOW_FORBIDDEN "Path traversal attempt detected"
+	SHOW_FORBIDDEN "Path traversal attempt detected"
 fi
 
 if ! check_file_access "$REQUESTED_FILE" "$REFERER"; then
-    log_auth_event "WARN" "Access denied to file: $ORIGINAL_URL (Mode: $ACCESS_CONTROL_MODE, Referer: $REFERER)"
-    SHOW_FORBIDDEN "Access to this resource is not allowed"
+	log_auth_event "WARN" "Access denied to file: $ORIGINAL_URL (Mode: $ACCESS_CONTROL_MODE, Referer: $REFERER)"
+	SHOW_FORBIDDEN "Access to this resource is not allowed"
 fi
 
 if [ ! -f "$REQUESTED_FILE" ]; then
-    log_auth_event "INFO" "404 Not Found: $REQUESTED_FILE"
-    SHOW_NOT_FOUND "The requested URL $ORIGINAL_URL was not found on this server"
+	log_auth_event "INFO" "404 Not Found: $REQUESTED_FILE"
+	SHOW_NOT_FOUND "The requested URL $ORIGINAL_URL was not found on this server"
 fi
 
 # 處理檔案回應
 EXTENSION="${REQUESTED_FILE##*.}"
 case "$EXTENSION" in
 "html")
-    SECURITY_HEADERS
-    ;;
+	SECURITY_HEADERS
+	;;
 "css")
-    SECURITY_HEADERS "text/css"
-    echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
-    ;;
+	SECURITY_HEADERS "text/css"
+	echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
+	;;
 "js")
-    SECURITY_HEADERS "application/javascript"
-    echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
-    ;;
+	SECURITY_HEADERS "application/javascript"
+	echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
+	;;
 "png" | "jpg" | "jpeg" | "gif")
-    SECURITY_HEADERS "image/${EXTENSION}"
-    echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
-    ;;
+	SECURITY_HEADERS "image/${EXTENSION}"
+	echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
+	;;
 "svg")
-    SECURITY_HEADERS "image/svg+xml"
-    echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
-    ;;
+	SECURITY_HEADERS "image/svg+xml"
+	echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
+	;;
 "woff" | "woff2" | "ttf" | "eot")
-    SECURITY_HEADERS "font/${EXTENSION}"
-    echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
-    ;;
+	SECURITY_HEADERS "font/${EXTENSION}"
+	echo "Cache-Control: public, max-age=$CACHE_MAX_AGE"
+	;;
 *)
-    SECURITY_HEADERS "application/octet-stream"
-    ;;
+	SECURITY_HEADERS "application/octet-stream"
+	;;
 esac
 
 cat "$REQUESTED_FILE"

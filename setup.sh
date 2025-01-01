@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase_setup.sh"
-Version="Beta221"
+Version="Beta222"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -120,7 +120,17 @@ fi
 TASK "正在安裝必要的套件" "deps=(curl wget lighttpd expect); CHECK_DEPS -a;"
 
 INSTALL_DIR="/opt/panelbase"
-TASK "創建必要的目錄" "ADD -d $INSTALL_DIR/{www,cgi-bin,config,logs} /var/cache/lighttpd/{uploads,compress} /var/log/lighttpd"
+TASK "創建必要的目錄" "ADD -d $INSTALL_DIR/{www,cgi-bin,config,logs} /var/cache/lighttpd/{uploads,compress}"
+
+# 確保日誌目錄存在並設置權限
+mkdir -p "$INSTALL_DIR/logs"
+chmod "$DIR_MODE" "$INSTALL_DIR/logs"
+chown www-data:www-data "$INSTALL_DIR/logs"
+
+# 確保緩存目錄存在並設置權限
+mkdir -p /var/cache/lighttpd/{uploads,compress}
+chmod "$DIR_MODE" /var/cache/lighttpd/{uploads,compress}
+chown -R www-data:www-data /var/cache/lighttpd
 
 text "下載面板文件..."
 BASE_URL="https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main"
