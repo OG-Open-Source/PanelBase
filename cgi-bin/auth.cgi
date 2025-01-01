@@ -1508,6 +1508,12 @@ if is_public_resource "$ORIGINAL_URL"; then
 fi
 
 # 驗證 session
+if [ -z "$AUTH_TOKEN" ]; then
+	log_auth_event "INFO" "No session token found"
+	REDIRECT_TO_LOGIN "$ORIGINAL_URL" "No session"
+	exit 0
+fi
+
 CURRENT_TIME=$(date +%s)
 VALID_SESSION=$(awk -F: -v token="$AUTH_TOKEN" -v time="$CURRENT_TIME" -v max_age="$SESSION_LIFETIME" \
 	'$1 == token && (time - $3) < max_age {print $2}' "$SESSION_FILE")
