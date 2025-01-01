@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase_setup.sh"
-Version="Beta219"
+Version="Beta220"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -204,86 +204,10 @@ if [[ $USE_CUSTOM_HTML =~ ^[Yy]$ ]]; then
 fi
 
 text "配置 Lighttpd..."
-cat >/etc/lighttpd/lighttpd.conf <<EOF
-server.modules = (
-    "mod_access",
-    "mod_alias",
-    "mod_compress",
-    "mod_redirect",
-    "mod_rewrite",
-    "mod_cgi"
-)
-
-server.document-root        = "$INSTALL_DIR/www"
-server.upload-dirs         = ( "/var/cache/lighttpd/uploads" )
-server.errorlog            = "/var/log/lighttpd/error.log"
-server.pid-file           = "/var/run/lighttpd.pid"
-server.username           = "www-data"
-server.groupname          = "www-data"
-server.port               = $PANEL_PORT
-
-# 啟用 CGI
-cgi.assign = (
-    ".cgi" => ""
-)
-
-# 設置 MIME 類型
-mimetype.assign = (
-    ".html" => "text/html",
-    ".txt" => "text/plain",
-    ".css" => "text/css",
-    ".js" => "application/javascript",
-    ".jpg" => "image/jpeg",
-    ".jpeg" => "image/jpeg",
-    ".gif" => "image/gif",
-    ".png" => "image/png",
-    ".svg" => "image/svg+xml",
-    ".ico" => "image/x-icon"
-)
-
-# 設置目錄訪問權限
-\$HTTP["url"] =~ "^/cgi-bin/" {
-    dir-listing.activate = "disable"
-    cgi.assign = ( "" => "" )
-}
-
-\$HTTP["url"] =~ "^/config/" {
-    url.access-deny = ( "" )
-}
-
-# 設置 /s 路徑重寫規則
-url.rewrite-once = (
-    "^/s/(.+)" => "/cgi-bin/auth.cgi/\$1"
-)
-
-# 設置 index 檔案
-index-file.names = ( "index.html" )
-
-# 啟用壓縮
-compress.cache-dir          = "/var/cache/lighttpd/compress/"
-compress.filetype          = ( "application/javascript", "text/css", "text/html", "text/plain" )
-
-# 設置訪問日誌
-server.errorlog-use-syslog = "enable"
-
-# 設置檔案上傳限制
-server.max-request-size    = 1048576
-
-# 設置連接超時
-server.max-keep-alive-requests = 100
-server.max-keep-alive-idle = 30
-
-# 設置 etag
-static-file.etags         = "enable"
-
-# 設置目錄列表
-dir-listing.activate      = "disable"
-
-# 設置字符集
-server.stream-response-body = 1
-server.range-requests     = "enable"
-
-EOF
+curl -sSLO "${BASE_URL}/config/lighttpd.conf"
+sed -i "s/server.port.*=.*8080/server.port               = $PANEL_PORT/" lighttpd.conf
+sed -i "s|server.document-root.*=.*\"/opt/panelbase/www\"|server.document-root        = \"$INSTALL_DIR/www\"|" lighttpd.conf
+mv lighttpd.conf /etc/lighttpd/lighttpd.conf
 
 TASK "創建用戶配置" "echo '${ADMIN_NAME}:$(echo -n "${ADMIN_PASS}" | md5sum | cut -d' ' -f1)' > $INSTALL_DIR/config/user.conf && touch $INSTALL_DIR/config/sessions.conf"
 
