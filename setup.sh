@@ -4,7 +4,7 @@
 
 Authors="OGATA Open-Source"
 Scripts="panelbase_setup.sh"
-Version="Beta220"
+Version="Beta221"
 License="Apache License 2.0"
 
 CLR1="\033[0;31m"
@@ -120,7 +120,7 @@ fi
 TASK "正在安裝必要的套件" "deps=(curl wget lighttpd expect); CHECK_DEPS -a;"
 
 INSTALL_DIR="/opt/panelbase"
-TASK "創建必要的目錄" "ADD -d $INSTALL_DIR/{www,cgi-bin,config,logs}"
+TASK "創建必要的目錄" "ADD -d $INSTALL_DIR/{www,cgi-bin,config,logs} /var/cache/lighttpd/{uploads,compress} /var/log/lighttpd"
 
 text "下載面板文件..."
 BASE_URL="https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main"
@@ -225,9 +225,15 @@ chmod "$CONFIG_MODE" "$INSTALL_DIR/config/security.conf"
 chown -R www-data:www-data "$INSTALL_DIR"
 chown -R www-data:www-data /etc/lighttpd
 
-mkdir -p /var/log/lighttpd
-chown -R www-data:www-data /var/log/lighttpd
-chmod "$DIR_MODE" /var/log/lighttpd
+# 設置日誌和緩存目錄權限
+chown -R www-data:www-data /var/cache/lighttpd
+chmod "$DIR_MODE" /var/cache/lighttpd
+chmod "$DIR_MODE" /var/cache/lighttpd/uploads
+chmod "$DIR_MODE" /var/cache/lighttpd/compress
+
+# 設置日誌目錄權限
+chmod "$DIR_MODE" "$INSTALL_DIR/logs"
+chown www-data:www-data "$INSTALL_DIR/logs"
 
 TASK "配置 sudo 權限" "cat > /etc/sudoers.d/panelbase << EOF
 www-data ALL=(ALL) NOPASSWD: ALL
