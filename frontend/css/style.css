@@ -1,0 +1,133 @@
+/* Custom styles for dark mode */
+.dark {
+	color-scheme: dark;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+	background: #888;
+	border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+	background: #555;
+}
+
+/* Input styles */
+input[type="text"],
+input[type="password"],
+input[type="number"] {
+	@apply bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100;
+}
+
+/* Pre/code block styles */
+pre {
+	font-family: 'Fira Code', 'Consolas', monospace;
+	line-height: 1.5;
+	tab-size: 4;
+}
+
+/* Material Design Icons */
+.mdi {
+	font-size: 24px;
+}
+
+/* Transitions */
+.fade-enter-active,
+.fade-leave-active {
+	transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+	opacity: 0;
+}
+
+/* Custom button styles */
+button {
+	transition: all 0.2s ease;
+}
+
+button:active {
+	transform: scale(0.98);
+}
+
+/* Command output styling */
+.command-output {
+	font-family: 'Fira Code', 'Consolas', monospace;
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+/* Share token input */
+.share-token-input {
+	font-family: 'Fira Code', 'Consolas', monospace;
+	user-select: all;
+}
+
+/* Loading spinner */
+.loading {
+	@apply inline-block animate-spin rounded-full border-4 border-gray-300 border-t-blue-600 h-8 w-8;
+}
+
+/* Toast notifications */
+.toast {
+	@apply fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg;
+	animation: slideIn 0.3s ease-out;
+}
+
+.toast-success {
+	@apply bg-green-500 text-white;
+}
+
+.toast-error {
+	@apply bg-red-500 text-white;
+}
+
+@keyframes slideIn {
+	from {
+		transform: translateY(100%);
+		opacity: 0;
+	}
+
+	to {
+		transform: translateY(0);
+		opacity: 1;
+	}
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+	.container {
+		@apply px-4;
+	}
+
+	.command-section {
+		@apply flex-col;
+	}
+
+	.command-section button {
+		@apply mt-2 w-full;
+	}
+}
+
+/* Focus styles */
+*:focus {
+	@apply outline-none ring-2 ring-blue-500 ring-opacity-50;
+}
+
+/* Custom checkbox styles */
+input[type="checkbox"] {
+	@apply rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500;
+	width: 1.2em;
+	height: 1.2em;
+}
