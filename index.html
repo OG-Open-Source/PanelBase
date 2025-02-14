@@ -4,269 +4,582 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>PanelBase Control Panel</title>
-	<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-	<link href="frontend/css/style.css" rel="stylesheet">
-	<link href="https://cdn.jsdelivr.net/npm/@mdi/font@6.5.95/css/materialdesignicons.min.css" rel="stylesheet">
-	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+	<title>PanelBase</title>
+	<link rel="icon" type="image/png" href="favicon.png">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" />
+	<style>
+		:root {
+			--primary-color: #007AFF;
+			--primary-gradient: linear-gradient(135deg, #0A84FF, #0066CC);
+			--error-color: #FF3B30;
+			--background-color: #F2F2F7;
+			--input-background: #FFFFFF;
+			--text-color: #1C1C1E;
+			--secondary-text: #8E8E93;
+			--border-radius: 12px;
+			--border-radius-lg: 16px;
+			--border-radius-sm: 8px;
+			--input-height: 44px;
+			--container-bg: rgba(255, 255, 255, 0.95);
+			--container-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+			--input-border: rgba(0, 0, 0, 0.1);
+			--body-gradient: linear-gradient(135deg, #F6F8FB, #E9EEF3);
+			--primary-rgb: 0, 122, 255;
+		}
+
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+		}
+
+		body {
+			background: var(--body-gradient);
+			min-height: 100vh;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			padding: 20px;
+			position: relative;
+			overflow: hidden;
+			isolation: isolate;
+		}
+
+		body::before {
+			content: '';
+			position: absolute;
+			width: 200%;
+			height: 200%;
+			z-index: -1;
+		}
+
+		body::after {
+			content: '';
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background: linear-gradient(45deg, transparent 45%, rgba(var(--primary-rgb), 0.03) 50%, transparent 55%),
+				linear-gradient(-45deg, transparent 45%, rgba(var(--primary-rgb), 0.03) 50%, transparent 55%);
+			background-size: 30px 30px;
+			animation: backgroundMove 60s linear infinite;
+			z-index: -1;
+		}
+
+		.container {
+			width: 100%;
+			max-width: 380px;
+			padding: 32px;
+			background: var(--container-bg);
+			border-radius: var(--border-radius-lg);
+			box-shadow: var(--container-shadow);
+			backdrop-filter: blur(16px);
+			-webkit-backdrop-filter: blur(16px);
+			position: relative;
+			z-index: 1;
+			transition: box-shadow 0.3s ease;
+			margin: 20px;
+		}
+
+		.container:hover {
+			box-shadow: 0 15px 35px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0, 0, 0, 0.1);
+		}
+
+		.header {
+			text-align: center;
+			margin-bottom: 32px;
+			position: relative;
+		}
+
+		h1 {
+			font-size: 32px;
+			font-weight: 700;
+			background: var(--primary-gradient);
+			background-clip: text;
+			-webkit-background-clip: text;
+			-webkit-text-fill-color: transparent;
+			margin-bottom: 12px;
+			letter-spacing: -0.5px;
+		}
+
+		.input-container {
+			position: relative;
+			margin-bottom: 16px;
+			background: none;
+		}
+
+		input {
+			width: 100%;
+			height: var(--input-height);
+			padding: 0 16px 0 40px;
+			border: 1.5px solid var(--input-border);
+			border-radius: var(--border-radius);
+			font-size: 16px;
+			background: var(--input-background);
+			transition: all 0.3s ease;
+			color: var(--text-color);
+			box-shadow: none;
+		}
+
+		input:focus {
+			outline: none;
+			border-color: var(--primary-color);
+			box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.15);
+		}
+
+		.input-container i {
+			position: absolute;
+			left: 14px;
+			top: 50%;
+			transform: translateY(-50%);
+			color: var(--secondary-text);
+			transition: color 0.3s ease;
+		}
+
+		.input-container input:focus+i {
+			color: var(--primary-color);
+		}
+
+		button[type="submit"] {
+			width: 100%;
+			height: var(--input-height);
+			background: var(--primary-gradient);
+			color: white;
+			border: none;
+			border-radius: var(--border-radius);
+			font-size: 16px;
+			font-weight: 600;
+			cursor: pointer;
+			transition: all 0.3s ease;
+			position: relative;
+			overflow: hidden;
+		}
+
+		button[type="submit"]::before {
+			content: '';
+			position: absolute;
+			top: 0;
+			left: -100%;
+			width: 200%;
+			height: 100%;
+			background: linear-gradient(120deg, transparent 0%, transparent 25%, rgba(255, 255, 255, 0.3) 45%, rgba(255, 255, 255, 0.7) 50%, rgba(255, 255, 255, 0.3) 55%, transparent 75%, transparent 100%);
+			transform: skewX(-25deg);
+			animation: shine 8s infinite;
+		}
+
+		@keyframes shine {
+			0% {
+				left: -200%;
+			}
+
+			20%,
+			100% {
+				left: 200%;
+			}
+		}
+
+		button[type="submit"]:hover {
+			transform: translateY(-1px);
+			box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.3);
+		}
+
+		button[type="submit"]:active {
+			transform: translateY(0);
+		}
+
+		button[type="submit"]:disabled {
+			background: var(--secondary-text);
+			transform: none;
+			cursor: not-allowed;
+		}
+
+		button[type="submit"]:disabled::before {
+			display: none;
+		}
+
+		.language-switcher {
+			margin-top: 24px;
+			text-align: center;
+			display: flex;
+			justify-content: center;
+			gap: 8px;
+		}
+
+		.language-switcher button {
+			background: none;
+			border: 2px solid transparent;
+			padding: 6px 12px;
+			color: var(--secondary-text);
+			font-size: 14px;
+			cursor: pointer;
+			transition: all 0.2s ease;
+			border-radius: var(--border-radius-sm);
+		}
+
+		.language-switcher button:hover {
+			background: rgba(0, 122, 255, 0.1);
+			color: var(--primary-color);
+		}
+
+		.language-switcher button[data-active="true"] {
+			border-color: var(--primary-color);
+			color: var(--primary-color);
+		}
+
+		@keyframes rotate {
+			from {
+				transform: rotate(0deg);
+			}
+
+			to {
+				transform: rotate(360deg);
+			}
+		}
+
+		@keyframes backgroundMove {
+			from {
+				background-position: 0 0;
+			}
+
+			to {
+				background-position: 100% 100%;
+			}
+		}
+
+		#errorMessage {
+			color: var(--error-color);
+			font-size: 14px;
+			margin-top: 12px;
+			margin-bottom: 16px;
+			text-align: center;
+			opacity: 0;
+			transform: translateY(-10px);
+			transition: all 0.3s ease;
+			border-radius: var(--border-radius-sm);
+			background: rgba(255, 59, 48, 0.1);
+			padding: 8px 12px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 8px;
+			animation: none;
+		}
+
+		#errorMessage:not([hidden]) {
+			opacity: 1;
+			transform: translateY(0);
+			animation: shake 0.5s cubic-bezier(.36, .07, .19, .97) both;
+		}
+
+		@keyframes shake {
+
+			10%,
+			90% {
+				transform: translateX(-1px);
+			}
+
+			20%,
+			80% {
+				transform: translateX(2px);
+			}
+
+			30%,
+			50%,
+			70% {
+				transform: translateX(-4px);
+			}
+
+			40%,
+			60% {
+				transform: translateX(4px);
+			}
+		}
+
+		@media (max-width: 480px) {
+			body {
+				padding: 0;
+				background: var(--container-bg);
+			}
+
+			.container {
+				max-width: 100%;
+				margin: 0;
+				padding: 20px;
+				min-height: 100vh;
+				border-radius: 0;
+				box-shadow: none;
+			}
+
+			.footer {
+				position: relative;
+				margin-top: 20px;
+				transform: none;
+				left: 0;
+				bottom: 0;
+			}
+
+			body::before,
+			body::after {
+				display: none;
+			}
+
+			.theme-switcher {
+				top: 10px;
+				right: 10px;
+			}
+		}
+
+		.footer {
+			position: fixed;
+			bottom: 20px;
+			left: 50%;
+			transform: translateX(-50%);
+			color: var(--secondary-text);
+			font-size: 12px;
+			opacity: 0.9;
+			transition: all 0.3s ease;
+			white-space: nowrap;
+			background: var(--container-bg);
+			padding: 8px 16px;
+			border-radius: var(--border-radius);
+			box-shadow: var(--container-shadow);
+			backdrop-filter: blur(8px);
+			z-index: 2;
+		}
+
+		.footer:hover {
+			opacity: 1;
+			transform: translateX(-50%) translateY(-2px);
+		}
+
+		.footer a {
+			color: var(--primary-color);
+			text-decoration: none;
+			font-weight: 500;
+			transition: all 0.3s ease;
+		}
+
+		.footer a:hover {
+			text-decoration: underline;
+			opacity: 0.9;
+		}
+	</style>
 </head>
 
-<body class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 font-inter">
-	<div id="app" class="min-h-screen">
-		<!-- Login Form -->
-		<div v-if="!isAuthenticated" class="flex items-center justify-center min-h-screen p-4">
-			<div
-				class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100 dark:border-gray-700">
-				<div class="flex items-center justify-between mb-8">
-					<h1
-						class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-indigo-600 dark:from-blue-400 dark:to-indigo-500">
-						PanelBase</h1>
-					<button @click="toggleTheme"
-						class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-						<span class="mdi text-2xl"
-							:class="isDark ? 'mdi-weather-sunny text-yellow-400' : 'mdi-weather-night text-gray-600'"></span>
-					</button>
-				</div>
-
-				<form @submit.prevent="login" class="space-y-6">
-					<!-- Connection Settings -->
-					<div class="space-y-6">
-						<div class="flex items-center">
-							<span class="mdi mdi-server-network text-blue-500 text-xl mr-2"></span>
-							<h2 class="text-lg font-semibold text-gray-900 dark:text-white">Connection</h2>
-						</div>
-						<div class="grid grid-cols-2 gap-4">
-							<div class="col-span-1">
-								<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Host
-									IP</label>
-								<div class="relative">
-									<span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-										<span class="mdi mdi-ip-network"></span>
-									</span>
-									<input v-model="connection.host" type="text" placeholder="192.168.1.1"
-										class="pl-10 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-								</div>
-							</div>
-							<div class="col-span-1">
-								<label
-									class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Port</label>
-								<div class="relative">
-									<span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-										<span class="mdi mdi-pound"></span>
-									</span>
-									<input v-model.number="connection.port" type="number" placeholder="80"
-										class="pl-10 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-								</div>
-							</div>
-						</div>
-						<div>
-							<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Security
-								Code</label>
-							<div class="relative">
-								<span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-									<span class="mdi mdi-shield-key"></span>
-								</span>
-								<input v-model="connection.securityCode" type="password" placeholder="8-digit code"
-									class="pl-10 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-									maxlength="8">
-							</div>
-						</div>
-					</div>
-
-					<!-- System Keys -->
-					<div class="space-y-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-						<div class="flex items-center">
-							<span class="mdi mdi-key-chain text-blue-500 text-xl mr-2"></span>
-							<h2 class="text-lg font-semibold text-gray-900 dark:text-white">System Keys</h2>
-						</div>
-						<div class="space-y-4">
-							<div>
-								<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">System
-									ID</label>
-								<div class="relative">
-									<span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-										<span class="mdi mdi-identifier"></span>
-									</span>
-									<input v-model="keys.key1" type="password"
-										class="pl-10 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-								</div>
-							</div>
-							<div>
-								<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Machine
-									ID</label>
-								<div class="relative">
-									<span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-										<span class="mdi mdi-desktop-tower"></span>
-									</span>
-									<input v-model="keys.key2" type="password"
-										class="pl-10 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-								</div>
-							</div>
-							<div>
-								<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">System
-									UUID</label>
-								<div class="relative">
-									<span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-										<span class="mdi mdi-uuid"></span>
-									</span>
-									<input v-model="keys.key3" type="password"
-										class="pl-10 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-								</div>
-							</div>
-						</div>
-					</div>
-
-					<button type="submit"
-						class="w-full flex justify-center items-center py-3 px-4 rounded-lg text-white text-sm font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-lg transform transition-all duration-150 hover:scale-[1.02]">
-						<span class="mdi mdi-login mr-2"></span>
-						Connect to Panel
-					</button>
-				</form>
-			</div>
+<body>
+	<div class="container">
+		<div class="header">
+			<h1>PanelBase</h1>
+			<p i18n="login-prompt">Please login to continue</p>
 		</div>
-
-		<!-- Main Panel -->
-		<div v-else class="min-h-screen">
-			<!-- Header -->
-			<nav class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-				<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-					<div class="flex justify-between h-16">
-						<div class="flex items-center">
-							<span class="mdi mdi-server text-blue-500 text-2xl mr-2"></span>
-							<h1 class="text-xl font-bold text-gray-900 dark:text-white">PanelBase</h1>
-							<span
-								class="ml-2 px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full dark:bg-blue-900 dark:text-blue-200">
-								{{connection.host}}:{{connection.port}}
-							</span>
-						</div>
-						<div class="flex items-center space-x-4">
-							<button @click="toggleTheme"
-								class="p-2 rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-								<span class="mdi text-xl"
-									:class="isDark ? 'mdi-weather-sunny' : 'mdi-weather-night'"></span>
-							</button>
-							<button @click="logout"
-								class="flex items-center px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300">
-								<span class="mdi mdi-logout mr-1"></span>
-								Logout
-							</button>
-						</div>
-					</div>
-				</div>
-			</nav>
-
-			<!-- Main Content -->
-			<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-				<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-					<!-- Command Section -->
-					<div class="lg:col-span-2">
-						<div
-							class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-							<div class="p-6">
-								<div class="flex items-center mb-4">
-									<span class="mdi mdi-console text-blue-500 text-xl mr-2"></span>
-									<h2 class="text-lg font-semibold text-gray-900 dark:text-white">Command Console</h2>
-								</div>
-								<div class="space-y-4">
-									<div class="flex space-x-2">
-										<div class="relative flex-1">
-											<span
-												class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-												<span class="mdi mdi-chevron-right"></span>
-											</span>
-											<input v-model="command" type="text" placeholder="Enter command..."
-												class="pl-10 block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-										</div>
-										<button @click="executeCommand"
-											class="px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-medium shadow-sm transition-colors">
-											Execute
-										</button>
-									</div>
-									<div v-if="commandOutput" class="mt-4">
-										<div class="flex items-center justify-between mb-2">
-											<h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Output</h3>
-											<span class="text-xs text-gray-500">Command result</span>
-										</div>
-										<pre
-											class="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg overflow-x-auto font-mono text-sm text-gray-800 dark:text-gray-200">{{ commandOutput }}</pre>
-									</div>
-								</div>
-							</div>
-						</div>
-					</div>
-
-					<!-- Share Access Section -->
-					<div class="lg:col-span-1">
-						<div
-							class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-							<div class="p-6">
-								<div class="flex items-center mb-4">
-									<span class="mdi mdi-share-variant text-blue-500 text-xl mr-2"></span>
-									<h2 class="text-lg font-semibold text-gray-900 dark:text-white">Share Access</h2>
-								</div>
-								<div class="space-y-4">
-									<div>
-										<label
-											class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Max
-											Users</label>
-										<input v-model.number="shareConfig.maxUsers" type="number" min="1"
-											class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-									</div>
-									<div>
-										<label
-											class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Expiry
-											(hours)</label>
-										<input v-model.number="shareConfig.expiryHours" type="number" min="1"
-											class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-									</div>
-									<div>
-										<label
-											class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Permissions</label>
-										<div class="space-y-2">
-											<label class="flex items-center">
-												<input v-model="shareConfig.permissions" type="checkbox" value="system"
-													class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-												<span class="ml-2 text-sm text-gray-700 dark:text-gray-300">System
-													Commands</span>
-											</label>
-											<label class="flex items-center">
-												<input v-model="shareConfig.permissions" type="checkbox" value="network"
-													class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-												<span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Network
-													Commands</span>
-											</label>
-										</div>
-									</div>
-									<button @click="createShareToken"
-										class="w-full flex justify-center items-center py-2 px-4 rounded-lg bg-green-500 hover:bg-green-600 text-white font-medium shadow-sm transition-colors">
-										<span class="mdi mdi-key-plus mr-1"></span>
-										Generate Token
-									</button>
-									<div v-if="shareToken" class="mt-4">
-										<label
-											class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Share
-											Token</label>
-										<div class="flex space-x-2">
-											<input readonly :value="shareToken"
-												class="block flex-1 rounded-lg border-gray-300 bg-gray-50 dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300 font-mono text-sm">
-											<button @click="copyShareToken"
-												class="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300">
-												<span class="mdi mdi-content-copy"></span>
-											</button>
-										</div>
-									</div>
-								</div>
-							</div>
-						</div>
-					</div>
+		<form id="loginForm" onsubmit="handleLogin(event)">
+			<div class="form-group">
+				<label for="address" i18n="address">IP Address</label>
+				<div class="input-container">
+					<i class="fas fa-server"></i>
+					<input type="text" id="address" name="address" placeholder="Your Server IP">
 				</div>
 			</div>
+			<div class="form-group">
+				<label for="port" i18n="port">Port</label>
+				<div class="input-container">
+					<i class="fas fa-bolt"></i>
+					<input type="port" id="port" name="port" placeholder="Your PanelBase Port">
+				</div>
+			</div>
+			<div class="form-group">
+				<label for="entrance" i18n="entrance">Security Gateway</label>
+				<div class="input-container">
+					<i class="fas fa-shield-alt"></i>
+					<input type="entrance" id="entrance" name="entrance" placeholder="Your Security Gateway">
+				</div>
+				<div id="errorMessage" hidden></div>
+			</div>
+			<button type="submit" onclick="saveSettings()"><span i18n="login_button">Save Settings</span></button>
+		</form>
+		<div class="language-switcher">
+			<button onclick="changeLanguage('en')" data-lang="en">EN</button>
+			<button onclick="changeLanguage('zh-TW')" data-lang="zh-TW">繁</button>
+			<button onclick="changeLanguage('zh-CN')" data-lang="zh-CN">简</button>
 		</div>
 	</div>
 
-	<script src="https://cdn.jsdelivr.net/npm/vue@3.2.31/dist/vue.global.prod.js"></script>
-	<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-	<script src="frontend/js/app.js"></script>
+	<div class="footer">
+		Powered by <a href="https://github.com/OG-Open-Source" target="_blank">OG Open Source</a>
+	</div>
+
+	<script>
+		const i18n = {
+			'en': {
+				'login-prompt': 'Please login to continue',
+				'address': 'IP Address',
+				'address_placeholder': 'Your Server IP',
+				'port': 'Port',
+				'port_placeholder': 'Your PanelBase Port',
+				'entrance': 'Security Gateway',
+				'entrance_placeholder': 'Your Security Gateway',
+				'login_button': 'Login',
+				'logging_in': 'Logging in...',
+				'error_invalid': 'Invalid username or password',
+				'error_server': 'Server error, please try again later',
+				'error_invalid_chars': 'Invalid characters detected'
+			},
+			'zh-TW': {
+				'login-prompt': '請登入以繼續',
+				'address': 'IP 位址',
+				'address_placeholder': '您的伺服器 IP',
+				'port': '連接埠',
+				'port_placeholder': '您的 PanelBase 連接埠',
+				'entrance': '安全入口',
+				'entrance_placeholder': '您的安全入口',
+				'login_button': '登入',
+				'logging_in': '登入中...',
+				'error_invalid': '用戶名或密碼錯誤',
+				'error_server': '發生錯誤，請稍後再試',
+				'error_invalid_chars': '包含無效字符'
+			},
+			'zh-CN': {
+				'login-prompt': '请登录以继续',
+				'address': 'IP 地址',
+				'address_placeholder': '您的服务器 IP',
+				'port': '端口',
+				'port_placeholder': '您的 PanelBase 端口',
+				'entrance': '安全入口',
+				'entrance_placeholder': '您的安全入口',
+				'login_button': '登录',
+				'logging_in': '登录中...',
+				'error_invalid': '用户名或密码错误',
+				'error_server': '发生错误，请稍后再试',
+				'error_invalid_chars': '包含无效字符'
+			}
+		};
+
+		function getBrowserLanguage() {
+			const lang = navigator.language || navigator.userLanguage;
+			if (lang.startsWith('zh')) {
+				return lang === 'zh-TW' ? 'zh-TW' : 'zh-CN';
+			}
+			return 'en';
+		}
+
+		let currentLanguage = localStorage.getItem('panelbase-language') || getBrowserLanguage();
+
+		function updateTexts() {
+			document.querySelectorAll('[i18n]').forEach(element => {
+				const key = element.getAttribute('i18n');
+				element.textContent = i18n[currentLanguage][key];
+			});
+
+			document.getElementById('address').placeholder = i18n[currentLanguage]['address_placeholder'];
+			document.getElementById('port').placeholder = i18n[currentLanguage]['port_placeholder'];
+			document.getElementById('entrance').placeholder = i18n[currentLanguage]['entrance_placeholder'];
+			document.documentElement.lang = currentLanguage;
+
+			document.querySelectorAll('[data-lang]').forEach(button => {
+				button.setAttribute('data-active', button.getAttribute('data-lang') === currentLanguage);
+			});
+		}
+
+		function changeLanguage(lang) {
+			currentLanguage = lang;
+			localStorage.setItem('panelbase-language', lang);
+			updateTexts();
+
+			const errorMessage = document.getElementById('errorMessage');
+			if (!errorMessage.hidden) {
+				const currentErrorKey = errorMessage.getAttribute('data-error-key');
+				if (currentErrorKey) {
+					showErrorMessage(currentErrorKey);
+				}
+			}
+		}
+
+		updateTexts();
+
+		function showErrorMessage(errorKey) {
+			const errorMessage = document.getElementById('errorMessage');
+			errorMessage.innerHTML = `<i class="fas fa-exclamation-circle"></i>${i18n[currentLanguage][errorKey]}`;
+			errorMessage.setAttribute('data-error-key', errorKey);
+			errorMessage.hidden = false;
+
+			errorMessage.style.animation = 'none';
+			void errorMessage.offsetHeight;
+			errorMessage.style.animation = 'shake 0.5s cubic-bezier(.36, .07, .19, .97) both';
+		}
+
+		async function handleLogin(event) {
+			event.preventDefault();
+			const submitButton = event.target.querySelector('button[type="submit"]');
+			const address = document.getElementById('address').value;
+			const port = document.getElementById('port').value;
+
+			if (!/^[A-Za-z0-9]+$/.test(address)) {
+				showErrorMessage('error_invalid_chars');
+				return;
+			}
+
+			if (!/^[A-Za-z0-9!@$]+$/.test(port)) {
+				showErrorMessage('error_invalid_chars');
+				return;
+			}
+
+			try {
+				submitButton.disabled = true;
+				submitButton.querySelector('[i18n="login_button"]').textContent = i18n[currentLanguage]['logging_in'];
+				window.location.href = '#';
+			} catch (error) {
+				console.error('Error:', error);
+				showErrorMessage('error_server');
+				submitButton.disabled = false;
+				submitButton.querySelector('[i18n="login_button"]').textContent = i18n[currentLanguage]['login_button'];
+			}
+		}
+
+		function saveSettings() {
+			const address = document.getElementById('address').value;
+			const port = document.getElementById('port').value;
+			const entrance = document.getElementById('entrance').value;
+
+			if (address && port && entrance) {
+				try {
+					const expirationDate = new Date();
+					expirationDate.setFullYear(expirationDate.getFullYear() + 1);
+					document.cookie = `settings=${encodeURIComponent(
+						JSON.stringify({
+							address,
+							port,
+							entrance
+						})
+					)}; expires=${expirationDate.toUTCString()}; path=/`;
+					displayStoredSettings();
+					showMessage('Settings saved successfully!', 'success');
+				} catch (error) {
+					console.error('Error saving settings:', error);
+					showMessage('Failed to save settings. Please check the console for details.', 'error');
+				}
+			} else {
+				showMessage('Please fill in all fields.', 'warning');
+			}
+		}
+
+		function getSettingsFromCookie() {
+			try {
+				const cookies = document.cookie.split(';');
+				for (let i = 0; i < cookies.length; i++) {
+					const cookie = cookies[i].trim();
+					if (cookie.startsWith('settings=')) {
+						return JSON.parse(decodeURIComponent(cookie.substring('settings='.length)));
+					}
+				}
+			} catch (error) {
+				console.error('Error reading cookie:', error);
+				showMessage('Error reading stored settings.', 'error');
+			}
+			return null;
+		}
+	</script>
 </body>
 
 </html>
