@@ -46,14 +46,6 @@
 			isolation: isolate;
 		}
 
-		body::before {
-			content: '';
-			position: absolute;
-			width: 200%;
-			height: 200%;
-			z-index: -1;
-		}
-
 		body::after {
 			content: '';
 			position: absolute;
@@ -64,7 +56,7 @@
 			background: linear-gradient(45deg, transparent 45%, rgba(var(--primary-rgb), 0.03) 50%, transparent 55%),
 				linear-gradient(-45deg, transparent 45%, rgba(var(--primary-rgb), 0.03) 50%, transparent 55%);
 			background-size: 30px 30px;
-			animation: backgroundMove 60s linear infinite;
+			animation: backgroundMove 20s linear infinite;
 			z-index: -1;
 		}
 
@@ -349,11 +341,6 @@
 			z-index: 2;
 		}
 
-		.footer:hover {
-			opacity: 1;
-			transform: translateX(-50%) translateY(-2px);
-		}
-
 		.footer a {
 			color: var(--primary-color);
 			text-decoration: none;
@@ -363,7 +350,39 @@
 
 		.footer a:hover {
 			text-decoration: underline;
-			opacity: 0.9;
+		}
+
+		.saved-settings-container {
+			position: absolute;
+			left: calc(100% + 20px);
+			top: 0;
+			width: 200px;
+			padding: 16px;
+			background: rgba(0, 0, 0, 0.05);
+			border-radius: var(--border-radius);
+			backdrop-filter: blur(8px);
+			-webkit-backdrop-filter: blur(8px);
+			border: 1px solid var(--input-border);
+			display: none;
+		}
+
+		.saved-settings-container.visible {
+			display: block;
+		}
+
+		.saved-settings-container p {
+			margin: 0 0 8px;
+			font-size: 14px;
+			color: var(--secondary-text);
+		}
+
+		.saved-settings-container p:last-child {
+			margin-bottom: 0;
+		}
+
+		.saved-settings-container strong {
+			color: var(--text-color);
+			font-weight: 500;
 		}
 	</style>
 </head>
@@ -403,6 +422,11 @@
 			<button onclick="changeLanguage('en')" data-lang="en">EN</button>
 			<button onclick="changeLanguage('zh-TW')" data-lang="zh-TW">繁</button>
 			<button onclick="changeLanguage('zh-CN')" data-lang="zh-CN">简</button>
+		</div>
+		<div class="saved-settings-container" id="savedSettings">
+			<p><strong>Server IP:</strong> <span id="savedAddress">-</span></p>
+			<p><strong>PanelBase Port:</strong> <span id="savedPort">-</span></p>
+			<p><strong>Security Gateway:</strong> <span id="savedEntrance">-</span></p>
 		</div>
 	</div>
 
@@ -564,6 +588,20 @@
 			}
 		}
 
+		function displayStoredSettings() {
+			const settings = getSettingsFromCookie();
+			const savedSettingsContainer = document.getElementById('savedSettings');
+
+			if (settings) {
+				document.getElementById('savedAddress').textContent = settings.address;
+				document.getElementById('savedPort').textContent = settings.port;
+				document.getElementById('savedEntrance').textContent = settings.entrance;
+				savedSettingsContainer.classList.add('visible');
+			} else {
+				savedSettingsContainer.classList.remove('visible');
+			}
+		}
+
 		function getSettingsFromCookie() {
 			try {
 				const cookies = document.cookie.split(';');
@@ -579,6 +617,10 @@
 			}
 			return null;
 		}
+
+		document.addEventListener('DOMContentLoaded', function () {
+			displayStoredSettings();
+		});
 	</script>
 </body>
 
