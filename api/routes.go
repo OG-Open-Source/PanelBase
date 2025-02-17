@@ -7,24 +7,12 @@ import (
 	"net/http"
 	"os/exec"
 	"strings"
-
 	"github.com/gorilla/mux"
 )
 
 type CommandRequest struct {
 	Command string   `json:"command"`
 	Args    []string `json:"args"`
-}
-
-// 新增 CommandFile 結構
-type CommandFile struct {
-	Metadata struct {
-		Name           string   `yaml:"name"`
-		Description    string   `yaml:"description"`
-		PackageManager string   `yaml:"package_manager"`
-		Dependencies   []string `yaml:"dependencies"`
-	} `yaml:"metadata"`
-	Commands []string `yaml:"commands"`
 }
 
 func SetupRoutes() *mux.Router {
