@@ -1,4 +1,6 @@
 #!/bin/bash
+# @package_manager: apt
+# @dependencies: apt-utils, curl
 
-apt autoclean
-apt autoremove
+$package_manager autoclean
+$package_manager autoremove
