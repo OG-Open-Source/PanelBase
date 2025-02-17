@@ -7,10 +7,8 @@ import (
 	"net/http"
 	"os/exec"
 	"strings"
-	"regexp"
 
 	"github.com/gorilla/mux"
-	"gopkg.in/yaml.v2"
 )
 
 type CommandRequest struct {
