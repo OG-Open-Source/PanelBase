@@ -1,0 +1,4 @@
+{
+    "clean1": "clean",
+    "clean2": "clean && another_command"
+}
