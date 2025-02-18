@@ -5,7 +5,8 @@ import (
 	"log"
 	"net/http"
 	"PanelBase/config"
-	"PanelBase/api"
+	"PanelBase/utils"
+	"github.com/gorilla/mux"
 )
 
 func main() {
@@ -13,14 +14,17 @@ func main() {
 	cfg := config.LoadConfig()
 
 	// 初始化路由管理器和主題管理器
-	routeManager := api.NewRouteManager()
-	themeManager := api.NewThemeManager(routeManager)
+	routeManager := utils.NewRouteManager()
+	themeManager := utils.NewThemeManager(routeManager)
 
 	// 初始化對外接口
-	externalHandler := api.NewExternalHandler(themeManager, routeManager)
+	externalHandler := utils.NewExternalHandler(themeManager, routeManager)
+
+	// 創建路由器
+	router := mux.NewRouter()
 
 	// 設置路由
-	router := externalHandler.SetupRoutes()
+	externalHandler.SetupRoutes(router)
 
 	// 啟動服務
 	addr := fmt.Sprintf(":%d", cfg.Port)

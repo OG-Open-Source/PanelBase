@@ -3,11 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
-	"os"
-	"path/filepath"
-
 	"github.com/gorilla/mux"
 )
 
@@ -38,7 +34,10 @@ func (h *ExternalHandler) statusHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *ExternalHandler) commandHandler(w http.ResponseWriter, r *http.Request) {
-	var req CommandRequest
+	var req struct {
+		Command string   `json:"command"`
+		Args    []string `json:"args"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "無效的請求", http.StatusBadRequest)
 		return
@@ -66,7 +65,9 @@ func (h *ExternalHandler) getRoutesHandler(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *ExternalHandler) installThemeHandler(w http.ResponseWriter, r *http.Request) {
-	var req ThemeRequest
+	var req struct {
+		URL string `json:"url"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "無效的請求", http.StatusBadRequest)
 		return
@@ -82,7 +83,9 @@ func (h *ExternalHandler) installThemeHandler(w http.ResponseWriter, r *http.Req
 }
 
 func (h *ExternalHandler) installRouteHandler(w http.ResponseWriter, r *http.Request) {
-	var req RouteRequest
+	var req struct {
+		URL string `json:"url"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "無效的請求", http.StatusBadRequest)
 		return

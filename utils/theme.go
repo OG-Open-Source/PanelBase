@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -106,6 +107,11 @@ func (m *ThemeManager) InstallTheme(url string) error {
 		return fmt.Errorf("無法更新路由: %v", err)
 	}
 
+	return nil
+}
+
+func (m *ThemeManager) unzip(src, dest string) error {
+	// 實現解壓邏輯
 	return nil
 }
 
