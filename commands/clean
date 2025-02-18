@@ -1,6 +1,9 @@
 #!/bin/bash
-# @package_manager: apt
+# @pkg_manager: apt
 # @dependencies: apt-utils, curl
+# @author: PanelBase Team
+# @version: 1.0.0
+# @description: 清理系統套件快取
 
-$package_manager autoclean
-$package_manager autoremove
+apt autoclean
+apt autoremove
