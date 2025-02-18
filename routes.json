@@ -1,4 +1,7 @@
 {
-  "clean": "clean.sh",
-  "install": "install.sh"
+  "commands": {
+    "clean": "clean.sh",
+    "install": "install.sh"
+  },
+  "variables": ["api_key", "username"]
 }

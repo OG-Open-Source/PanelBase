@@ -25,13 +25,16 @@ func (m *RouteManager) ExecuteCommand(command string, args []string) (string, er
 	}
 
 	// 解析 routes.json
-	var routes map[string]string
+	var routes struct {
+		Commands   map[string]string `json:"commands"`
+		Variables  []string          `json:"variables"`
+	}
 	if err := json.Unmarshal(routesData, &routes); err != nil {
 		return "", fmt.Errorf("無法解析 routes.json: %v", err)
 	}
 
 	// 查找命令對應的文件
-	cmdFile, ok := routes[command]
+	cmdFile, ok := routes.Commands[command]
 	if !ok {
 		return "", fmt.Errorf("未找到命令: %s", command)
 	}
@@ -42,8 +45,17 @@ func (m *RouteManager) ExecuteCommand(command string, args []string) (string, er
 		return "", fmt.Errorf("無法讀取命令文件: %v", err)
 	}
 
+	// 替換變量
+	cmdContent := string(data)
+	for i, arg := range args {
+		// 如果變量在 variables 列表中，則替換為 {variable_name}
+		if i < len(routes.Variables) {
+			cmdContent = strings.ReplaceAll(cmdContent, fmt.Sprintf("{%s}", routes.Variables[i]), arg)
+		}
+	}
+
 	// 解析註解
-	pkgManager, dependencies, author, version, description := parseMetadata(string(data))
+	pkgManager, dependencies, author, version, description := parseMetadata(cmdContent)
 
 	// 輸出元數據信息
 	var output strings.Builder
@@ -64,13 +76,11 @@ func (m *RouteManager) ExecuteCommand(command string, args []string) (string, er
 	}
 
 	// 執行文件中的命令
-	lines := strings.Split(string(data), "\n")
+	lines := strings.Split(cmdContent, "\n")
 	for _, line := range lines {
 		if strings.HasPrefix(line, "#") || line == "" {
 			continue // 跳過註解和空行
 		}
-		// 將參數傳遞給命令
-		line = replaceArgs(line, args)
 
 		// 根據文件擴展名選擇解釋器
 		interpreter := "sh" // 默認為 sh
@@ -250,7 +260,8 @@ func isPackageInstalled(packageManager, packageName string) bool {
 // 替換命令中的參數
 func replaceArgs(cmd string, args []string) string {
 	for i, arg := range args {
-		cmd = strings.ReplaceAll(cmd, fmt.Sprintf("$%d", i+1), arg)
+		// 使用 {ARG_1}, {ARG_2}, ... 作為通用變量格式
+		cmd = strings.ReplaceAll(cmd, fmt.Sprintf("{ARG_%d}", i+1), arg)
 	}
 	return cmd
 }
