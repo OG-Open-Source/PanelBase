@@ -1,5 +1,5 @@
 #!/bin/bash
-# @commands: install,clean
+# @commands: install
 # @pkg_manager: apk, apt, opkg, pacman, yum, zypper, dnf
 # @dependencies: null
 # @author: PanelBase Team
