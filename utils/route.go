@@ -91,7 +91,7 @@ func (m *RouteManager) ExecuteCommand(command string, args []string) (string, er
 	tmpFile.Close()
 
 	// 解析註解
-	pkgManagers, dependencies, author, version, description := parseMetadata(content)
+	pkgManagers, dependencies, commands, author, version, description := parseMetadata(content, cmdFile)
 
 	// 輸出元數據信息
 	var output strings.Builder
@@ -108,6 +108,13 @@ func (m *RouteManager) ExecuteCommand(command string, args []string) (string, er
 	for _, dep := range dependencies {
 		if !isPackageInstalled(pkgManagers[0], dep) {
 			return "", fmt.Errorf("依賴套件未安裝: %s", dep)
+		}
+	}
+
+	// 如果有新的commands，更新routes.json
+	if len(commands) > 0 {
+		if err := m.updateCommands(commands); err != nil {
+			return "", fmt.Errorf("failed to update commands: %v", err)
 		}
 	}
 
@@ -154,6 +161,11 @@ func (m *RouteManager) InstallRoute(url string) error {
 		return fmt.Errorf("無法保存路由指令文件: %v", err)
 	}
 
+	// 解析並處理註解
+	if err := m.processRouteMetadata(routeFile, string(data)); err != nil {
+		return fmt.Errorf("無法處理路由指令文件元數據: %v", err)
+	}
+
 	// 更新 routes.json
 	if err := m.updateRoutes(routeFile); err != nil {
 		return fmt.Errorf("無法更新路由: %v", err)
@@ -163,7 +175,71 @@ func (m *RouteManager) InstallRoute(url string) error {
 }
 
 func (m *RouteManager) updateRoutes(routeFile string) error {
+	// 讀取文件內容
+	data, err := ioutil.ReadFile(routeFile)
+	if err != nil {
+		return err
+	}
+
+	// 解析並處理註解
+	if err := m.processRouteMetadata(routeFile, string(data)); err != nil {
+		return fmt.Errorf("無法處理路由指令文件元數據: %v", err)
+	}
+
 	// 更新 routes.json
+	routesData, err := ioutil.ReadFile("routes.json")
+	if err != nil {
+		return err
+	}
+
+	var routes struct {
+		Commands  map[string]string `json:"commands"`
+		Variables map[string]string `json:"variables"`
+	}
+	if err := json.Unmarshal(routesData, &routes); err != nil {
+		return err
+	}
+
+	// 添加新命令
+	fileName := filepath.Base(routeFile)
+	routes.Commands[strings.TrimSuffix(fileName, filepath.Ext(fileName))] = fileName
+
+	// 寫回 routes.json
+	newData, err := json.MarshalIndent(routes, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return ioutil.WriteFile("routes.json", newData, 0644)
+}
+
+func (m *RouteManager) processRouteMetadata(filePath, content string) error {
+	// 解析註解
+	pkgManagers, dependencies, commands, _, _, _ := parseMetadata(content, filepath.Base(filePath))
+
+	// 處理 commands
+	if len(commands) > 0 {
+		if err := m.updateCommands(commands); err != nil {
+			return fmt.Errorf("無法更新 commands: %v", err)
+		}
+	}
+
+	// 處理 dependencies
+	if len(dependencies) > 0 {
+		for _, pkgManager := range pkgManagers {
+			if !isPackageManagerSupported([]string{pkgManager}) {
+				return fmt.Errorf("系統不支援套件管理器: %s", pkgManager)
+			}
+
+			for _, dep := range dependencies {
+				if !isPackageInstalled(pkgManager, dep) {
+					// 這裡可以添加自動安裝依賴的邏輯
+					return fmt.Errorf("依賴套件未安裝: %s", dep)
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -183,29 +259,9 @@ func InstallRouteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 下載路由指令文件
-	resp, err := http.Get(req.URL)
-	if err != nil {
-		http.Error(w, "無法下載路由指令文件", http.StatusInternalServerError)
-		return
-	}
-	defer resp.Body.Close()
-
-	// 保存路由指令文件
-	routeFile := filepath.Join("commands", filepath.Base(req.URL))
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		http.Error(w, "無法讀取路由指令文件數據", http.StatusInternalServerError)
-		return
-	}
-	if err := ioutil.WriteFile(routeFile, data, 0644); err != nil {
-		http.Error(w, "無法保存路由指令文件", http.StatusInternalServerError)
-		return
-	}
-
-	// 更新 routes.json
-	if err := updateRoutes(routeFile); err != nil {
-		http.Error(w, "無法更新路由", http.StatusInternalServerError)
+	// 下載並安裝路由指令文件
+	if err := NewRouteManager().InstallRoute(req.URL); err != nil {
+		http.Error(w, fmt.Sprintf("路由指令文件安裝失敗: %v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -219,16 +275,23 @@ func updateRoutes(routeFile string) error {
 }
 
 // 解析註解
-func parseMetadata(data string) ([]string, []string, string, string, string) {
+func parseMetadata(data, filePath string) ([]string, []string, map[string]string, string, string, string) {
 	var pkgManagers []string
 	var dependencies []string
+	var commands map[string]string = make(map[string]string)
 	var author string
 	var version string
 	var description string
 
 	lines := strings.Split(data, "\n")
 	for _, line := range lines {
-		if strings.HasPrefix(line, "# @pkg_manager:") {
+		if strings.HasPrefix(line, "# @commands:") {
+			// 解析commands，格式為 command1,command2
+			cmdNames := strings.Split(strings.TrimSpace(strings.Split(line, ":")[1]), ",")
+			for _, cmd := range cmdNames {
+				commands[strings.TrimSpace(cmd)] = filePath
+			}
+		} else if strings.HasPrefix(line, "# @pkg_manager:") {
 			pkgManagers = strings.Split(strings.TrimSpace(strings.Split(line, ":")[1]), ",")
 			for i := range pkgManagers {
 				pkgManagers[i] = strings.TrimSpace(pkgManagers[i])
@@ -250,7 +313,7 @@ func parseMetadata(data string) ([]string, []string, string, string, string) {
 		}
 	}
 
-	return pkgManagers, dependencies, author, version, description
+	return pkgManagers, dependencies, commands, author, version, description
 }
 
 // 檢查系統是否支援指定的套件管理器
@@ -327,4 +390,33 @@ func replaceArgs(cmd string, args []string) string {
 		cmd = strings.ReplaceAll(cmd, fmt.Sprintf("{ARG_%d}", i+1), arg)
 	}
 	return cmd
+}
+
+func (m *RouteManager) updateCommands(commands map[string]string) error {
+	// 讀取現有的routes.json
+	data, err := ioutil.ReadFile("routes.json")
+	if err != nil {
+		return err
+	}
+
+	var routes struct {
+		Commands  map[string]string `json:"commands"`
+		Variables map[string]string `json:"variables"`
+	}
+	if err := json.Unmarshal(data, &routes); err != nil {
+		return err
+	}
+
+	// 更新commands
+	for cmd, file := range commands {
+		routes.Commands[cmd] = file
+	}
+
+	// 寫回routes.json
+	newData, err := json.MarshalIndent(routes, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return ioutil.WriteFile("routes.json", newData, 0644)
 }
