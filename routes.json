@@ -3,5 +3,8 @@
     "clean": "clean.sh",
     "install": "install.sh"
   },
-  "variables": ["api_key", "username"]
+  "variables": {
+    "api_key": "default_api_key",
+    "username": "default_user"
+  }
 }

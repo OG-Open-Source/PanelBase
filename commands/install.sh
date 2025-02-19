@@ -1,13 +1,9 @@
 #!/bin/bash
-# @pkg_manager: apt
-# @dependencies: apt-utils
+# @pkg_manager: apk, apt, opkg, pacman, yum, zypper, dnf
+# @dependencies: null
 # @author: PanelBase Team
-# @version: 1.0.0
+# @version: 1.0.0.1
 # @description: 安裝指定的套件
 
-if [ -z "$1" ]; then
-    echo "請提供要安裝的套件名稱"
-    exit 1
-fi
-
-apt install -y $1
+[ -f ~/utilkit.sh ] && source ~/utilkit.sh || bash <(curl -sL raw.ogtt.tk/shell/get_utilkit.sh) && source ~/utilkit.sh
+ADD *#ARG_1#*

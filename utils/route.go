@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
 	"os/exec"
-	"strings"
+	"regexp"
 	"runtime"
+	"strconv"
+	"strings"
 )
 
 type RouteManager struct{}
@@ -27,7 +30,7 @@ func (m *RouteManager) ExecuteCommand(command string, args []string) (string, er
 	// 解析 routes.json
 	var routes struct {
 		Commands   map[string]string `json:"commands"`
-		Variables  []string          `json:"variables"`
+		Variables  map[string]string `json:"variables"`
 	}
 	if err := json.Unmarshal(routesData, &routes); err != nil {
 		return "", fmt.Errorf("無法解析 routes.json: %v", err)
@@ -46,16 +49,49 @@ func (m *RouteManager) ExecuteCommand(command string, args []string) (string, er
 	}
 
 	// 替換變量
-	cmdContent := string(data)
+	content := string(data)
 	for i, arg := range args {
-		// 如果變量在 variables 列表中，則替換為 {variable_name}
-		if i < len(routes.Variables) {
-			cmdContent = strings.ReplaceAll(cmdContent, fmt.Sprintf("{%s}", routes.Variables[i]), arg)
-		}
+		// 替換 *#ARG_N#* 格式的變量
+		content = strings.ReplaceAll(content, fmt.Sprintf("*#ARG_%d#*", i+1), arg)
 	}
 
+	// 自動生成 ARG_數字 變量
+	re := regexp.MustCompile(`\*#ARG_\d+#\*`)
+	content = re.ReplaceAllStringFunc(content, func(match string) string {
+		// 提取數字部分
+		num := strings.TrimPrefix(strings.TrimSuffix(match, "#*"), "*#ARG_")
+		index, _ := strconv.Atoi(num)
+		if index > 0 && index <= len(args) {
+			return args[index-1]
+		}
+		return ""
+	})
+
+	// 替換其他變量
+	for key, value := range routes.Variables {
+		// 如果值為空，則替換為空字符串
+		content = strings.ReplaceAll(content, fmt.Sprintf("*#%s#*", key), value)
+	}
+
+	// 替換所有未匹配的變量為空字符串
+	re = regexp.MustCompile(`\*#[A-Za-z0-9_]+#\*`)
+	content = re.ReplaceAllString(content, "")
+
+	// 創建臨時文件
+	tmpFile, err := ioutil.TempFile("", "cmd_")
+	if err != nil {
+		return "", fmt.Errorf("無法創建臨時文件: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	// 寫入替換後的內容
+	if _, err := tmpFile.WriteString(content); err != nil {
+		return "", fmt.Errorf("無法寫入臨時文件: %v", err)
+	}
+	tmpFile.Close()
+
 	// 解析註解
-	pkgManager, dependencies, author, version, description := parseMetadata(cmdContent)
+	pkgManagers, dependencies, author, version, description := parseMetadata(content)
 
 	// 輸出元數據信息
 	var output strings.Builder
@@ -64,45 +100,36 @@ func (m *RouteManager) ExecuteCommand(command string, args []string) (string, er
 	output.WriteString(fmt.Sprintf("介紹: %s\n", description))
 
 	// 檢查系統是否支援指定的套件管理器
-	if !isPackageManagerSupported(pkgManager) {
-		return "", fmt.Errorf("系統不支援套件管理器: %s", pkgManager)
+	if !isPackageManagerSupported(pkgManagers) {
+		return "", fmt.Errorf("系統不支援套件管理器: %v", pkgManagers)
 	}
 
 	// 檢查依賴套件是否已安裝
 	for _, dep := range dependencies {
-		if !isPackageInstalled(pkgManager, dep) {
+		if !isPackageInstalled(pkgManagers[0], dep) {
 			return "", fmt.Errorf("依賴套件未安裝: %s", dep)
 		}
 	}
 
-	// 執行文件中的命令
-	lines := strings.Split(cmdContent, "\n")
-	for _, line := range lines {
-		if strings.HasPrefix(line, "#") || line == "" {
-			continue // 跳過註解和空行
-		}
-
-		// 根據文件擴展名選擇解釋器
-		interpreter := "sh" // 默認為 sh
-		switch filepath.Ext(cmdFile) {
-		case ".py":
-			interpreter = "python3"
-		case ".go":
-			interpreter = "go run"
-		case ".sh":
-			interpreter = "bash"
-		default:
-			interpreter = "sh"
-		}
-
-		out, err := exec.Command(interpreter, "-c", line).CombinedOutput()
-		if err != nil {
-			return "", fmt.Errorf("%v: %s", err, out)
-		}
-		output.WriteString(fmt.Sprintf("%s\n", out))
+	// 根據文件類型執行
+	var cmd *exec.Cmd
+	switch filepath.Ext(cmdFile) {
+	case ".sh":
+		cmd = exec.Command("bash", tmpFile.Name())
+	case ".py":
+		cmd = exec.Command("python3", tmpFile.Name())
+	case ".go":
+		cmd = exec.Command("go", "run", tmpFile.Name())
+	default:
+		return "", fmt.Errorf("不支援的文件類型: %s", filepath.Ext(cmdFile))
 	}
 
-	return output.String(), nil
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("%v: %s", err, out)
+	}
+
+	return string(out), nil
 }
 
 func (m *RouteManager) GetRoutes() ([]byte, error) {
@@ -192,8 +219,8 @@ func updateRoutes(routeFile string) error {
 }
 
 // 解析註解
-func parseMetadata(data string) (string, []string, string, string, string) {
-	var pkgManager string
+func parseMetadata(data string) ([]string, []string, string, string, string) {
+	var pkgManagers []string
 	var dependencies []string
 	var author string
 	var version string
@@ -202,12 +229,17 @@ func parseMetadata(data string) (string, []string, string, string, string) {
 	lines := strings.Split(data, "\n")
 	for _, line := range lines {
 		if strings.HasPrefix(line, "# @pkg_manager:") {
-			pkgManager = strings.TrimSpace(strings.Split(line, ":")[1])
+			pkgManagers = strings.Split(strings.TrimSpace(strings.Split(line, ":")[1]), ",")
+			for i := range pkgManagers {
+				pkgManagers[i] = strings.TrimSpace(pkgManagers[i])
+			}
 		} else if strings.HasPrefix(line, "# @dependencies:") {
 			deps := strings.TrimSpace(strings.Split(line, ":")[1])
-			dependencies = strings.Split(deps, ",")
-			for i := range dependencies {
-				dependencies[i] = strings.TrimSpace(dependencies[i])
+			if deps != "null" {
+				dependencies = strings.Split(deps, ",")
+				for i := range dependencies {
+					dependencies[i] = strings.TrimSpace(dependencies[i])
+				}
 			}
 		} else if strings.HasPrefix(line, "# @author:") {
 			author = strings.TrimSpace(strings.Split(line, ":")[1])
@@ -218,21 +250,44 @@ func parseMetadata(data string) (string, []string, string, string, string) {
 		}
 	}
 
-	return pkgManager, dependencies, author, version, description
+	return pkgManagers, dependencies, author, version, description
 }
 
 // 檢查系統是否支援指定的套件管理器
-func isPackageManagerSupported(packageManager string) bool {
-	switch packageManager {
-	case "apt":
-		// 檢查是否為 Debian/Ubuntu 系統
-		return runtime.GOOS == "linux" && isCommandAvailable("apt-get")
-	case "yum":
-		// 檢查是否為 CentOS/RHEL 系統
-		return runtime.GOOS == "linux" && isCommandAvailable("yum")
-	default:
-		return false
+func isPackageManagerSupported(packageManagers []string) bool {
+	for _, packageManager := range packageManagers {
+		switch packageManager {
+		case "apk":
+			if runtime.GOOS == "linux" && isCommandAvailable("apk") {
+				return true
+			}
+		case "apt":
+			if runtime.GOOS == "linux" && isCommandAvailable("apt-get") {
+				return true
+			}
+		case "opkg":
+			if runtime.GOOS == "linux" && isCommandAvailable("opkg") {
+				return true
+			}
+		case "pacman":
+			if runtime.GOOS == "linux" && isCommandAvailable("pacman") {
+				return true
+			}
+		case "yum":
+			if runtime.GOOS == "linux" && isCommandAvailable("yum") {
+				return true
+			}
+		case "zypper":
+			if runtime.GOOS == "linux" && isCommandAvailable("zypper") {
+				return true
+			}
+		case "dnf":
+			if runtime.GOOS == "linux" && isCommandAvailable("dnf") {
+				return true
+			}
+		}
 	}
+	return false
 }
 
 // 檢查命令是否可用
@@ -245,10 +300,18 @@ func isCommandAvailable(command string) bool {
 func isPackageInstalled(packageManager, packageName string) bool {
 	var checkCmd string
 	switch packageManager {
+	case "apk":
+		checkCmd = fmt.Sprintf("apk info -e %s &>/dev/null", packageName)
 	case "apt":
 		checkCmd = fmt.Sprintf("dpkg-query -W -f='${Status}' %s 2>/dev/null | grep -q 'ok installed'", packageName)
-	case "yum":
-		checkCmd = fmt.Sprintf("rpm -q %s", packageName)
+	case "opkg":
+		checkCmd = fmt.Sprintf("opkg list-installed | grep -q '^%s '", packageName)
+	case "pacman":
+		checkCmd = fmt.Sprintf("pacman -Qi %s &>/dev/null", packageName)
+	case "yum", "dnf":
+		checkCmd = fmt.Sprintf("%s list installed %s &>/dev/null", packageManager, packageName)
+	case "zypper":
+		checkCmd = fmt.Sprintf("zypper se -i -x %s &>/dev/null", packageName)
 	default:
 		return false
 	}
