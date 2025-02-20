@@ -67,12 +67,6 @@ func (m *RouteManager) ExecuteCommand(command string, args []string) (string, er
 		return ""
 	})
 
-	// 替換其他變量
-	for key, value := range routes.Variables {
-		// 如果值為空，則替換為空字符串
-		content = strings.ReplaceAll(content, fmt.Sprintf("*#%s#*", key), value)
-	}
-
 	// 替換所有未匹配的變量為空字符串
 	re = regexp.MustCompile(`\*#[A-Za-z0-9_]+#\*`)
 	content = re.ReplaceAllString(content, "")

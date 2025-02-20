@@ -7,8 +7,10 @@
 # @description: Delete specified files
 
 [ -f ~/utilkit.sh ] && source ~/utilkit.sh || bash <(curl -sL raw.ogtt.tk/shell/get_utilkit.sh) && source ~/utilkit.sh
-file="*#file#*"
-path="*#path#*"
+
+file="*#ARG_1#*"
+path="*#ARG_2#*"
+
 if [ -n "$file" ]; then
     DEL -f $file
 fi

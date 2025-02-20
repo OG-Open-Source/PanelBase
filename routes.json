@@ -5,9 +5,5 @@
     "create": "create.sh",
     "delete": "delete.sh",
     "remove": "remove.sh"
-  },
-  "variables": {
-    "file": "default_file",
-    "path": "default_path"
   }
 }
