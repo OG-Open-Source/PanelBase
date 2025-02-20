@@ -2,9 +2,9 @@
   "commands": {
     "clean": "clean.sh",
     "install": "install.sh",
-    "remove": "remove.sh",
+    "create": "create.sh",
     "delete": "delete.sh",
-    "create": "create.sh"
+    "remove": "remove.sh"
   },
   "variables": {
     "file": "default_file",

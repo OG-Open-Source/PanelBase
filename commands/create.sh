@@ -7,9 +7,11 @@
 # @description: Create specified files
 
 [ -f ~/utilkit.sh ] && source ~/utilkit.sh || bash <(curl -sL raw.ogtt.tk/shell/get_utilkit.sh) && source ~/utilkit.sh
-if [ -n "*#PATH#*" ]; then
-	ADD -d *#PATH#*
+file="*#file#*"
+path="*#path#*"
+if [ -n "$file" ]; then
+    ADD -f $file
 fi
-if [ -n "*#FILE#*" ]; then
-	ADD -f *#FILE#*
+if [ -n "$path" ]; then
+    ADD -d $path
 fi
