@@ -1,10 +1,15 @@
 #!/bin/bash
-# @commands: clean
+# @commands: delete
 # @pkg_manager: apk, apt, opkg, pacman, yum, zypper, dnf
 # @dependencies: null
 # @author: PanelBase Team
 # @version: 1.0.0
-# @description: Clean system cache
+# @description: Delete specified files
 
 [ -f ~/utilkit.sh ] && source ~/utilkit.sh || bash <(curl -sL raw.ogtt.tk/shell/get_utilkit.sh) && source ~/utilkit.sh
-SYS_CLEAN
+if [ -n "*#PATH#*" ]; then
+	DEL -d *#PATH#*
+fi
+if [ -n "*#FILE#*" ]; then
+	DEL -f *#FILE#*
+fi

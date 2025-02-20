@@ -16,6 +16,14 @@ import (
 
 type RouteManager struct{}
 
+var (
+	safeDirs = []string{
+		"/root/PanelBase",
+		"/usr/local/PanelBase",
+		"/opt/PanelBase",
+	}
+)
+
 func NewRouteManager() *RouteManager {
 	return &RouteManager{}
 }
@@ -76,6 +84,11 @@ func (m *RouteManager) ExecuteCommand(command string, args []string) (string, er
 	// 替換所有未匹配的變量為空字符串
 	re = regexp.MustCompile(`\*#[A-Za-z0-9_]+#\*`)
 	content = re.ReplaceAllString(content, "")
+
+	// 檢查命令是否安全
+	if !isSafeCommand(content) {
+		return "", fmt.Errorf("命令包含不安全操作")
+	}
 
 	// 創建臨時文件
 	tmpFile, err := ioutil.TempFile("", "cmd_")
@@ -161,6 +174,11 @@ func (m *RouteManager) InstallRoute(url string) error {
 		return fmt.Errorf("無法保存路由指令文件: %v", err)
 	}
 
+	// 檢查文件內容是否安全
+	if !isSafeCommand(string(data)) {
+		return fmt.Errorf("下載的文件包含不安全操作")
+	}
+
 	// 解析並處理註解
 	if err := m.processRouteMetadata(routeFile, string(data)); err != nil {
 		return fmt.Errorf("無法處理路由指令文件元數據: %v", err)
@@ -237,6 +255,13 @@ func (m *RouteManager) processRouteMetadata(filePath, content string) error {
 					return fmt.Errorf("依賴套件未安裝: %s", dep)
 				}
 			}
+		}
+	}
+
+	// 檢查依賴項是否安全
+	for _, dep := range dependencies {
+		if !isSafePackage(dep) {
+			return fmt.Errorf("不安全的依賴項: %s", dep)
 		}
 	}
 
@@ -419,4 +444,62 @@ func (m *RouteManager) updateCommands(commands map[string]string) error {
 	}
 
 	return ioutil.WriteFile("routes.json", newData, 0644)
+}
+
+func isSafePath(path string) bool {
+	for _, dir := range safeDirs {
+		if strings.HasPrefix(path, dir) {
+			return false
+		}
+	}
+	return true
+}
+
+func isSafeCommand(content string) bool {
+	// 檢查是否包含危險命令
+	dangerousCommands := []string{
+		"rm -rf",
+		"chmod",
+		"chown",
+		"mv",
+		"cp",
+		"ln",
+		"dd",
+		">",
+		">>",
+		"|",
+	}
+
+	for _, cmd := range dangerousCommands {
+		if strings.Contains(content, cmd) {
+			return false
+		}
+	}
+
+	// 檢查是否嘗試修改安全目錄
+	for _, dir := range safeDirs {
+		if strings.Contains(content, dir) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func isSafePackage(packageName string) bool {
+	// 定義不安全包的黑名單
+	unsafePackages := []string{
+		"malware",
+		"virus",
+		"backdoor",
+		"rootkit",
+	}
+
+	for _, unsafe := range unsafePackages {
+		if strings.Contains(strings.ToLower(packageName), unsafe) {
+			return false
+		}
+	}
+
+	return true
 }

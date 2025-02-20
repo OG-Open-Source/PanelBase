@@ -1,10 +1,13 @@
 {
   "commands": {
     "clean": "clean.sh",
-    "install": "install.sh"
+    "install": "install.sh",
+    "remove": "remove.sh",
+    "delete": "delete.sh",
+    "create": "create.sh"
   },
   "variables": {
-    "api_key": "default_api_key",
-    "username": "default_user"
+    "file": "default_file",
+    "path": "default_path"
   }
 }
