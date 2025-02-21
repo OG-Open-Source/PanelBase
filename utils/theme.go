@@ -26,14 +26,14 @@ func NewThemeManager(routeManager *RouteManager) *ThemeManager {
 func InstallThemeHandler(w http.ResponseWriter, r *http.Request) {
 	var req ThemeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "無效的請求", http.StatusBadRequest)
+		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 
 	// 下載主題
 	themeDir := "themes"
 	if err := os.MkdirAll(themeDir, 0755); err != nil {
-		http.Error(w, "無法創建主題目錄", http.StatusInternalServerError)
+		http.Error(w, "Failed to create theme directory", http.StatusInternalServerError)
 		return
 	}
 
@@ -59,18 +59,18 @@ func InstallThemeHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 解壓主題文件
 	if err := unzip(themeFile, themeDir); err != nil {
-		http.Error(w, "無法解壓主題文件", http.StatusInternalServerError)
+		http.Error(w, "Failed to extract theme file", http.StatusInternalServerError)
 		return
 	}
 
 	// 更新 routes.json
 	if err := updateRoutesFromTheme(themeDir); err != nil {
-		http.Error(w, "無法更新路由", http.StatusInternalServerError)
+		http.Error(w, "Failed to update routes", http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("主題安裝成功"))
+	w.Write([]byte("Theme installed successfully"))
 }
 
 func (m *ThemeManager) InstallTheme(url string) error {
@@ -97,12 +97,12 @@ func (m *ThemeManager) InstallTheme(url string) error {
 
 	// 解壓主題文件
 	if err := m.unzip(themeFile, themeDir); err != nil {
-		return fmt.Errorf("無法解壓主題文件: %v", err)
+		return fmt.Errorf("failed to extract theme file: %v", err)
 	}
 
 	// 更新 routes.json
 	if err := m.routeManager.UpdateRoutesFromTheme(themeDir); err != nil {
-		return fmt.Errorf("無法更新路由: %v", err)
+		return fmt.Errorf("failed to update routes: %v", err)
 	}
 
 	return nil

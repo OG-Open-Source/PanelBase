@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type RouteManager struct{}
@@ -21,6 +22,12 @@ func NewRouteManager() *RouteManager {
 }
 
 func (m *RouteManager) ExecuteCommand(command string, args []string) (string, error) {
+	startTime := time.Now()
+	defer func() {
+		// 可選: 記錄指令執行時間到日誌
+		fmt.Printf("Command %s executed in %v\n", command, time.Since(startTime))
+	}()
+
 	routesData, err := ioutil.ReadFile("routes.json")
 	if err != nil {
 		return "", fmt.Errorf("failed to read routes.json: %v", err)
@@ -42,7 +49,7 @@ func (m *RouteManager) ExecuteCommand(command string, args []string) (string, er
 	// 讀取命令文件
 	data, err := ioutil.ReadFile(fmt.Sprintf("commands/%s", cmdFile))
 	if err != nil {
-		return "", fmt.Errorf("無法讀取命令文件: %v", err)
+		return "", fmt.Errorf("failed to read command file: %v", err)
 	}
 
 	// 替換變量
@@ -71,7 +78,7 @@ func (m *RouteManager) ExecuteCommand(command string, args []string) (string, er
 	// 創建臨時文件
 	tmpFile, err := ioutil.TempFile("", "cmd_")
 	if err != nil {
-		return "", fmt.Errorf("無法創建臨時文件: %v", err)
+		return "", fmt.Errorf("failed to create temp file: %v", err)
 	}
 	defer os.Remove(tmpFile.Name())
 
@@ -86,19 +93,19 @@ func (m *RouteManager) ExecuteCommand(command string, args []string) (string, er
 
 	// 輸出元數據信息
 	var output strings.Builder
-	output.WriteString(fmt.Sprintf("作者: %s\n", author))
-	output.WriteString(fmt.Sprintf("版本: %s\n", version))
-	output.WriteString(fmt.Sprintf("介紹: %s\n", description))
+	output.WriteString(fmt.Sprintf("Author: %s\n", author))
+	output.WriteString(fmt.Sprintf("Version: %s\n", version))
+	output.WriteString(fmt.Sprintf("Description: %s\n", description))
 
 	// 檢查系統是否支援指定的套件管理器
 	if !isPackageManagerSupported(pkgManagers) {
-		return "", fmt.Errorf("系統不支援套件管理器: %v", pkgManagers)
+		return "", fmt.Errorf("system does not support package managers: %v", pkgManagers)
 	}
 
 	// 檢查依賴套件是否已安裝
 	for _, dep := range dependencies {
 		if !isPackageInstalled(pkgManagers[0], dep) {
-			return "", fmt.Errorf("依賴套件未安裝: %s", dep)
+			return "", fmt.Errorf("dependency not installed: %s", dep)
 		}
 	}
 
@@ -119,7 +126,7 @@ func (m *RouteManager) ExecuteCommand(command string, args []string) (string, er
 	case ".go":
 		cmd = exec.Command("go", "run", tmpFile.Name())
 	default:
-		return "", fmt.Errorf("不支援的文件類型: %s", filepath.Ext(cmdFile))
+		return "", fmt.Errorf("unsupported file type: %s", filepath.Ext(cmdFile))
 	}
 
 	out, err := cmd.CombinedOutput()
@@ -127,6 +134,9 @@ func (m *RouteManager) ExecuteCommand(command string, args []string) (string, er
 		// 返回完整的錯誤信息，包括命令輸出
 		return string(out), fmt.Errorf("%v: %s", err, out)
 	}
+
+	// 在返回前添加執行時間到元數據
+	output.WriteString(fmt.Sprintf("\nExecution time: %v", time.Since(startTime)))
 
 	return string(out), nil
 }
@@ -150,17 +160,17 @@ func (m *RouteManager) InstallRoute(url string) error {
 
 	// 驗證元數據格式
 	if err := validateMetadata(string(data)); err != nil {
-		return fmt.Errorf("元數據格式驗證失敗: %v", err)
+		return fmt.Errorf("metadata validation failed: %v", err)
 	}
 
 	// 解析並處理註解
 	if err := m.processRouteMetadata(routeFile, string(data)); err != nil {
-		return fmt.Errorf("無法處理路由指令文件元數據: %v", err)
+		return fmt.Errorf("failed to process route metadata: %v", err)
 	}
 
 	// 更新 routes.json
 	if err := m.updateRoutes(routeFile); err != nil {
-		return fmt.Errorf("無法更新路由: %v", err)
+		return fmt.Errorf("failed to update routes: %v", err)
 	}
 
 	return nil
@@ -175,7 +185,7 @@ func (m *RouteManager) updateRoutes(routeFile string) error {
 
 	// 解析並處理註解
 	if err := m.processRouteMetadata(routeFile, string(data)); err != nil {
-		return fmt.Errorf("無法處理路由指令文件元數據: %v", err)
+		return fmt.Errorf("failed to process route metadata: %v", err)
 	}
 
 	// 更新 routes.json
@@ -237,7 +247,7 @@ func (m *RouteManager) processRouteMetadata(filePath, content string) error {
 		}
 
 		if !supported {
-			return fmt.Errorf("系統不支援任何指定的套件管理器: %v", pkgManagers)
+			return fmt.Errorf("system does not support any specified package managers: %v", pkgManagers)
 		}
 
 		for _, pkgManager := range pkgManagers {
@@ -248,7 +258,7 @@ func (m *RouteManager) processRouteMetadata(filePath, content string) error {
 			for _, dep := range dependencies {
 				if !isPackageInstalled(pkgManager, dep) {
 					// 這裡可以添加自動安裝依賴的邏輯
-					return fmt.Errorf("依賴套件未安裝: %s", dep)
+					return fmt.Errorf("dependency not installed: %s", dep)
 				}
 			}
 		}
@@ -458,7 +468,7 @@ func (m *RouteManager) GetRouteMetadata(url string) (map[string]interface{}, err
 
 	// 驗證元數據格式
 	if err := validateMetadata(string(data)); err != nil {
-		return nil, fmt.Errorf("元數據格式驗證失敗: %v", err)
+		return nil, fmt.Errorf("metadata validation failed: %v", err)
 	}
 
 	// 解析元數據
