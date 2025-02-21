@@ -152,8 +152,10 @@ func (m *RouteManager) InstallRoute(url string) error {
 	if err != nil {
 		return fmt.Errorf(`{"status": "error", "message": "無法讀取路由指令文件數據: %v"}`, err)
 	}
-	if err := ioutil.WriteFile(routeFile, data, 0644); err != nil {
-		return fmt.Errorf(`{"status": "error", "message": "無法保存路由指令文件: %v"}`, err)
+
+	// 驗證元數據格式
+	if err := validateMetadata(string(data)); err != nil {
+		return fmt.Errorf(`{"status": "error", "message": "元數據格式驗證失敗: %v"}`, err)
 	}
 
 	// 解析並處理註解
@@ -459,6 +461,11 @@ func (m *RouteManager) GetRouteMetadata(url string) (map[string]interface{}, err
 		return nil, fmt.Errorf("無法讀取路由指令文件數據: %v", err)
 	}
 
+	// 驗證元數據格式
+	if err := validateMetadata(string(data)); err != nil {
+		return nil, fmt.Errorf("元數據格式驗證失敗: %v", err)
+	}
+
 	// 解析元數據
 	pkgManagers, dependencies, commands, author, version, description := parseMetadata(string(data), filepath.Base(url))
 
@@ -470,4 +477,32 @@ func (m *RouteManager) GetRouteMetadata(url string) (map[string]interface{}, err
 		"version":      version,
 		"description":  description,
 	}, nil
+}
+
+func validateMetadata(content string) error {
+	lines := strings.Split(content, "\n")
+	expectedOrder := []string{"commands", "pkg_manager", "dependencies", "author", "version", "description"}
+	found := 0
+
+	for _, line := range lines {
+		if strings.HasPrefix(line, "# @") || strings.HasPrefix(line, "// @") {
+			line = strings.TrimPrefix(line, "# @")
+			line = strings.TrimPrefix(line, "// @")
+
+			if strings.HasPrefix(line, expectedOrder[found]+":") {
+				found++
+				if found == len(expectedOrder) {
+					return nil
+				}
+			} else {
+				// 如果順序不對，重置計數器
+				found = 0
+			}
+		} else if strings.TrimSpace(line) != "" && found > 0 {
+			// 如果找到空行或非註解行，重置計數器
+			found = 0
+		}
+	}
+
+	return fmt.Errorf("元數據格式錯誤：未找到連續且順序正確的6行註解")
 }
