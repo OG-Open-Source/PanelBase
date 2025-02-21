@@ -31,8 +31,9 @@ func (h *ExternalHandler) SetupRoutes(router *mux.Router) {
 	router.HandleFunc("/{securityEntry}/status", h.statusHandler).Methods("GET")
 	router.HandleFunc("/{securityEntry}/command", h.commandHandler).Methods("POST")
 	router.HandleFunc("/{securityEntry}/routes", h.getRoutesHandler).Methods("GET")
-	router.HandleFunc("/{securityEntry}/install/theme", h.installThemeHandler).Methods("POST")
-	router.HandleFunc("/{securityEntry}/install/route", h.installRouteHandler).Methods("POST")
+	router.HandleFunc("/{securityEntry}/theme/install", h.installThemeHandler).Methods("POST")
+	router.HandleFunc("/{securityEntry}/route/install", h.installRouteHandler).Methods("POST")
+	router.HandleFunc("/{securityEntry}/route/metadata", h.getRouteMetadataHandler).Methods("POST")
 }
 
 func (h *ExternalHandler) statusHandler(w http.ResponseWriter, r *http.Request) {
@@ -146,6 +147,27 @@ func (h *ExternalHandler) installRouteHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	sendGeneralResponse(w, "success", "Route installed successfully")
+}
+
+func (h *ExternalHandler) getRouteMetadataHandler(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		URL string `json:"url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendGeneralResponse(w, "error", "Invalid request")
+		return
+	}
+
+	metadata, err := h.routeManager.GetRouteMetadata(req.URL)
+	if err != nil {
+		sendGeneralResponse(w, "error", fmt.Sprintf("無法獲取路由指令文件元數據: %v", err))
+		return
+	}
+
+	sendGeneralResponse(w, "success", "Route metadata retrieved successfully")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"metadata": metadata,
+	})
 }
 
 // 用於 /{securityEntry}/command 路徑的響應模板

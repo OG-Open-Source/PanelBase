@@ -189,10 +189,15 @@ func (m *RouteManager) updateRoutes(routeFile string) error {
 
 	var routes struct {
 		Commands  map[string]string `json:"commands"`
-		Variables map[string]string `json:"variables"`
+		Variables map[string]string `json:"variables,omitempty"`
 	}
 	if err := json.Unmarshal(routesData, &routes); err != nil {
 		return fmt.Errorf(`{"status": "error", "message": "無法解析 routes.json: %v"}`, err)
+	}
+
+	// 如果Variables為nil，初始化為空map
+	if routes.Variables == nil {
+		routes.Variables = make(map[string]string)
 	}
 
 	// 添加新命令
@@ -223,11 +228,24 @@ func (m *RouteManager) processRouteMetadata(filePath, content string) error {
 		}
 	}
 
-	// 處理 dependencies
-	if len(dependencies) > 0 {
+	// 如果有依賴，才進行檢查
+	if len(dependencies) > 0 && len(pkgManagers) > 0 {
+		// 檢查是否有支援的包管理器
+		supported := false
+		for _, pkgManager := range pkgManagers {
+			if isPackageManagerSupported([]string{pkgManager}) {
+				supported = true
+				break
+			}
+		}
+
+		if !supported {
+			return fmt.Errorf(`{"status": "error", "message": "系統不支援任何指定的套件管理器: %v"}`, pkgManagers)
+		}
+
 		for _, pkgManager := range pkgManagers {
 			if !isPackageManagerSupported([]string{pkgManager}) {
-				return fmt.Errorf(`{"status": "error", "message": "系統不支援套件管理器: %s"}`, pkgManager)
+				continue
 			}
 
 			for _, dep := range dependencies {
@@ -284,31 +302,38 @@ func parseMetadata(data, filePath string) ([]string, []string, map[string]string
 
 	lines := strings.Split(data, "\n")
 	for _, line := range lines {
-		if strings.HasPrefix(line, "# @commands:") {
-			// 解析commands，格式為 command1,command2
-			cmdNames := strings.Split(strings.TrimSpace(strings.Split(line, ":")[1]), ",")
-			for _, cmd := range cmdNames {
-				commands[strings.TrimSpace(cmd)] = filePath
-			}
-		} else if strings.HasPrefix(line, "# @pkg_manager:") {
-			pkgManagers = strings.Split(strings.TrimSpace(strings.Split(line, ":")[1]), ",")
-			for i := range pkgManagers {
-				pkgManagers[i] = strings.TrimSpace(pkgManagers[i])
-			}
-		} else if strings.HasPrefix(line, "# @dependencies:") {
-			deps := strings.TrimSpace(strings.Split(line, ":")[1])
-			if deps != "null" {
-				dependencies = strings.Split(deps, ",")
-				for i := range dependencies {
-					dependencies[i] = strings.TrimSpace(dependencies[i])
+		// 處理 # @ 和 // @ 格式的註解
+		if strings.HasPrefix(line, "# @") || strings.HasPrefix(line, "// @") {
+			// 移除註解符號
+			line = strings.TrimPrefix(line, "# @")
+			line = strings.TrimPrefix(line, "// @")
+
+			if strings.HasPrefix(line, "commands:") {
+				// 解析commands，格式為 command1,command2
+				cmdNames := strings.Split(strings.TrimSpace(strings.Split(line, ":")[1]), ",")
+				for _, cmd := range cmdNames {
+					commands[strings.TrimSpace(cmd)] = filePath
 				}
+			} else if strings.HasPrefix(line, "pkg_manager:") {
+				pkgManagers = strings.Split(strings.TrimSpace(strings.Split(line, ":")[1]), ",")
+				for i := range pkgManagers {
+					pkgManagers[i] = strings.TrimSpace(pkgManagers[i])
+				}
+			} else if strings.HasPrefix(line, "dependencies:") {
+				deps := strings.TrimSpace(strings.Split(line, ":")[1])
+				if deps != "null" {
+					dependencies = strings.Split(deps, ",")
+					for i := range dependencies {
+						dependencies[i] = strings.TrimSpace(dependencies[i])
+					}
+				}
+			} else if strings.HasPrefix(line, "author:") {
+				author = strings.TrimSpace(strings.Split(line, ":")[1])
+			} else if strings.HasPrefix(line, "version:") {
+				version = strings.TrimSpace(strings.Split(line, ":")[1])
+			} else if strings.HasPrefix(line, "description:") {
+				description = strings.TrimSpace(strings.Split(line, ":")[1])
 			}
-		} else if strings.HasPrefix(line, "# @author:") {
-			author = strings.TrimSpace(strings.Split(line, ":")[1])
-		} else if strings.HasPrefix(line, "# @version:") {
-			version = strings.TrimSpace(strings.Split(line, ":")[1])
-		} else if strings.HasPrefix(line, "# @description:") {
-			description = strings.TrimSpace(strings.Split(line, ":")[1])
 		}
 	}
 
@@ -418,4 +443,31 @@ func (m *RouteManager) updateCommands(commands map[string]string) error {
 	}
 
 	return ioutil.WriteFile("routes.json", newData, 0644)
+}
+
+func (m *RouteManager) GetRouteMetadata(url string) (map[string]interface{}, error) {
+	// 下載路由指令文件
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("無法下載路由指令文件: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// 讀取文件數據
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("無法讀取路由指令文件數據: %v", err)
+	}
+
+	// 解析元數據
+	pkgManagers, dependencies, commands, author, version, description := parseMetadata(string(data), filepath.Base(url))
+
+	return map[string]interface{}{
+		"commands":     commands,
+		"pkg_manager":  pkgManagers,
+		"dependencies": dependencies,
+		"author":       author,
+		"version":      version,
+		"description":  description,
+	}, nil
 }

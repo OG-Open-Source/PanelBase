@@ -1,9 +1,9 @@
-# @commands: time
-# @pkg_manager: apk, apt, opkg, pacman, yum, zypper, dnf
-# @dependencies: golang
-# @author: PanelBase Team
-# @version: 1.0.0
-# @description: Show current time
+// @commands: time
+// @pkg_manager: apk, apt, opkg, pacman, yum, zypper, dnf
+// @dependencies: golang
+// @author: PanelBase Team
+// @version: 1.0.0
+// @description: Show current time
 
 package time
 
