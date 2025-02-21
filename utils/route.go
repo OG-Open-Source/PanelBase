@@ -21,25 +21,22 @@ func NewRouteManager() *RouteManager {
 }
 
 func (m *RouteManager) ExecuteCommand(command string, args []string) (string, error) {
-	// 加載 routes.json
 	routesData, err := ioutil.ReadFile("routes.json")
 	if err != nil {
-		return "", fmt.Errorf("無法讀取 routes.json: %v", err)
+		return "", fmt.Errorf("failed to read routes.json: %v", err)
 	}
 
-	// 解析 routes.json
 	var routes struct {
 		Commands   map[string]string `json:"commands"`
 		Variables  map[string]string `json:"variables"`
 	}
 	if err := json.Unmarshal(routesData, &routes); err != nil {
-		return "", fmt.Errorf("無法解析 routes.json: %v", err)
+		return "", fmt.Errorf("failed to parse routes.json: %v", err)
 	}
 
-	// 查找命令對應的文件
 	cmdFile, ok := routes.Commands[command]
 	if !ok {
-		return "", fmt.Errorf("未找到命令: %s", command)
+		return "", fmt.Errorf("command not found: %s", command)
 	}
 
 	// 讀取命令文件
@@ -139,33 +136,31 @@ func (m *RouteManager) GetRoutes() ([]byte, error) {
 }
 
 func (m *RouteManager) InstallRoute(url string) error {
-	// 下載路由指令文件
 	resp, err := http.Get(url)
 	if err != nil {
-		return fmt.Errorf(`{"status": "error", "message": "無法下載路由指令文件: %v"}`, err)
+		return fmt.Errorf("download failed: %v", err)
 	}
 	defer resp.Body.Close()
 
-	// 保存路由指令文件
 	routeFile := filepath.Join("commands", filepath.Base(url))
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf(`{"status": "error", "message": "無法讀取路由指令文件數據: %v"}`, err)
+		return fmt.Errorf("read failed: %v", err)
 	}
 
 	// 驗證元數據格式
 	if err := validateMetadata(string(data)); err != nil {
-		return fmt.Errorf(`{"status": "error", "message": "元數據格式驗證失敗: %v"}`, err)
+		return fmt.Errorf("元數據格式驗證失敗: %v", err)
 	}
 
 	// 解析並處理註解
 	if err := m.processRouteMetadata(routeFile, string(data)); err != nil {
-		return fmt.Errorf(`{"status": "error", "message": "無法處理路由指令文件元數據: %v"}`, err)
+		return fmt.Errorf("無法處理路由指令文件元數據: %v", err)
 	}
 
 	// 更新 routes.json
 	if err := m.updateRoutes(routeFile); err != nil {
-		return fmt.Errorf(`{"status": "error", "message": "無法更新路由: %v"}`, err)
+		return fmt.Errorf("無法更新路由: %v", err)
 	}
 
 	return nil
@@ -175,18 +170,18 @@ func (m *RouteManager) updateRoutes(routeFile string) error {
 	// 讀取文件內容
 	data, err := ioutil.ReadFile(routeFile)
 	if err != nil {
-		return fmt.Errorf(`{"status": "error", "message": "無法讀取路由指令文件: %v"}`, err)
+		return fmt.Errorf("無法讀取路由指令文件: %v", err)
 	}
 
 	// 解析並處理註解
 	if err := m.processRouteMetadata(routeFile, string(data)); err != nil {
-		return fmt.Errorf(`{"status": "error", "message": "無法處理路由指令文件元數據: %v"}`, err)
+		return fmt.Errorf("無法處理路由指令文件元數據: %v", err)
 	}
 
 	// 更新 routes.json
 	routesData, err := ioutil.ReadFile("routes.json")
 	if err != nil {
-		return fmt.Errorf(`{"status": "error", "message": "無法讀取 routes.json: %v"}`, err)
+		return fmt.Errorf("無法讀取 routes.json: %v", err)
 	}
 
 	var routes struct {
@@ -194,7 +189,7 @@ func (m *RouteManager) updateRoutes(routeFile string) error {
 		Variables map[string]string `json:"variables,omitempty"`
 	}
 	if err := json.Unmarshal(routesData, &routes); err != nil {
-		return fmt.Errorf(`{"status": "error", "message": "無法解析 routes.json: %v"}`, err)
+		return fmt.Errorf("無法解析 routes.json: %v", err)
 	}
 
 	// 如果Variables為nil，初始化為空map
@@ -209,11 +204,11 @@ func (m *RouteManager) updateRoutes(routeFile string) error {
 	// 寫回 routes.json
 	newData, err := json.MarshalIndent(routes, "", "  ")
 	if err != nil {
-		return fmt.Errorf(`{"status": "error", "message": "無法編碼 routes.json: %v"}`, err)
+		return fmt.Errorf("無法編碼 routes.json: %v", err)
 	}
 
 	if err := ioutil.WriteFile("routes.json", newData, 0644); err != nil {
-		return fmt.Errorf(`{"status": "error", "message": "無法寫入 routes.json: %v"}`, err)
+		return fmt.Errorf("無法寫入 routes.json: %v", err)
 	}
 
 	return nil
@@ -226,7 +221,7 @@ func (m *RouteManager) processRouteMetadata(filePath, content string) error {
 	// 處理 commands
 	if len(commands) > 0 {
 		if err := m.updateCommands(commands); err != nil {
-			return fmt.Errorf(`{"status": "error", "message": "無法更新 commands: %v"}`, err)
+			return fmt.Errorf("無法更新 commands: %v", err)
 		}
 	}
 
@@ -242,7 +237,7 @@ func (m *RouteManager) processRouteMetadata(filePath, content string) error {
 		}
 
 		if !supported {
-			return fmt.Errorf(`{"status": "error", "message": "系統不支援任何指定的套件管理器: %v"}`, pkgManagers)
+			return fmt.Errorf("系統不支援任何指定的套件管理器: %v", pkgManagers)
 		}
 
 		for _, pkgManager := range pkgManagers {
@@ -253,7 +248,7 @@ func (m *RouteManager) processRouteMetadata(filePath, content string) error {
 			for _, dep := range dependencies {
 				if !isPackageInstalled(pkgManager, dep) {
 					// 這裡可以添加自動安裝依賴的邏輯
-					return fmt.Errorf(`{"status": "error", "message": "依賴套件未安裝: %s"}`, dep)
+					return fmt.Errorf("依賴套件未安裝: %s", dep)
 				}
 			}
 		}

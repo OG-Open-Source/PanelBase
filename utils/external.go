@@ -50,7 +50,7 @@ func (h *ExternalHandler) checkAccess(next http.Handler) http.Handler {
 		host := r.Host
 
 		if !allowedIPs[clientIP] && host != "panel.ogtt.tk" {
-			sendGeneralResponse(w, "error", "Access denied")
+			sendJSONResponse(w, "error", "Access denied", http.StatusForbidden)
 			return
 		}
 
@@ -60,32 +60,20 @@ func (h *ExternalHandler) checkAccess(next http.Handler) http.Handler {
 
 func (h *ExternalHandler) statusHandler(w http.ResponseWriter, r *http.Request) {
 	hostname, _ := os.Hostname()
-	goVersion := runtime.Version()
-	numCPU := runtime.NumCPU()
 	memStats := &runtime.MemStats{}
 	runtime.ReadMemStats(memStats)
 
-	response := map[string]interface{}{
-		"status":      "running",
+	data := map[string]interface{}{
 		"version":     "0.1.0.1",
 		"hostname":    hostname,
-		"go_version":  goVersion,
-		"cpu_cores":   numCPU,
-		"memory_usage": map[string]interface{}{
-			"alloc":      memStats.Alloc,
-			"total_alloc": memStats.TotalAlloc,
-			"sys":        memStats.Sys,
-			"num_gc":     uint64(memStats.NumGC),
-		},
+		"go_version":  runtime.Version(),
+		"cpu_cores":   runtime.NumCPU(),
+		"memory":      memStats.Alloc,
 		"uptime":      time.Since(startTime).String(),
 		"last_update": lastUpdateTime.Format(time.RFC3339),
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, "Unable to encode JSON response", http.StatusInternalServerError)
-	}
+	sendJSONResponse(w, "success", data, http.StatusOK)
 }
 
 func (h *ExternalHandler) commandHandler(w http.ResponseWriter, r *http.Request) {
@@ -94,17 +82,17 @@ func (h *ExternalHandler) commandHandler(w http.ResponseWriter, r *http.Request)
 		Args    []string `json:"args"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		sendCommandResponse(w, "error", "Invalid request")
+		sendJSONResponse(w, "error", "Invalid request", http.StatusBadRequest)
 		return
 	}
 
 	output, err := h.routeManager.ExecuteCommand(req.Command, req.Args)
 	if err != nil {
-		sendCommandResponse(w, "error", output)
+		sendJSONResponse(w, "error", err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	sendCommandResponse(w, "success", output)
+	sendJSONResponse(w, "success", output, http.StatusOK)
 }
 
 // 判斷是否為PanelBase管理操作
@@ -121,20 +109,19 @@ func isManagementCommand(command string) bool {
 func (h *ExternalHandler) getRoutesHandler(w http.ResponseWriter, r *http.Request) {
 	data, err := h.routeManager.GetRoutes()
 	if err != nil {
-		sendJSONError(w, "Failed to read routes file", http.StatusInternalServerError)
+		sendJSONResponse(w, "error", "Failed to read routes file", http.StatusInternalServerError)
 		return
 	}
 
 	var routes interface{}
 	if err := json.Unmarshal(data, &routes); err != nil {
-		sendJSONError(w, "Failed to parse routes file", http.StatusInternalServerError)
+		sendJSONResponse(w, "error", "Failed to parse routes file", http.StatusInternalServerError)
 		return
 	}
 
-	sendGeneralResponse(w, "success", "Routes retrieved successfully")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	sendJSONResponse(w, "success", map[string]interface{}{
 		"routes": routes,
-	})
+	}, http.StatusOK)
 }
 
 func (h *ExternalHandler) installThemeHandler(w http.ResponseWriter, r *http.Request) {
@@ -142,16 +129,16 @@ func (h *ExternalHandler) installThemeHandler(w http.ResponseWriter, r *http.Req
 		URL string `json:"url"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		sendGeneralResponse(w, "error", "Invalid request")
+		sendJSONResponse(w, "error", "Invalid request", http.StatusBadRequest)
 		return
 	}
 
 	if err := h.themeManager.InstallTheme(req.URL); err != nil {
-		sendGeneralResponse(w, "error", fmt.Sprintf("Theme installation failed: %v", err))
+		sendJSONResponse(w, "error", fmt.Sprintf("Theme installation failed: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	sendGeneralResponse(w, "success", "Theme installed successfully")
+	sendJSONResponse(w, "success", "Theme installed successfully", http.StatusOK)
 }
 
 func (h *ExternalHandler) installRouteHandler(w http.ResponseWriter, r *http.Request) {
@@ -159,16 +146,16 @@ func (h *ExternalHandler) installRouteHandler(w http.ResponseWriter, r *http.Req
 		URL string `json:"url"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		sendJSONError(w, "Invalid request", http.StatusBadRequest)
+		sendJSONResponse(w, "error", "Invalid request", http.StatusBadRequest)
 		return
 	}
 
 	if err := h.routeManager.InstallRoute(req.URL); err != nil {
-		sendJSONError(w, fmt.Sprintf("Route installation failed: %v", err), http.StatusInternalServerError)
+		sendJSONResponse(w, "error", fmt.Sprintf("Route installation failed: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	sendGeneralResponse(w, "success", "Route installed successfully")
+	sendJSONResponse(w, "success", "Route installed successfully", http.StatusOK)
 }
 
 func (h *ExternalHandler) getRouteMetadataHandler(w http.ResponseWriter, r *http.Request) {
@@ -176,45 +163,26 @@ func (h *ExternalHandler) getRouteMetadataHandler(w http.ResponseWriter, r *http
 		URL string `json:"url"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		sendGeneralResponse(w, "error", "Invalid request")
+		sendJSONResponse(w, "error", "Invalid request", http.StatusBadRequest)
 		return
 	}
 
 	metadata, err := h.routeManager.GetRouteMetadata(req.URL)
 	if err != nil {
-		sendGeneralResponse(w, "error", fmt.Sprintf("無法獲取路由指令文件元數據: %v", err))
+		sendJSONResponse(w, "error", fmt.Sprintf("無法獲取路由指令文件元數據: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	sendGeneralResponse(w, "success", "Route metadata retrieved successfully")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	sendJSONResponse(w, "success", map[string]interface{}{
 		"metadata": metadata,
-	})
+	}, http.StatusOK)
 }
 
-// 用於 /{securityEntry}/command 路徑的響應模板
-func sendCommandResponse(w http.ResponseWriter, status string, output string) {
+func sendJSONResponse(w http.ResponseWriter, status string, data interface{}, code int) {
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":  status,
-		"output":  output,
-	})
-}
-
-// 用於其他路徑的響應模板
-func sendGeneralResponse(w http.ResponseWriter, status string, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":  status,
-		"message": message,
-	})
-}
-
-func sendJSONError(w http.ResponseWriter, message string, statusCode int) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":  "error",
-		"message": message,
+		"status": status,
+		"data":   data,
 	})
 }

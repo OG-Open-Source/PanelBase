@@ -74,27 +74,25 @@ func InstallThemeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *ThemeManager) InstallTheme(url string) error {
-	// 下載主題
 	themeDir := "themes"
 	if err := os.MkdirAll(themeDir, 0755); err != nil {
-		return fmt.Errorf("無法創建主題目錄: %v", err)
+		return fmt.Errorf("failed to create theme dir: %v", err)
 	}
 
-	// 下載主題文件
 	resp, err := http.Get(url)
 	if err != nil {
-		return fmt.Errorf("無法下載主題: %v", err)
+		return fmt.Errorf("download failed: %v", err)
 	}
 	defer resp.Body.Close()
 
-	// 保存主題文件
 	themeFile := filepath.Join(themeDir, "theme.zip")
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("無法讀取主題數據: %v", err)
+		return fmt.Errorf("read failed: %v", err)
 	}
+
 	if err := ioutil.WriteFile(themeFile, data, 0644); err != nil {
-		return fmt.Errorf("無法保存主題文件: %v", err)
+		return fmt.Errorf("save failed: %v", err)
 	}
 
 	// 解壓主題文件
