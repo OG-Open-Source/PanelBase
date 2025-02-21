@@ -127,7 +127,8 @@ func (m *RouteManager) ExecuteCommand(command string, args []string) (string, er
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("%v: %s", err, out)
+		// 返回完整的錯誤信息，包括命令輸出
+		return string(out), fmt.Errorf("%v: %s", err, out)
 	}
 
 	return string(out), nil
@@ -141,7 +142,7 @@ func (m *RouteManager) InstallRoute(url string) error {
 	// 下載路由指令文件
 	resp, err := http.Get(url)
 	if err != nil {
-		return fmt.Errorf("無法下載路由指令文件: %v", err)
+		return fmt.Errorf(`{"status": "error", "message": "無法下載路由指令文件: %v"}`, err)
 	}
 	defer resp.Body.Close()
 
@@ -149,20 +150,20 @@ func (m *RouteManager) InstallRoute(url string) error {
 	routeFile := filepath.Join("commands", filepath.Base(url))
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("無法讀取路由指令文件數據: %v", err)
+		return fmt.Errorf(`{"status": "error", "message": "無法讀取路由指令文件數據: %v"}`, err)
 	}
 	if err := ioutil.WriteFile(routeFile, data, 0644); err != nil {
-		return fmt.Errorf("無法保存路由指令文件: %v", err)
+		return fmt.Errorf(`{"status": "error", "message": "無法保存路由指令文件: %v"}`, err)
 	}
 
 	// 解析並處理註解
 	if err := m.processRouteMetadata(routeFile, string(data)); err != nil {
-		return fmt.Errorf("無法處理路由指令文件元數據: %v", err)
+		return fmt.Errorf(`{"status": "error", "message": "無法處理路由指令文件元數據: %v"}`, err)
 	}
 
 	// 更新 routes.json
 	if err := m.updateRoutes(routeFile); err != nil {
-		return fmt.Errorf("無法更新路由: %v", err)
+		return fmt.Errorf(`{"status": "error", "message": "無法更新路由: %v"}`, err)
 	}
 
 	return nil
@@ -172,18 +173,18 @@ func (m *RouteManager) updateRoutes(routeFile string) error {
 	// 讀取文件內容
 	data, err := ioutil.ReadFile(routeFile)
 	if err != nil {
-		return err
+		return fmt.Errorf(`{"status": "error", "message": "無法讀取路由指令文件: %v"}`, err)
 	}
 
 	// 解析並處理註解
 	if err := m.processRouteMetadata(routeFile, string(data)); err != nil {
-		return fmt.Errorf("無法處理路由指令文件元數據: %v", err)
+		return fmt.Errorf(`{"status": "error", "message": "無法處理路由指令文件元數據: %v"}`, err)
 	}
 
 	// 更新 routes.json
 	routesData, err := ioutil.ReadFile("routes.json")
 	if err != nil {
-		return err
+		return fmt.Errorf(`{"status": "error", "message": "無法讀取 routes.json: %v"}`, err)
 	}
 
 	var routes struct {
@@ -191,7 +192,7 @@ func (m *RouteManager) updateRoutes(routeFile string) error {
 		Variables map[string]string `json:"variables"`
 	}
 	if err := json.Unmarshal(routesData, &routes); err != nil {
-		return err
+		return fmt.Errorf(`{"status": "error", "message": "無法解析 routes.json: %v"}`, err)
 	}
 
 	// 添加新命令
@@ -201,10 +202,14 @@ func (m *RouteManager) updateRoutes(routeFile string) error {
 	// 寫回 routes.json
 	newData, err := json.MarshalIndent(routes, "", "  ")
 	if err != nil {
-		return err
+		return fmt.Errorf(`{"status": "error", "message": "無法編碼 routes.json: %v"}`, err)
 	}
 
-	return ioutil.WriteFile("routes.json", newData, 0644)
+	if err := ioutil.WriteFile("routes.json", newData, 0644); err != nil {
+		return fmt.Errorf(`{"status": "error", "message": "無法寫入 routes.json: %v"}`, err)
+	}
+
+	return nil
 }
 
 func (m *RouteManager) processRouteMetadata(filePath, content string) error {
@@ -214,7 +219,7 @@ func (m *RouteManager) processRouteMetadata(filePath, content string) error {
 	// 處理 commands
 	if len(commands) > 0 {
 		if err := m.updateCommands(commands); err != nil {
-			return fmt.Errorf("無法更新 commands: %v", err)
+			return fmt.Errorf(`{"status": "error", "message": "無法更新 commands: %v"}`, err)
 		}
 	}
 
@@ -222,13 +227,13 @@ func (m *RouteManager) processRouteMetadata(filePath, content string) error {
 	if len(dependencies) > 0 {
 		for _, pkgManager := range pkgManagers {
 			if !isPackageManagerSupported([]string{pkgManager}) {
-				return fmt.Errorf("系統不支援套件管理器: %s", pkgManager)
+				return fmt.Errorf(`{"status": "error", "message": "系統不支援套件管理器: %s"}`, pkgManager)
 			}
 
 			for _, dep := range dependencies {
 				if !isPackageInstalled(pkgManager, dep) {
 					// 這裡可以添加自動安裝依賴的邏輯
-					return fmt.Errorf("依賴套件未安裝: %s", dep)
+					return fmt.Errorf(`{"status": "error", "message": "依賴套件未安裝: %s"}`, dep)
 				}
 			}
 		}

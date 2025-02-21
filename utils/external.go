@@ -71,20 +71,28 @@ func (h *ExternalHandler) commandHandler(w http.ResponseWriter, r *http.Request)
 		Args    []string `json:"args"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		sendJSONError(w, "Invalid request", http.StatusBadRequest)
+		sendCommandResponse(w, "error", "Invalid request")
 		return
 	}
 
 	output, err := h.routeManager.ExecuteCommand(req.Command, req.Args)
 	if err != nil {
-		sendJSONError(w, fmt.Sprintf("Command execution failed: %v", err), http.StatusInternalServerError)
+		sendCommandResponse(w, "error", output)
 		return
 	}
 
-	sendJSONResponse(w, map[string]interface{}{
-		"status":  "success",
-		"output":  output,
-	})
+	sendCommandResponse(w, "success", output)
+}
+
+// 判斷是否為PanelBase管理操作
+func isManagementCommand(command string) bool {
+	managementCommands := map[string]bool{
+		"install/theme": true,
+		"install/route": true,
+		"update/theme":  true,
+		"update/route":  true,
+	}
+	return managementCommands[command]
 }
 
 func (h *ExternalHandler) getRoutesHandler(w http.ResponseWriter, r *http.Request) {
@@ -100,9 +108,9 @@ func (h *ExternalHandler) getRoutesHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	sendJSONResponse(w, map[string]interface{}{
-		"status":  "success",
-		"routes":  routes,
+	sendGeneralResponse(w, "success", "Routes retrieved successfully")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"routes": routes,
 	})
 }
 
@@ -111,19 +119,16 @@ func (h *ExternalHandler) installThemeHandler(w http.ResponseWriter, r *http.Req
 		URL string `json:"url"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		sendJSONError(w, "Invalid request", http.StatusBadRequest)
+		sendGeneralResponse(w, "error", "Invalid request")
 		return
 	}
 
 	if err := h.themeManager.InstallTheme(req.URL); err != nil {
-		sendJSONError(w, fmt.Sprintf("Theme installation failed: %v", err), http.StatusInternalServerError)
+		sendGeneralResponse(w, "error", fmt.Sprintf("Theme installation failed: %v", err))
 		return
 	}
 
-	sendJSONResponse(w, map[string]interface{}{
-		"status":  "success",
-		"message": "Theme installed successfully",
-	})
+	sendGeneralResponse(w, "success", "Theme installed successfully")
 }
 
 func (h *ExternalHandler) installRouteHandler(w http.ResponseWriter, r *http.Request) {
@@ -140,17 +145,25 @@ func (h *ExternalHandler) installRouteHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	sendJSONResponse(w, map[string]interface{}{
-		"status":  "success",
-		"message": "Route installed successfully",
+	sendGeneralResponse(w, "success", "Route installed successfully")
+}
+
+// 用於 /{securityEntry}/command 路徑的響應模板
+func sendCommandResponse(w http.ResponseWriter, status string, output string) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  status,
+		"output":  output,
 	})
 }
 
-func sendJSONResponse(w http.ResponseWriter, data interface{}) {
+// 用於其他路徑的響應模板
+func sendGeneralResponse(w http.ResponseWriter, status string, message string) {
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		http.Error(w, "Failed to encode JSON response", http.StatusInternalServerError)
-	}
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  status,
+		"message": message,
+	})
 }
 
 func sendJSONError(w http.ResponseWriter, message string, statusCode int) {
