@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime"
 	"time"
+	"strings"
 )
 
 var (
@@ -28,12 +29,33 @@ func NewExternalHandler(themeManager *ThemeManager, routeManager *RouteManager) 
 }
 
 func (h *ExternalHandler) SetupRoutes(router *mux.Router) {
+	router.Use(h.checkAccess)
 	router.HandleFunc("/{securityEntry}/status", h.statusHandler).Methods("GET")
 	router.HandleFunc("/{securityEntry}/command", h.commandHandler).Methods("POST")
 	router.HandleFunc("/{securityEntry}/routes", h.getRoutesHandler).Methods("GET")
 	router.HandleFunc("/{securityEntry}/theme/install", h.installThemeHandler).Methods("POST")
 	router.HandleFunc("/{securityEntry}/route/install", h.installRouteHandler).Methods("POST")
 	router.HandleFunc("/{securityEntry}/route/metadata", h.getRouteMetadataHandler).Methods("POST")
+}
+
+func (h *ExternalHandler) checkAccess(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		clientIP := strings.Split(r.RemoteAddr, ":")[0]
+
+		allowedIPs := map[string]bool{
+			"127.0.0.1": true,
+			"localhost": true,
+		}
+
+		host := r.Host
+
+		if !allowedIPs[clientIP] && host != "panel.ogtt.tk" {
+			sendGeneralResponse(w, "error", "Access denied")
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (h *ExternalHandler) statusHandler(w http.ResponseWriter, r *http.Request) {
