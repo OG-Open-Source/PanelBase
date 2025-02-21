@@ -12,8 +12,8 @@ file="*#ARG_1#*"
 path="*#ARG_2#*"
 
 if [ -n "$file" ]; then
-    ADD -f $file
+    ADD -f /$file
 fi
 if [ -n "$path" ]; then
-    ADD -d $path
+    ADD -d /$path
 fi

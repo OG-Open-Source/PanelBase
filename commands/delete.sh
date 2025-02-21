@@ -12,8 +12,8 @@ file="*#ARG_1#*"
 path="*#ARG_2#*"
 
 if [ -n "$file" ]; then
-    DEL -f $file
+    DEL -f /$file
 fi
 if [ -n "$path" ]; then
-    DEL -d $path
+    DEL -d /$path
 fi
