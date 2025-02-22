@@ -13,12 +13,21 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"github.com/OG-Open-Source/PanelBase/internal/config"
 )
 
-type RouteManager struct{}
+type RouteManager struct {
+	routes map[string]RouteConfig
+}
 
 func NewRouteManager() *RouteManager {
-	return &RouteManager{}
+	data, _ := os.ReadFile("web/routes.json")
+	var config RouteConfig
+	json.Unmarshal(data, &config)
+	
+	return &RouteManager{
+		routes: config.Routes,
+	}
 }
 
 func (m *RouteManager) ExecuteCommand(command string, args []string) (string, error) {
@@ -510,4 +519,9 @@ func validateMetadata(content string) error {
 	}
 
 	return fmt.Errorf("元數據格式錯誤：未找到連續且順序正確的6行註解")
+}
+
+type routeConfig struct {
+	Commands  map[string]string `json:"commands"`
+	Variables map[string]string `json:"variables"`
 }

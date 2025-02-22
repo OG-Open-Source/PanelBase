@@ -31,7 +31,7 @@ func InstallThemeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 下載主題
-	themeDir := "themes"
+	themeDir := "web/themes"
 	if err := os.MkdirAll(themeDir, 0755); err != nil {
 		http.Error(w, "Failed to create theme directory", http.StatusInternalServerError)
 		return
@@ -74,7 +74,7 @@ func InstallThemeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *ThemeManager) InstallTheme(url string) error {
-	themeDir := "themes"
+	themeDir := "web/themes"
 	if err := os.MkdirAll(themeDir, 0755); err != nil {
 		return fmt.Errorf("failed to create theme dir: %v", err)
 	}
@@ -119,6 +119,11 @@ func unzip(src, dest string) error {
 }
 
 func updateRoutesFromTheme(themeDir string) error {
+	// 從主題目錄更新 routes.json
+	return nil
+}
+
+func (m *ThemeManager) updateRoutesFromTheme(themeDir string) error {
 	// 從主題目錄更新 routes.json
 	return nil
 }

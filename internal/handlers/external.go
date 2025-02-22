@@ -11,6 +11,12 @@ import (
 	"strings"
 	"encoding/base64"
 	"strconv"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"io"
+	"github.com/OG-Open-Source/PanelBase/internal/config"
+	"github.com/OG-Open-Source/PanelBase/pkg/utils"
 )
 
 var (
@@ -35,7 +41,7 @@ func (h *ExternalHandler) SetupRoutes(router *mux.Router) {
 	router.HandleFunc("/{securityEntry}/status", h.statusHandler).Methods("GET")
 	router.HandleFunc("/{securityEntry}/command", h.commandHandler).Methods("POST")
 	router.HandleFunc("/{securityEntry}/routes", h.getRoutesHandler).Methods("GET")
-	router.HandleFunc("/{securityEntry}/theme/install", h.installThemeHandler).Methods("POST")
+	router.HandleFunc("/{securityEntry}/theme/install", h.InstallThemeHandler).Methods("POST")
 	router.HandleFunc("/{securityEntry}/route/install", h.installRouteHandler).Methods("POST")
 	router.HandleFunc("/{securityEntry}/route/metadata", h.getRouteMetadataHandler).Methods("POST")
 	router.HandleFunc("/{securityEntry}/login", h.loginHandler).Methods("POST")
@@ -157,7 +163,7 @@ func (h *ExternalHandler) getRoutesHandler(w http.ResponseWriter, r *http.Reques
 	}, http.StatusOK)
 }
 
-func (h *ExternalHandler) installThemeHandler(w http.ResponseWriter, r *http.Request) {
+func (h *ExternalHandler) InstallThemeHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		URL string `json:"url"`
 	}
@@ -277,4 +283,16 @@ func sendJSONResponse(w http.ResponseWriter, status string, data interface{}, co
 	}
 	
 	json.NewEncoder(w).Encode(response)
+}
+
+func (h *ExternalHandler) validateRequest(r *http.Request) bool {
+	// 驗證HMAC簽名
+	receivedSign := r.Header.Get("X-Signature")
+	body, _ := io.ReadAll(r.Body)
+	
+	mac := hmac.New(sha256.New, []byte(os.Getenv("PANELBASE_SESSION_KEY")))
+	mac.Write(body)
+	expectedSign := hex.EncodeToString(mac.Sum(nil))
+	
+	return hmac.Equal([]byte(receivedSign), []byte(expectedSign))
 }

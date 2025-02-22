@@ -9,6 +9,7 @@
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
     />
+    <meta name="csrf-token" content="{{.CSRFToken}}">
     <style>
       :root {
         --primary-color: #007aff;
@@ -463,7 +464,7 @@
       >
     </div>
 
-    <script src="js/panel.js"></script>
+    <script src="/static/js/panel.js"></script>
     <script>
       const i18n = {
         en: {
@@ -592,74 +593,67 @@
 
       async function handleLogin(event) {
         event.preventDefault();
-        const submitButton = event.target.querySelector(
-          'button[type="submit"]'
-        );
+        const submitButton = event.target.querySelector('button[type="submit"]');
         const address = document.getElementById("address").value;
         const port = document.getElementById("port").value;
         const entrance = document.getElementById("entrance").value;
 
         try {
           submitButton.disabled = true;
-          submitButton.querySelector('[i18n="login_button"]').textContent =
+          submitButton.querySelector('[i18n="login_button"]').textContent = 
             i18n[currentLanguage]["checking_agent"];
 
           // 第一步：檢查Agent是否在線
-          const healthResponse = await fetch(
-            `http://${address}:${port}/health`,
-            {
-              timeout: 5000, // 5秒超時
-            }
-          );
+          const healthResponse = await fetch(`http://${address}:${port}/health`, {
+            timeout: 5000 // 5秒超時
+          });
 
           if (!healthResponse.ok) {
-            throw new Error("agent_offline");
+            throw new Error('agent_offline');
           }
 
           // 第二步：進行正式登入
-          const loginResponse = await fetch(
-            `http://${address}:${port}/${entrance}/login`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ address, port, entrance }),
-            }
-          );
+          const loginResponse = await fetch(`http://${address}:${port}/${entrance}/login`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({address, port, entrance})
+          });
 
           const result = await loginResponse.json();
-          if (result.status !== "success") {
-            throw new Error(result.message || "login_failed");
+          if (result.status !== 'success') {
+            throw new Error(result.message || 'login_failed');
           }
 
           // 登入成功後保存會話
           saveSession(result.session);
           window.location.href = result.dashboard;
+
         } catch (error) {
           handleLoginError(error);
         } finally {
           submitButton.disabled = false;
-          submitButton.querySelector('[i18n="login_button"]').textContent =
+          submitButton.querySelector('[i18n="login_button"]').textContent = 
             i18n[currentLanguage]["login_button"];
         }
       }
 
       function handleLoginError(error) {
         const errorMap = {
-          agent_offline: "error_agent_offline",
-          "Invalid security entrance": "error_invalid_entrance",
-          ETIMEDOUT: "error_connection_timeout",
+          'agent_offline': 'error_agent_offline',
+          'Invalid security entrance': 'error_invalid_entrance',
+          'ETIMEDOUT': 'error_connection_timeout'
         };
-
-        const errorKey = errorMap[error.message] || "error_server";
+        
+        const errorKey = errorMap[error.message] || 'error_server';
         showErrorMessage(errorKey);
       }
 
       function saveSession(sessionToken) {
         const sessionData = {
           token: sessionToken,
-          expires: new Date(Date.now() + 3600 * 1000), // 1小時有效期
+          expires: new Date(Date.now() + 3600 * 1000) // 1小時有效期
         };
-        localStorage.setItem("panelbase_session", JSON.stringify(sessionData));
+        localStorage.setItem('panelbase_session', JSON.stringify(sessionData));
       }
 
       function saveSettings() {
