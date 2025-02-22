@@ -13,20 +13,50 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"github.com/OG-Open-Source/PanelBase/internal/config"
 )
 
-type RouteManager struct {
-	routes map[string]RouteConfig
+type RouteConfig struct {
+	Routes []struct {
+		Path    string   `json:"path"`
+		Methods []string `json:"methods"`
+	} `json:"routes"`
 }
+
+type RouteManager struct {
+	routes map[string]struct {
+		Path    string   `json:"path"`
+		Methods []string `json:"methods"`
+	}
+}
+
+// 安全入口驗證規則
+var entranceRegex = regexp.MustCompile(`^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]{12,24}$`)
 
 func NewRouteManager() *RouteManager {
 	data, _ := os.ReadFile("web/routes.json")
 	var config RouteConfig
 	json.Unmarshal(data, &config)
 	
+	routesMap := make(map[string]struct {
+		Path    string   `json:"path"`
+		Methods []string `json:"methods"`
+	})
+	for _, route := range config.Routes {
+		routesMap[route.Path] = struct {
+			Path    string   `json:"path"`
+			Methods []string `json:"methods"`
+		}{
+			Path:    route.Path,
+			Methods: route.Methods,
+		}
+	}
+	
+	if _, err := os.Stat("commands"); os.IsNotExist(err) {
+		os.Mkdir("commands", 0755)
+	}
+	
 	return &RouteManager{
-		routes: config.Routes,
+		routes: routesMap,
 	}
 }
 
@@ -37,9 +67,9 @@ func (m *RouteManager) ExecuteCommand(command string, args []string) (string, er
 		fmt.Printf("Command %s executed in %v\n", command, time.Since(startTime))
 	}()
 
-	routesData, err := ioutil.ReadFile("routes.json")
+	routesData, err := ioutil.ReadFile("web/routes.json")
 	if err != nil {
-		return "", fmt.Errorf("failed to read routes.json: %v", err)
+		return "", fmt.Errorf("failed to read web/routes.json: %v", err)
 	}
 
 	var routes struct {
@@ -47,7 +77,7 @@ func (m *RouteManager) ExecuteCommand(command string, args []string) (string, er
 		Variables  map[string]string `json:"variables"`
 	}
 	if err := json.Unmarshal(routesData, &routes); err != nil {
-		return "", fmt.Errorf("failed to parse routes.json: %v", err)
+		return "", fmt.Errorf("failed to parse web/routes.json: %v", err)
 	}
 
 	cmdFile, ok := routes.Commands[command]
@@ -56,9 +86,15 @@ func (m *RouteManager) ExecuteCommand(command string, args []string) (string, er
 	}
 
 	// 讀取命令文件
-	data, err := ioutil.ReadFile(fmt.Sprintf("commands/%s", cmdFile))
+	cmdPath := filepath.Join("commands", cmdFile)
+	data, err := ioutil.ReadFile(cmdPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read command file: %v", err)
+	}
+
+	// 添加執行權限檢查
+	if !isExecutable(cmdPath) {
+		return "", fmt.Errorf("command file is not executable")
 	}
 
 	// 替換變量
@@ -521,7 +557,15 @@ func validateMetadata(content string) error {
 	return fmt.Errorf("元數據格式錯誤：未找到連續且順序正確的6行註解")
 }
 
-type routeConfig struct {
-	Commands  map[string]string `json:"commands"`
-	Variables map[string]string `json:"variables"`
+// 驗證安全入口格式
+func (m *RouteManager) ValidateEntrance(entrance string) bool {
+	return entranceRegex.MatchString(entrance)
+}
+
+func isExecutable(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return info.Mode().Perm()&0111 != 0
 }

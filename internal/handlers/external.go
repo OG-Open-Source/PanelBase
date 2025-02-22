@@ -15,7 +15,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"io"
-	"github.com/OG-Open-Source/PanelBase/internal/config"
 	"github.com/OG-Open-Source/PanelBase/pkg/utils"
 )
 
@@ -25,11 +24,11 @@ var (
 )
 
 type ExternalHandler struct {
-	themeManager  *ThemeManager
-	routeManager  *RouteManager
+	themeManager  *utils.ThemeManager
+	routeManager  *utils.RouteManager
 }
 
-func NewExternalHandler(themeManager *ThemeManager, routeManager *RouteManager) *ExternalHandler {
+func NewExternalHandler(themeManager *utils.ThemeManager, routeManager *utils.RouteManager) *ExternalHandler {
 	return &ExternalHandler{
 		themeManager: themeManager,
 		routeManager: routeManager,
@@ -41,7 +40,7 @@ func (h *ExternalHandler) SetupRoutes(router *mux.Router) {
 	router.HandleFunc("/{securityEntry}/status", h.statusHandler).Methods("GET")
 	router.HandleFunc("/{securityEntry}/command", h.commandHandler).Methods("POST")
 	router.HandleFunc("/{securityEntry}/routes", h.getRoutesHandler).Methods("GET")
-	router.HandleFunc("/{securityEntry}/theme/install", h.InstallThemeHandler).Methods("POST")
+	router.HandleFunc("/{securityEntry}/theme/install", h.installThemeHandler).Methods("POST")
 	router.HandleFunc("/{securityEntry}/route/install", h.installRouteHandler).Methods("POST")
 	router.HandleFunc("/{securityEntry}/route/metadata", h.getRouteMetadataHandler).Methods("POST")
 	router.HandleFunc("/{securityEntry}/login", h.loginHandler).Methods("POST")
@@ -163,7 +162,7 @@ func (h *ExternalHandler) getRoutesHandler(w http.ResponseWriter, r *http.Reques
 	}, http.StatusOK)
 }
 
-func (h *ExternalHandler) InstallThemeHandler(w http.ResponseWriter, r *http.Request) {
+func (h *ExternalHandler) installThemeHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		URL string `json:"url"`
 	}

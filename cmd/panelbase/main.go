@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"github.com/OG-Open-Source/PanelBase/config"
-	"github.com/OG-Open-Source/PanelBase/utils"
+	"github.com/OG-Open-Source/PanelBase/internal/config"
+	"github.com/OG-Open-Source/PanelBase/internal/handlers"
+	"github.com/OG-Open-Source/PanelBase/pkg/utils"
 	"github.com/gorilla/mux"
 	"github.com/OG-Open-Source/PanelBase/internal/commands/clean"
 	"github.com/sirupsen/logrus"
@@ -28,13 +29,13 @@ func main() {
 	routeManager := utils.NewRouteManager()
 	themeManager := utils.NewThemeManager(routeManager)
 
-	externalHandler := utils.NewExternalHandler(themeManager, routeManager)
+	externalHandler := handlers.NewExternalHandler(themeManager, routeManager)
 
 	router := mux.NewRouter()
 
 	externalHandler.SetupRoutes(router)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
-	log.Printf("PanelBase agent is running on http://%s:%d/%s\n", cfg.IP, cfg.Port, cfg.SecurityEntry)
+	log.Printf("PanelBase agent is running on http://0.0.0.0:%d/%s\n", cfg.Port, cfg.SecurityEntry)
 	log.Fatal(http.ListenAndServe(addr, router))
 }

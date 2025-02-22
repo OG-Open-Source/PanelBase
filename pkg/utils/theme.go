@@ -18,9 +18,7 @@ type ThemeManager struct {
 }
 
 func NewThemeManager(routeManager *RouteManager) *ThemeManager {
-	return &ThemeManager{
-		routeManager: routeManager,
-	}
+	return &ThemeManager{routeManager: routeManager}
 }
 
 func InstallThemeHandler(w http.ResponseWriter, r *http.Request) {
