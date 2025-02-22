@@ -1,4 +1,4 @@
-package utils
+package handlers
 
 import (
 	"encoding/json"
@@ -16,7 +16,6 @@ import (
 	"encoding/hex"
 	"io"
 	"github.com/OG-Open-Source/PanelBase/pkg/utils"
-	"github.com/davecgh/go-spew/spew"
 )
 
 var (

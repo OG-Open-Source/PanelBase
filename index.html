@@ -453,6 +453,12 @@
         <p>
           <strong>Security Gateway:</strong> <span id="savedEntrance">-</span>
         </p>
+        <p>
+          <strong>Status:</strong>
+          <span id="serverStatus">
+            <i class="fas fa-circle-notch fa-spin"></i> Checking...
+          </span>
+        </p>
       </div>
     </div>
 
@@ -706,6 +712,37 @@
         );
       }
 
+      async function checkServerStatus() {
+        const settings = getLocalSettings();
+        const statusElement = document.getElementById("serverStatus");
+
+        if (!settings || !validateSettings(settings)) {
+          statusElement.innerHTML =
+            '<i class="fas fa-circle" style="color: var(--secondary-text);"></i> Not configured';
+          return;
+        }
+
+        try {
+          const response = await fetch(
+            `http://${settings.address}:${settings.port}/health`,
+            {
+              timeout: 5000,
+            }
+          );
+
+          if (response.ok) {
+            statusElement.innerHTML =
+              '<i class="fas fa-circle" style="color: #34C759;"></i> Online';
+          } else {
+            statusElement.innerHTML =
+              '<i class="fas fa-circle" style="color: var(--error-color);"></i> Offline';
+          }
+        } catch (error) {
+          statusElement.innerHTML =
+            '<i class="fas fa-circle" style="color: var(--error-color);"></i> Offline';
+        }
+      }
+
       function displayStoredSettings() {
         const settings = getLocalSettings();
         if (!validateSettings(settings)) {
@@ -722,7 +759,11 @@
             settings.entrance;
           savedSettingsContainer.classList.add("visible");
 
-          // 清除舊版cookie
+          // Check server status immediately and every 30 seconds
+          checkServerStatus();
+          setInterval(checkServerStatus, 30000);
+
+          // Clear old cookies
           document.cookie =
             "settings=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
         } else {

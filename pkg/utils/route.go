@@ -154,7 +154,7 @@ func (m *RouteManager) ExecuteCommand(command string, args []string) (string, er
 		}
 	}
 
-	// 如果有新的commands，更新routes.json
+	// 如果有新的commands，更新web/routes.json
 	if len(commands) > 0 {
 		if err := m.updateCommands(commands); err != nil {
 			return "", fmt.Errorf("failed to update commands: %v", err)
@@ -187,7 +187,7 @@ func (m *RouteManager) ExecuteCommand(command string, args []string) (string, er
 }
 
 func (m *RouteManager) GetRoutes() ([]byte, error) {
-	return ioutil.ReadFile("routes.json")
+	return ioutil.ReadFile("web/routes.json")
 }
 
 func (m *RouteManager) InstallRoute(url string) error {
@@ -213,7 +213,7 @@ func (m *RouteManager) InstallRoute(url string) error {
 		return fmt.Errorf("failed to process route metadata: %v", err)
 	}
 
-	// 更新 routes.json
+	// 更新 web/routes.json
 	if err := m.updateRoutes(routeFile); err != nil {
 		return fmt.Errorf("failed to update routes: %v", err)
 	}
@@ -233,10 +233,10 @@ func (m *RouteManager) updateRoutes(routeFile string) error {
 		return fmt.Errorf("failed to process route metadata: %v", err)
 	}
 
-	// 更新 routes.json
-	routesData, err := ioutil.ReadFile("routes.json")
+	// 更新 web/routes.json
+	routesData, err := ioutil.ReadFile("web/routes.json")
 	if err != nil {
-		return fmt.Errorf("無法讀取 routes.json: %v", err)
+		return fmt.Errorf("無法讀取 web/routes.json: %v", err)
 	}
 
 	var routes struct {
@@ -244,7 +244,7 @@ func (m *RouteManager) updateRoutes(routeFile string) error {
 		Variables map[string]string `json:"variables,omitempty"`
 	}
 	if err := json.Unmarshal(routesData, &routes); err != nil {
-		return fmt.Errorf("無法解析 routes.json: %v", err)
+		return fmt.Errorf("無法解析 web/routes.json: %v", err)
 	}
 
 	// 如果Variables為nil，初始化為空map
@@ -256,14 +256,14 @@ func (m *RouteManager) updateRoutes(routeFile string) error {
 	fileName := filepath.Base(routeFile)
 	routes.Commands[strings.TrimSuffix(fileName, filepath.Ext(fileName))] = fileName
 
-	// 寫回 routes.json
+	// 寫回 web/routes.json
 	newData, err := json.MarshalIndent(routes, "", "  ")
 	if err != nil {
-		return fmt.Errorf("無法編碼 routes.json: %v", err)
+		return fmt.Errorf("無法編碼 web/routes.json: %v", err)
 	}
 
-	if err := ioutil.WriteFile("routes.json", newData, 0644); err != nil {
-		return fmt.Errorf("無法寫入 routes.json: %v", err)
+	if err := ioutil.WriteFile("web/routes.json", newData, 0644); err != nil {
+		return fmt.Errorf("無法寫入 web/routes.json: %v", err)
 	}
 
 	return nil
@@ -313,7 +313,7 @@ func (m *RouteManager) processRouteMetadata(filePath, content string) error {
 }
 
 func (m *RouteManager) UpdateRoutesFromTheme(themeDir string) error {
-	// 從主題目錄更新 routes.json
+	// 從主題目錄更新 web/routes.json
 	return nil
 }
 
@@ -339,7 +339,7 @@ func InstallRouteHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func updateRoutes(routeFile string) error {
-	// 更新 routes.json
+	// 更新 web/routes.json
 	return nil
 }
 
@@ -469,8 +469,8 @@ func replaceArgs(cmd string, args []string) string {
 }
 
 func (m *RouteManager) updateCommands(commands map[string]string) error {
-	// 讀取現有的routes.json
-	data, err := ioutil.ReadFile("routes.json")
+	// 讀取現有的web/routes.json
+	data, err := ioutil.ReadFile("web/routes.json")
 	if err != nil {
 		return err
 	}
@@ -488,13 +488,13 @@ func (m *RouteManager) updateCommands(commands map[string]string) error {
 		routes.Commands[cmd] = file
 	}
 
-	// 寫回routes.json
+	// 寫回web/routes.json
 	newData, err := json.MarshalIndent(routes, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	return ioutil.WriteFile("routes.json", newData, 0644)
+	return ioutil.WriteFile("web/routes.json", newData, 0644)
 }
 
 func (m *RouteManager) GetRouteMetadata(url string) (map[string]interface{}, error) {
