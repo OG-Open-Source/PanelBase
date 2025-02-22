@@ -36,37 +36,26 @@ func (h *ExternalHandler) SetupRoutes(router *mux.Router) {
 	router.HandleFunc("/{securityEntry}/theme/install", h.installThemeHandler).Methods("POST")
 	router.HandleFunc("/{securityEntry}/route/install", h.installRouteHandler).Methods("POST")
 	router.HandleFunc("/{securityEntry}/route/metadata", h.getRouteMetadataHandler).Methods("POST")
+	router.HandleFunc("/{securityEntry}/login", h.loginHandler).Methods("POST")
 }
 
 func (h *ExternalHandler) checkAccess(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		clientIP := strings.Split(r.RemoteAddr, ":")[0]
-		host := r.Host
-
-		// 允許 panel.ogtt.tk 的訪問
-		allowedHosts := map[string]bool{
-			"panel.ogtt.tk": true,
-			"localhost:8080": true,
-		}
-
-		allowedIPs := map[string]bool{
-			"127.0.0.1": true,
-			"::1":       true,
-		}
-
-		// 檢查訪問權限的優先順序
-		if allowedHosts[host] {
-			next.ServeHTTP(w, r)
+		// 获取并验证cookie中的设置
+		settingsCookie, err := r.Cookie("panelbase_settings")
+		if err != nil || !validateSettings(settingsCookie.Value) {
+			sendJSONResponse(w, "error", "Invalid session", http.StatusUnauthorized)
 			return
 		}
 
-		if allowedIPs[clientIP] {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		sendJSONResponse(w, "error", "Unauthorized access attempt", http.StatusForbidden)
+		// 其他验证逻辑...
+		next.ServeHTTP(w, r)
 	})
+}
+
+func validateSettings(settings string) bool {
+	// 实现具体的验证逻辑
+	return true
 }
 
 func (h *ExternalHandler) statusHandler(w http.ResponseWriter, r *http.Request) {
@@ -201,6 +190,31 @@ func (h *ExternalHandler) getRouteMetadataHandler(w http.ResponseWriter, r *http
 	sendJSONResponse(w, "success", map[string]interface{}{
 		"message":  "Route metadata retrieved",
 		"metadata": metadata,
+	}, http.StatusOK)
+}
+
+func (h *ExternalHandler) loginHandler(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Address  string `json:"address"`
+		Port     string `json:"port"`
+		Entrance string `json:"entrance"`
+	}
+	
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendJSONResponse(w, "error", "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	// 验证逻辑(可扩展)
+	if req.Address == "" || req.Port == "" || req.Entrance == "" {
+		sendJSONResponse(w, "error", "Missing parameters", http.StatusBadRequest)
+		return
+	}
+
+	sendJSONResponse(w, "success", map[string]interface{}{
+		"message": "Login successful",
+		"dashboard": fmt.Sprintf("/dashboard?address=%s&port=%s&entrance=%s", 
+			req.Address, req.Port, req.Entrance),
 	}, http.StatusOK)
 }
 

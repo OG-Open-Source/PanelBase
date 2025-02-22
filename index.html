@@ -463,6 +463,7 @@
       >
     </div>
 
+    <script src="js/panel.js"></script>
     <script>
       const i18n = {
         en: {
@@ -478,9 +479,10 @@
           error_invalid: "Invalid username or password",
           error_server: "Server error, please try again later",
           error_invalid_chars: "Invalid characters detected",
-          "error_invalid_ip": "Invalid IP address format",
-          "error_invalid_port": "Port must be 1-65535",
-          "error_invalid_entrance": "Security gateway contains invalid characters"
+          error_invalid_ip: "Invalid IP address format",
+          error_invalid_port: "Port must be 1-65535",
+          error_invalid_entrance:
+            "Security gateway contains invalid characters",
         },
         "zh-TW": {
           "login-prompt": "請登入以繼續",
@@ -495,9 +497,9 @@
           error_invalid: "用戶名或密碼錯誤",
           error_server: "發生錯誤，請稍後再試",
           error_invalid_chars: "包含無效字符",
-          "error_invalid_ip": "IP位址格式錯誤",
-          "error_invalid_port": "連接埠必須為1-65535",
-          "error_invalid_entrance": "安全入口包含無效字符"
+          error_invalid_ip: "IP位址格式錯誤",
+          error_invalid_port: "連接埠必須為1-65535",
+          error_invalid_entrance: "安全入口包含無效字符",
         },
         "zh-CN": {
           "login-prompt": "请登录以继续",
@@ -512,9 +514,9 @@
           error_invalid: "用户名或密码错误",
           error_server: "发生错误，请稍后再试",
           error_invalid_chars: "包含无效字符",
-          "error_invalid_ip": "IP地址格式错误",
-          "error_invalid_port": "端口必须为1-65535",
-          "error_invalid_entrance": "安全入口包含无效字符"
+          error_invalid_ip: "IP地址格式错误",
+          error_invalid_port: "端口必须为1-65535",
+          error_invalid_entrance: "安全入口包含无效字符",
         },
       };
 
@@ -589,14 +591,16 @@
         const entrance = document.getElementById("entrance").value;
 
         // IP地址驗證 (支持IPv4和域名格式)
-        const ipRegex = /^(?!.*\.$)((?!0\d)([1-9]?\d|1\d\d|2[0-4]\d|25[0-5])(\.|$)){4}$|^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])\.)+([A-Za-z]{2,})$/;
+        const ipRegex =
+          /^(?!.*\.$)((?!0\d)([1-9]?\d|1\d\d|2[0-4]\d|25[0-5])(\.|$)){4}$|^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])\.)+([A-Za-z]{2,})$/;
         if (!ipRegex.test(address)) {
           showErrorMessage("error_invalid_ip");
           return;
         }
 
         // 端口驗證 (1-65535)
-        const portRegex = /^([1-9]\d{0,3}|[1-5]\d{4}|6[0-4]\d{3}|65[0-4]\d{2}|655[0-2]\d|6553[0-5])$/;
+        const portRegex =
+          /^([1-9]\d{0,3}|[1-5]\d{4}|6[0-4]\d{3}|65[0-4]\d{2}|655[0-2]\d|6553[0-5])$/;
         if (!portRegex.test(port)) {
           showErrorMessage("error_invalid_port");
           return;
@@ -614,23 +618,20 @@
           submitButton.querySelector('[i18n="login_button"]').textContent =
             i18n[currentLanguage]["logging_in"];
 
-          // 構建 PanelBase 對接 URL
-          const panelBaseUrl = `http://${address}:${port}/${entrance}/command`;
+          // 調用登入接口
+          const loginResponse = await fetch(
+            `http://${address}:${port}/${entrance}/login`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ address, port, entrance }),
+            }
+          );
 
-          // 發送測試請求驗證連接
-          const response = await fetch(panelBaseUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ command: "status" }),
-          });
+          if (!loginResponse.ok) throw new Error("Login failed");
 
-          if (!response.ok) {
-            throw new Error("Connection failed");
-          }
-
-          // 保存設置並跳轉
-          saveSettings();
-          window.location.href = panelBaseUrl.replace("/command", "/dashboard");
+          const { dashboard } = await loginResponse.json();
+          window.location.href = dashboard;
         } catch (error) {
           console.error("Error:", error);
           showErrorMessage("error_server");

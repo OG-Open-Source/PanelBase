@@ -9,5 +9,5 @@
 command="*#ARG_1#*"
 
 if [ -n "$command" ]; then
-	eval "$command"
+	eval '$command'
 fi
