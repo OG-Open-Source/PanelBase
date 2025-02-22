@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"time"
 	"strings"
+	"encoding/base64"
+	"strconv"
 )
 
 var (
@@ -37,25 +39,42 @@ func (h *ExternalHandler) SetupRoutes(router *mux.Router) {
 	router.HandleFunc("/{securityEntry}/route/install", h.installRouteHandler).Methods("POST")
 	router.HandleFunc("/{securityEntry}/route/metadata", h.getRouteMetadataHandler).Methods("POST")
 	router.HandleFunc("/{securityEntry}/login", h.loginHandler).Methods("POST")
+	router.HandleFunc("/health", h.healthCheckHandler).Methods("GET")
 }
 
 func (h *ExternalHandler) checkAccess(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// 获取并验证cookie中的设置
-		settingsCookie, err := r.Cookie("panelbase_settings")
-		if err != nil || !validateSettings(settingsCookie.Value) {
-			sendJSONResponse(w, "error", "Invalid session", http.StatusUnauthorized)
+		// 從Cookie或Header獲取會話令牌
+		sessionToken := ""
+		if cookie, err := r.Cookie("panelbase_session"); err == nil {
+			sessionToken = cookie.Value
+		} else if authHeader := r.Header.Get("Authorization"); authHeader != "" {
+			sessionToken = strings.TrimPrefix(authHeader, "Bearer ")
+		}
+
+		if !h.validateSession(sessionToken) {
+			sendJSONResponse(w, "error", "Invalid or expired session", http.StatusUnauthorized)
 			return
 		}
 
-		// 其他验证逻辑...
 		next.ServeHTTP(w, r)
 	})
 }
 
-func validateSettings(settings string) bool {
-	// 实现具体的验证逻辑
-	return true
+func (h *ExternalHandler) validateSession(token string) bool {
+	decoded, err := base64.StdEncoding.DecodeString(token)
+	if err != nil {
+		return false
+	}
+
+	parts := strings.Split(string(decoded), "|")
+	if len(parts) != 4 {
+		return false
+	}
+
+	// 檢查會話有效期(1小時)
+	timestamp, _ := strconv.ParseInt(parts[3], 10, 64)
+	return time.Now().Unix()-timestamp < 3600
 }
 
 func (h *ExternalHandler) statusHandler(w http.ResponseWriter, r *http.Request) {
@@ -193,6 +212,14 @@ func (h *ExternalHandler) getRouteMetadataHandler(w http.ResponseWriter, r *http
 	}, http.StatusOK)
 }
 
+func (h *ExternalHandler) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
+	sendJSONResponse(w, "success", map[string]interface{}{
+		"status":  "online",
+		"version": "0.1.0.1",
+		"uptime":  time.Since(startTime).String(),
+	}, http.StatusOK)
+}
+
 func (h *ExternalHandler) loginHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Address  string `json:"address"`
@@ -201,21 +228,29 @@ func (h *ExternalHandler) loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		sendJSONResponse(w, "error", "Invalid request", http.StatusBadRequest)
+		sendJSONResponse(w, "error", "Invalid request format", http.StatusBadRequest)
 		return
 	}
 
-	// 验证逻辑(可扩展)
-	if req.Address == "" || req.Port == "" || req.Entrance == "" {
-		sendJSONResponse(w, "error", "Missing parameters", http.StatusBadRequest)
+	// 驗證入口格式
+	if !h.routeManager.ValidateEntrance(req.Entrance) {
+		sendJSONResponse(w, "error", "Invalid security entrance", http.StatusUnauthorized)
 		return
 	}
 
+	// 生成會話令牌
+	sessionToken := generateSessionToken(req.Address, req.Port, req.Entrance)
+	
 	sendJSONResponse(w, "success", map[string]interface{}{
-		"message": "Login successful",
-		"dashboard": fmt.Sprintf("/dashboard?address=%s&port=%s&entrance=%s", 
-			req.Address, req.Port, req.Entrance),
+		"message": "Authentication successful",
+		"session": sessionToken,
+		"dashboard": fmt.Sprintf("/dashboard?session=%s", sessionToken),
 	}, http.StatusOK)
+}
+
+func generateSessionToken(address, port, entrance string) string {
+	tokenData := fmt.Sprintf("%s|%s|%s|%d", address, port, entrance, time.Now().Unix())
+	return base64.StdEncoding.EncodeToString([]byte(tokenData))
 }
 
 func sendJSONResponse(w http.ResponseWriter, status string, data interface{}, code int) {

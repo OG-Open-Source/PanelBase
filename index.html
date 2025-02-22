@@ -483,6 +483,9 @@
           error_invalid_port: "Port must be 1-65535",
           error_invalid_entrance:
             "Security gateway contains invalid characters",
+          checking_agent: "Checking PanelBase Agent...",
+          error_agent_offline: "PanelBase Agent is offline",
+          error_connection_timeout: "Connection timeout",
         },
         "zh-TW": {
           "login-prompt": "請登入以繼續",
@@ -500,6 +503,9 @@
           error_invalid_ip: "IP位址格式錯誤",
           error_invalid_port: "連接埠必須為1-65535",
           error_invalid_entrance: "安全入口包含無效字符",
+          checking_agent: "正在檢查PanelBase服務...",
+          error_agent_offline: "PanelBase服務未啟動",
+          error_connection_timeout: "連線逾時",
         },
         "zh-CN": {
           "login-prompt": "请登录以继续",
@@ -517,6 +523,9 @@
           error_invalid_ip: "IP地址格式错误",
           error_invalid_port: "端口必须为1-65535",
           error_invalid_entrance: "安全入口包含无效字符",
+          checking_agent: "正在检查PanelBase服务...",
+          error_agent_offline: "PanelBase服务未启动",
+          error_connection_timeout: "连接超时",
         },
       };
 
@@ -583,63 +592,67 @@
 
       async function handleLogin(event) {
         event.preventDefault();
-        const submitButton = event.target.querySelector(
-          'button[type="submit"]'
-        );
+        const submitButton = event.target.querySelector('button[type="submit"]');
         const address = document.getElementById("address").value;
         const port = document.getElementById("port").value;
         const entrance = document.getElementById("entrance").value;
 
-        // IP地址驗證 (支持IPv4和域名格式)
-        const ipRegex =
-          /^(?!.*\.$)((?!0\d)([1-9]?\d|1\d\d|2[0-4]\d|25[0-5])(\.|$)){4}$|^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])\.)+([A-Za-z]{2,})$/;
-        if (!ipRegex.test(address)) {
-          showErrorMessage("error_invalid_ip");
-          return;
-        }
-
-        // 端口驗證 (1-65535)
-        const portRegex =
-          /^([1-9]\d{0,3}|[1-5]\d{4}|6[0-4]\d{3}|65[0-4]\d{2}|655[0-2]\d|6553[0-5])$/;
-        if (!portRegex.test(port)) {
-          showErrorMessage("error_invalid_port");
-          return;
-        }
-
-        // 安全入口驗證 (字母數字+指定符號)
-        const entranceRegex = /^[a-zA-Z0-9\-_@$!%*#?&]{4,32}$/;
-        if (!entranceRegex.test(entrance)) {
-          showErrorMessage("error_invalid_entrance");
-          return;
-        }
-
         try {
           submitButton.disabled = true;
-          submitButton.querySelector('[i18n="login_button"]').textContent =
-            i18n[currentLanguage]["logging_in"];
+          submitButton.querySelector('[i18n="login_button"]').textContent = 
+            i18n[currentLanguage]["checking_agent"];
 
-          // 調用登入接口
-          const loginResponse = await fetch(
-            `http://${address}:${port}/${entrance}/login`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ address, port, entrance }),
-            }
-          );
+          // 第一步：檢查Agent是否在線
+          const healthResponse = await fetch(`http://${address}:${port}/health`, {
+            timeout: 5000 // 5秒超時
+          });
 
-          if (!loginResponse.ok) throw new Error("Login failed");
+          if (!healthResponse.ok) {
+            throw new Error('agent_offline');
+          }
 
-          const { dashboard } = await loginResponse.json();
-          window.location.href = dashboard;
+          // 第二步：進行正式登入
+          const loginResponse = await fetch(`http://${address}:${port}/${entrance}/login`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({address, port, entrance})
+          });
+
+          const result = await loginResponse.json();
+          if (result.status !== 'success') {
+            throw new Error(result.message || 'login_failed');
+          }
+
+          // 登入成功後保存會話
+          saveSession(result.session);
+          window.location.href = result.dashboard;
+
         } catch (error) {
-          console.error("Error:", error);
-          showErrorMessage("error_server");
+          handleLoginError(error);
         } finally {
           submitButton.disabled = false;
-          submitButton.querySelector('[i18n="login_button"]').textContent =
+          submitButton.querySelector('[i18n="login_button"]').textContent = 
             i18n[currentLanguage]["login_button"];
         }
+      }
+
+      function handleLoginError(error) {
+        const errorMap = {
+          'agent_offline': 'error_agent_offline',
+          'Invalid security entrance': 'error_invalid_entrance',
+          'ETIMEDOUT': 'error_connection_timeout'
+        };
+        
+        const errorKey = errorMap[error.message] || 'error_server';
+        showErrorMessage(errorKey);
+      }
+
+      function saveSession(sessionToken) {
+        const sessionData = {
+          token: sessionToken,
+          expires: new Date(Date.now() + 3600 * 1000) // 1小時有效期
+        };
+        localStorage.setItem('panelbase_session', JSON.stringify(sessionData));
       }
 
       function saveSettings() {
