@@ -41,20 +41,31 @@ func (h *ExternalHandler) SetupRoutes(router *mux.Router) {
 func (h *ExternalHandler) checkAccess(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		clientIP := strings.Split(r.RemoteAddr, ":")[0]
+		host := r.Host
+
+		// 允許 panel.ogtt.tk 的訪問
+		allowedHosts := map[string]bool{
+			"panel.ogtt.tk": true,
+			"localhost:8080": true,
+		}
 
 		allowedIPs := map[string]bool{
 			"127.0.0.1": true,
-			"localhost": true,
+			"::1":       true,
 		}
 
-		host := r.Host
-
-		if !allowedIPs[clientIP] && host != "panel.ogtt.tk" {
-			sendJSONResponse(w, "error", "Unauthorized access attempt", http.StatusForbidden)
+		// 檢查訪問權限的優先順序
+		if allowedHosts[host] {
+			next.ServeHTTP(w, r)
 			return
 		}
 
-		next.ServeHTTP(w, r)
+		if allowedIPs[clientIP] {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		sendJSONResponse(w, "error", "Unauthorized access attempt", http.StatusForbidden)
 	})
 }
 
