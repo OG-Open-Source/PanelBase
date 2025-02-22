@@ -47,21 +47,36 @@ func (h *ExternalHandler) SetupRoutes(router *mux.Router) {
 	router.HandleFunc("/health", h.healthCheckHandler).Methods("GET")
 }
 
+var allowedOrigins = initAllowedOrigins()
+
+func initAllowedOrigins() map[string]bool {
+	origins := strings.Split(os.Getenv("ALLOWED_ORIGINS"), ",")
+	m := make(map[string]bool)
+	for _, o := range origins {
+		m[strings.TrimSpace(o)] = true
+	}
+	return m
+}
+
 func (h *ExternalHandler) checkAccess(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// 從Cookie或Header獲取會話令牌
-		sessionToken := ""
-		if cookie, err := r.Cookie("panelbase_session"); err == nil {
-			sessionToken = cookie.Value
-		} else if authHeader := r.Header.Get("Authorization"); authHeader != "" {
-			sessionToken = strings.TrimPrefix(authHeader, "Bearer ")
+		allowedOrigins := map[string]bool{
+			"127.0.0.1":       true,
+			"localhost":       true,
+			"panel.ogtt.tk":   true,
 		}
-
-		if !h.validateSession(sessionToken) {
-			sendJSONResponse(w, "error", "Invalid or expired session", http.StatusUnauthorized)
+		
+		// 從請求中獲取來源信息
+		origin := r.Host
+		if strings.Contains(origin, ":") {
+			origin = strings.Split(origin, ":")[0]
+		}
+		
+		if !allowedOrigins[origin] {
+			sendJSONResponse(w, "error", "Access denied", http.StatusForbidden)
 			return
 		}
-
+		
 		next.ServeHTTP(w, r)
 	})
 }

@@ -1,16 +1,16 @@
 {
-    "api_version": "v1",
-    "commands": {
-        "clean": "clean.sh",
-        "install": "install.sh",
-        "create": "create.sh",
-        "delete": "delete.sh",
-        "remove": "remove.sh"
-    },
-    "routes": [
-        {
-            "path": "/health",
-            "methods": ["GET"]
-        }
-    ]
-} 
+  "api_version": "v1",
+  "commands": {
+    "clean": "clean.sh",
+    "install": "install.sh",
+    "create": "create.sh",
+    "delete": "delete.sh",
+    "remove": "remove.sh"
+  },
+  "routes": [
+    {
+      "path": "/health",
+      "methods": ["GET"]
+    }
+  ]
+}

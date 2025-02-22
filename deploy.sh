@@ -59,15 +59,13 @@ echo "================================"
 mkdir -p commands web/static web/templates
 chmod 755 commands
 
-# 初始化默認命令文件
 for cmd in clean install create delete remove; do
-	echo "echo '${cmd} command executed'" > commands/${cmd}.sh
+	echo "echo '${cmd} command executed'" >commands/${cmd}.sh
 	chmod +x commands/${cmd}.sh
 done
 
-# 初始化默認路由配置
 mkdir -p web
-cat > web/routes.json <<'EOF'
+cat >web/routes.json <<'EOF'
 {
     "api_version": "v1",
     "commands": {
