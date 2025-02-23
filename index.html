@@ -1,206 +1,208 @@
 <!DOCTYPE html>
 <html>
-<head>
+  <head>
     <title>PanelBase</title>
-    <link rel="icon" type="image/png" href="/web/static/favicon.png">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/web/static/favicon.png" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style id="theme-style"></style>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding: 10px;
-            background-color: var(--header-bg);
-            border-radius: 5px;
-        }
-        .command-panel {
-            background-color: var(--panel-bg);
-            padding: 20px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-        }
-        .output-panel {
-            background-color: var(--output-bg);
-            padding: 20px;
-            border-radius: 5px;
-            min-height: 200px;
-            white-space: pre-wrap;
-        }
-        .error {
-            color: var(--error-color);
-            margin: 10px 0;
-        }
-        .success {
-            color: var(--success-color);
-            margin: 10px 0;
-        }
-        .connection-form {
-            background-color: var(--panel-bg);
-            padding: 20px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            display: none; /* Initially hidden */
-        }
-        
-        .connection-form.show {
-            display: block;
-        }
-        
-        .form-group {
-            margin-bottom: 15px;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-        }
-        
-        .form-group input {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        
-        .main-content {
-            display: none; /* Initially hidden */
-        }
-        
-        .main-content.show {
-            display: block;
-        }
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+      }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding: 10px;
+        background-color: var(--header-bg);
+        border-radius: 5px;
+      }
+      .command-panel {
+        background-color: var(--panel-bg);
+        padding: 20px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+      }
+      .output-panel {
+        background-color: var(--output-bg);
+        padding: 20px;
+        border-radius: 5px;
+        min-height: 200px;
+        white-space: pre-wrap;
+      }
+      .error {
+        color: var(--error-color);
+        margin: 10px 0;
+      }
+      .success {
+        color: var(--success-color);
+        margin: 10px 0;
+      }
+      .connection-form {
+        background-color: var(--panel-bg);
+        padding: 20px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+        display: none;
+      }
+
+      .connection-form.show {
+        display: block;
+      }
+
+      .form-group {
+        margin-bottom: 15px;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 5px;
+      }
+
+      .form-group input {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+
+      .main-content {
+        display: none;
+      }
+
+      .main-content.show {
+        display: block;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="container">
-        <div class="connection-form show" id="connection-form">
-            <h2>Connect to PanelBase Agent</h2>
-            <div class="form-group">
-                <label for="agent-ip">IP Address:</label>
-                <input type="text" id="agent-ip" placeholder="Enter IP address">
-            </div>
-            <div class="form-group">
-                <label for="agent-port">Port:</label>
-                <input type="number" id="agent-port" placeholder="Enter port number">
-            </div>
-            <div class="form-group">
-                <label for="agent-entry">Entry Token:</label>
-                <input type="text" id="agent-entry" placeholder="Enter entry token">
-            </div>
-            <button onclick="connectToAgent()">Connect</button>
+      <div class="connection-form show" id="connection-form">
+        <h2>Connect to PanelBase Agent</h2>
+        <div class="form-group">
+          <label for="agent-ip">IP Address:</label>
+          <input type="text" id="agent-ip" placeholder="Enter IP address" />
+        </div>
+        <div class="form-group">
+          <label for="agent-port">Port:</label>
+          <input
+            type="number"
+            id="agent-port"
+            placeholder="Enter port number"
+          />
+        </div>
+        <div class="form-group">
+          <label for="agent-entry">Entry Token:</label>
+          <input type="text" id="agent-entry" placeholder="Enter entry token" />
+        </div>
+        <button onclick="connectToAgent()">Connect</button>
+      </div>
+
+      <div class="main-content" id="main-content">
+        <div class="header">
+          <h1>PanelBase</h1>
+          <div class="status" id="connection-status">Connecting...</div>
         </div>
 
-        <div class="main-content" id="main-content">
-            <div class="header">
-                <h1>PanelBase</h1>
-                <div class="status" id="connection-status">Connecting...</div>
-            </div>
-
-            <div class="command-panel">
-                <h2>Command Execution</h2>
-                <select id="command-select">
-                    <option value="">Select a command...</option>
-                </select>
-                <div id="params-container"></div>
-                <button onclick="executeCommand()">Execute</button>
-            </div>
-
-            <div class="output-panel" id="output">
-                // Output will appear here
-            </div>
+        <div class="command-panel">
+          <h2>Command Execution</h2>
+          <select id="command-select">
+            <option value="">Select a command...</option>
+          </select>
+          <div id="params-container"></div>
+          <button onclick="executeCommand()">Execute</button>
         </div>
+
+        <div class="output-panel" id="output">// Output will appear here</div>
+      </div>
     </div>
 
     <script>
-        let API_BASE = '';
-        let currentTheme = null;
-        let availableCommands = null;
-        let connectionCheckInterval;
+      let API_BASE = "";
+      let currentTheme = null;
+      let availableCommands = null;
+      let connectionCheckInterval;
 
-        async function connectToAgent() {
-            stopConnectionCheck();
-            const ip = document.getElementById('agent-ip').value;
-            const port = document.getElementById('agent-port').value;
-            const entry = document.getElementById('agent-entry').value;
+      async function connectToAgent() {
+        stopConnectionCheck();
+        const ip = document.getElementById("agent-ip").value;
+        const port = document.getElementById("agent-port").value;
+        const entry = document.getElementById("agent-entry").value;
 
-            if (!ip || !port || !entry) {
-                showError('Please fill in all connection details');
-                return;
-            }
-
-            API_BASE = `http://${ip}:${port}/${entry}/`;
-
-            try {
-                const response = await fetch(`${API_BASE}connect`, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                if (!response.ok) {
-                    throw new Error('Connection failed');
-                }
-
-                const result = await response.json();
-                if (result.status === 'success') {
-                    // Save connection details to localStorage
-                    localStorage.setItem('panelbase_connection', JSON.stringify({
-                        ip, port, entry
-                    }));
-
-                    // Hide connection form and show main content
-                    document.getElementById('connection-form').classList.remove('show');
-                    document.getElementById('main-content').classList.add('show');
-
-                    // Initialize the main interface
-                    init();
-                    startConnectionCheck();
-                } else {
-                    throw new Error(result.message || 'Connection failed');
-                }
-            } catch (error) {
-                showError(`Connection failed: ${error.message}`);
-            }
+        if (!ip || !port || !entry) {
+          showError("Please fill in all connection details");
+          return;
         }
 
-        // Check for saved connection on page load
-        window.addEventListener('load', () => {
-            const savedConnection = localStorage.getItem('panelbase_connection');
-            if (savedConnection) {
-                const { ip, port, entry } = JSON.parse(savedConnection);
-                document.getElementById('agent-ip').value = ip;
-                document.getElementById('agent-port').value = port;
-                document.getElementById('agent-entry').value = entry;
-                connectToAgent();
-            }
-        });
+        API_BASE = `http://${ip}:${port}/${entry}/`;
 
-        // Theme management
-        async function loadTheme() {
-            try {
-                const response = await fetch(`${API_BASE}theme`);
-                if (!response.ok) throw new Error('Failed to load theme');
-                
-                const theme = await response.json();
-                currentTheme = theme;
-                
-                const styleSheet = document.getElementById('theme-style');
-                styleSheet.textContent = `
+        try {
+          const response = await fetch(`${API_BASE}connect`, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+
+          if (!response.ok) {
+            throw new Error("Connection failed");
+          }
+
+          const result = await response.json();
+          if (result.status === "success") {
+            localStorage.setItem(
+              "panelbase_connection",
+              JSON.stringify({
+                ip,
+                port,
+                entry,
+              })
+            );
+
+            document.getElementById("connection-form").classList.remove("show");
+            document.getElementById("main-content").classList.add("show");
+
+            init();
+            startConnectionCheck();
+          } else {
+            throw new Error(result.message || "Connection failed");
+          }
+        } catch (error) {
+          showError(`Connection failed: ${error.message}`);
+        }
+      }
+
+      window.addEventListener("load", () => {
+        const savedConnection = localStorage.getItem("panelbase_connection");
+        if (savedConnection) {
+          const { ip, port, entry } = JSON.parse(savedConnection);
+          document.getElementById("agent-ip").value = ip;
+          document.getElementById("agent-port").value = port;
+          document.getElementById("agent-entry").value = entry;
+          connectToAgent();
+        }
+      });
+
+      async function loadTheme() {
+        try {
+          const response = await fetch(`${API_BASE}theme`);
+          if (!response.ok) throw new Error("Failed to load theme");
+
+          const theme = await response.json();
+          currentTheme = theme;
+
+          const styleSheet = document.getElementById("theme-style");
+          styleSheet.textContent = `
                     :root {
                         --bg-color: ${theme.colors.background};
                         --text-color: ${theme.colors.text};
@@ -211,163 +213,164 @@
                         --success-color: ${theme.colors.success};
                     }
                 `;
-            } catch (error) {
-                console.error('Theme loading failed:', error);
-                showError('Failed to load theme');
-            }
+        } catch (error) {
+          console.error("Theme loading failed:", error);
+          showError("Failed to load theme");
+        }
+      }
+
+      async function loadCommands() {
+        try {
+          const response = await fetch(`${API_BASE}commands`);
+          if (!response.ok) throw new Error("Failed to load commands");
+
+          const commands = await response.json();
+          availableCommands = commands;
+
+          const select = document.getElementById("command-select");
+          select.innerHTML = '<option value="">Select a command...</option>';
+
+          Object.entries(commands).forEach(([path, command]) => {
+            const option = document.createElement("option");
+            option.value = path;
+            option.textContent = `${command.metadata.name} (v${command.metadata.version})`;
+            select.appendChild(option);
+          });
+        } catch (error) {
+          console.error("Commands loading failed:", error);
+          showError("Failed to load available commands");
+        }
+      }
+
+      async function executeCommand() {
+        const commandPath = document.getElementById("command-select").value;
+        if (!commandPath) {
+          showError("Please select a command");
+          return;
         }
 
-        // Command management
-        async function loadCommands() {
-            try {
-                const response = await fetch(`${API_BASE}commands`);
-                if (!response.ok) throw new Error('Failed to load commands');
-                
-                const commands = await response.json();
-                availableCommands = commands;
-                
-                const select = document.getElementById('command-select');
-                select.innerHTML = '<option value="">Select a command...</option>';
-                
-                Object.entries(commands).forEach(([path, command]) => {
-                    const option = document.createElement('option');
-                    option.value = path;
-                    option.textContent = `${command.metadata.name} (v${command.metadata.version})`;
-                    select.appendChild(option);
-                });
-            } catch (error) {
-                console.error('Commands loading failed:', error);
-                showError('Failed to load available commands');
-            }
+        const command = availableCommands[commandPath];
+        const params = {};
+
+        const inputs = document.querySelectorAll("#params-container input");
+        inputs.forEach((input) => {
+          params[input.name] = input.value;
+        });
+
+        try {
+          const response = await fetch(`${API_BASE}${commandPath}`, {
+            method: command.method,
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(params),
+          });
+
+          if (!response.ok) throw new Error("Command execution failed");
+
+          const result = await response.json();
+          showOutput(result.output);
+
+          if (result.status === "success") {
+            showSuccess("Command executed successfully");
+          } else {
+            showError(result.message || "Command execution failed");
+          }
+        } catch (error) {
+          console.error("Command execution failed:", error);
+          showError("Failed to execute command");
         }
+      }
 
-        // Command execution
-        async function executeCommand() {
-            const commandPath = document.getElementById('command-select').value;
-            if (!commandPath) {
-                showError('Please select a command');
-                return;
-            }
+      function showError(message) {
+        const output = document.getElementById("output");
+        output.innerHTML += `<div class="error">${message}</div>`;
+        output.scrollTop = output.scrollHeight;
+      }
 
-            const command = availableCommands[commandPath];
-            const params = {};
-            
-            // Collect parameters
-            const inputs = document.querySelectorAll('#params-container input');
-            inputs.forEach(input => {
-                params[input.name] = input.value;
-            });
+      function showSuccess(message) {
+        const output = document.getElementById("output");
+        output.innerHTML += `<div class="success">${message}</div>`;
+        output.scrollTop = output.scrollHeight;
+      }
 
-            try {
-                const response = await fetch(`${API_BASE}${commandPath}`, {
-                    method: command.method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(params)
-                });
+      function showOutput(message) {
+        const output = document.getElementById("output");
+        output.innerHTML += `<pre>${message}</pre>`;
+        output.scrollTop = output.scrollHeight;
+      }
 
-                if (!response.ok) throw new Error('Command execution failed');
-                
-                const result = await response.json();
-                showOutput(result.output);
-                
-                if (result.status === 'success') {
-                    showSuccess('Command executed successfully');
-                } else {
-                    showError(result.message || 'Command execution failed');
-                }
-            } catch (error) {
-                console.error('Command execution failed:', error);
-                showError('Failed to execute command');
-            }
-        }
+      document
+        .getElementById("command-select")
+        .addEventListener("change", (e) => {
+          const commandPath = e.target.value;
+          const container = document.getElementById("params-container");
+          container.innerHTML = "";
 
-        // UI helpers
-        function showError(message) {
-            const output = document.getElementById('output');
-            output.innerHTML += `<div class="error">${message}</div>`;
-            output.scrollTop = output.scrollHeight;
-        }
+          if (!commandPath || !availableCommands[commandPath]) return;
 
-        function showSuccess(message) {
-            const output = document.getElementById('output');
-            output.innerHTML += `<div class="success">${message}</div>`;
-            output.scrollTop = output.scrollHeight;
-        }
-
-        function showOutput(message) {
-            const output = document.getElementById('output');
-            output.innerHTML += `<pre>${message}</pre>`;
-            output.scrollTop = output.scrollHeight;
-        }
-
-        // Command parameter UI
-        document.getElementById('command-select').addEventListener('change', (e) => {
-            const commandPath = e.target.value;
-            const container = document.getElementById('params-container');
-            container.innerHTML = '';
-
-            if (!commandPath || !availableCommands[commandPath]) return;
-
-            const command = availableCommands[commandPath];
-            command.args.forEach((arg, index) => {
-                const div = document.createElement('div');
-                div.innerHTML = `
+          const command = availableCommands[commandPath];
+          command.args.forEach((arg, index) => {
+            const div = document.createElement("div");
+            div.innerHTML = `
                     <label for="arg-${index}">Parameter ${index + 1}:</label>
                     <input type="text" id="arg-${index}" name="arg${index}" placeholder="${arg}">
                 `;
-                container.appendChild(div);
-            });
+            container.appendChild(div);
+          });
         });
 
-        // Initialize
-        async function init() {
-            try {
-                await loadTheme();
-                await loadCommands();
-                document.getElementById('connection-status').textContent = 'Connected';
-                document.getElementById('connection-status').style.color = 'var(--success-color)';
-            } catch (error) {
-                console.error('Initialization failed:', error);
-                document.getElementById('connection-status').textContent = 'Connection Failed';
-                document.getElementById('connection-status').style.color = 'var(--error-color)';
-            }
+      async function init() {
+        try {
+          await loadTheme();
+          await loadCommands();
+          document.getElementById("connection-status").textContent =
+            "Connected";
+          document.getElementById("connection-status").style.color =
+            "var(--success-color)";
+        } catch (error) {
+          console.error("Initialization failed:", error);
+          document.getElementById("connection-status").textContent =
+            "Connection Failed";
+          document.getElementById("connection-status").style.color =
+            "var(--error-color)";
         }
+      }
 
-        function startConnectionCheck() {
-            connectionCheckInterval = setInterval(async () => {
-                try {
-                    const response = await fetch(`${API_BASE}connect`, {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error('Connection lost');
-                    }
-                    
-                    const result = await response.json();
-                    if (result.status !== 'success') {
-                        throw new Error('Connection check failed');
-                    }
-                } catch (error) {
-                    document.getElementById('connection-status').textContent = 'Disconnected';
-                    document.getElementById('connection-status').style.color = 'var(--error-color)';
-                    
-                    // Try to reconnect
-                    connectToAgent();
-                }
-            }, 30000); // Check every 30 seconds
-        }
+      function startConnectionCheck() {
+        connectionCheckInterval = setInterval(async () => {
+          try {
+            const response = await fetch(`${API_BASE}connect`, {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+              },
+            });
 
-        function stopConnectionCheck() {
-            if (connectionCheckInterval) {
-                clearInterval(connectionCheckInterval);
+            if (!response.ok) {
+              throw new Error("Connection lost");
             }
+
+            const result = await response.json();
+            if (result.status !== "success") {
+              throw new Error("Connection check failed");
+            }
+          } catch (error) {
+            document.getElementById("connection-status").textContent =
+              "Disconnected";
+            document.getElementById("connection-status").style.color =
+              "var(--error-color)";
+
+            connectToAgent();
+          }
+        }, 30000);
+      }
+
+      function stopConnectionCheck() {
+        if (connectionCheckInterval) {
+          clearInterval(connectionCheckInterval);
         }
+      }
     </script>
-</body>
-</html> 
+  </body>
+</html>

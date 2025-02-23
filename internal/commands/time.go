@@ -3,7 +3,7 @@
 // @dependencies: golang
 // @author: PanelBase Team
 // @version: 1.0.0
-// @description: Show current time
+// @description: Returns the current server time
 
 package commands
 
@@ -13,6 +13,5 @@ import (
 )
 
 func main() {
-	now := time.Now()
-	fmt.Println(now.Format("2006-01-02 15:04:05"))
+	fmt.Println(time.Now().Format("2006-01-02 15:04:05"))
 }

@@ -1,5 +1,9 @@
 #!/bin/bash
 
+get_ip() {
+	curl -s -4 ifconfig.me
+}
+
 get_port() {
 	while true; do
 		port=$(((RANDOM % (49151 - 1024 + 1)) + 1024))
@@ -13,10 +17,6 @@ get_port() {
 
 get_entry() {
 	head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9!@#$%^&*()_+-=' | head -c 16
-}
-
-get_ip() {
-	curl -s -4 ifconfig.me
 }
 
 # 檢查是否已經運行
@@ -78,10 +78,11 @@ start_service() {
 	go mod tidy
 
 	# 設置環境變數
+	IP=$(get_ip)
 	PORT=$(get_port)
 	ENTRY=$(get_entry)
-	IP=$(get_ip)
 
+	echo "IP=$IP" >>.env
 	echo "PORT=$PORT" >.env
 	echo "ENTRY=$ENTRY" >>.env
 

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 )
 
@@ -37,18 +36,18 @@ func LoadTheme(themeName string) error {
 	themePath := filepath.Join("themes", themeName+".json")
 	data, err := ioutil.ReadFile(themePath)
 	if err != nil {
-		Log(ERROR, "Failed to read theme file: %v", err)
+		Log(EROR, "Failed to read theme file: %v", err)
 		return err
 	}
 
 	theme := &Theme{}
 	if err := json.Unmarshal(data, theme); err != nil {
-		Log(ERROR, "Failed to parse theme file: %v", err)
+		Log(EROR, "Failed to parse theme file: %v", err)
 		return err
 	}
 
 	if err := theme.Validate(); err != nil {
-		Log(ERROR, "Invalid theme configuration: %v", err)
+		Log(EROR, "Invalid theme configuration: %v", err)
 		return err
 	}
 
@@ -60,7 +59,7 @@ func LoadTheme(themeName string) error {
 func GetTheme() *Theme {
 	if currentTheme == nil {
 		if err := LoadTheme("default"); err != nil {
-			Log(ERROR, "Failed to load default theme: %v", err)
+			Log(EROR, "Failed to load default theme: %v", err)
 			return nil
 		}
 	}

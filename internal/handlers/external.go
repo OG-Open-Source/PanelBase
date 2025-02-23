@@ -3,8 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"os"
-	"path"
 	"strings"
 	"github.com/OG-Open-Source/PanelBase/pkg/utils"
 )
@@ -27,16 +27,33 @@ func NewExternalHandler() *ExternalHandler {
 
 func (h *ExternalHandler) Init() error {
 	if err := h.routeManager.LoadRoutes("internal/config/routes.json"); err != nil {
-		utils.Log(utils.ERROR, "Failed to initialize external handler: %v", err)
+		utils.Log(utils.EROR, "Failed to initialize handler: %v", err)
 		return err
 	}
 	return nil
 }
 
 func (h *ExternalHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Remove the origin check since we now support connections from anywhere
-	// Set CORS headers for development
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	origin := r.Header.Get("Origin")
+	if origin != "" {
+		u, err := url.Parse(origin)
+		if err != nil {
+			utils.Log(utils.EROR, "Invalid origin: %v", err)
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
+		if u.Host != "panel.ogtt.tk" && u.Host != "localhost" && !strings.HasPrefix(u.Host, "127.0.0.1") {
+			utils.Log(utils.WARN, "Unauthorized access attempt from: %s", origin)
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+	} else {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+	}
+
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
@@ -44,10 +61,8 @@ func (h *ExternalHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract API path
 	apiPath := strings.TrimPrefix(r.URL.Path, "/"+os.Getenv("ENTRY")+"/")
-	
-	// Handle connect endpoint
+
 	if apiPath == "connect" {
 		h.handleConnect(w, r)
 		return
@@ -71,12 +86,6 @@ func (h *ExternalHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ExternalHandler) handleGet(w http.ResponseWriter, r *http.Request, route *utils.Route) {
-	if route.Method != "GET" {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Parse query parameters
 	args := make(map[string]string)
 	for key, values := range r.URL.Query() {
 		if len(values) > 0 {
@@ -86,7 +95,7 @@ func (h *ExternalHandler) handleGet(w http.ResponseWriter, r *http.Request, rout
 
 	output, err := h.routeManager.ExecuteCommand(route, args)
 	if err != nil {
-		utils.Log(utils.ERROR, "Command execution failed: %v", err)
+		utils.Log(utils.EROR, "Command execution failed: %v", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(APIResponse{
@@ -104,22 +113,16 @@ func (h *ExternalHandler) handleGet(w http.ResponseWriter, r *http.Request, rout
 }
 
 func (h *ExternalHandler) handlePost(w http.ResponseWriter, r *http.Request, route *utils.Route) {
-	if route.Method != "POST" {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Parse JSON body
 	var args map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&args); err != nil {
-		utils.Log(utils.ERROR, "Failed to parse request body: %v", err)
+		utils.Log(utils.EROR, "Failed to parse request body: %v", err)
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
 	output, err := h.routeManager.ExecuteCommand(route, args)
 	if err != nil {
-		utils.Log(utils.ERROR, "Command execution failed: %v", err)
+		utils.Log(utils.EROR, "Command execution failed: %v", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(APIResponse{
@@ -137,8 +140,7 @@ func (h *ExternalHandler) handlePost(w http.ResponseWriter, r *http.Request, rou
 }
 
 func (h *ExternalHandler) handleConnect(w http.ResponseWriter, r *http.Request) {
-	// Set CORS headers
-	w.Header().Set("Access-Control-Allow-Origin", "*") // 在生產環境中應該設置為特定域名
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
@@ -146,7 +148,6 @@ func (h *ExternalHandler) handleConnect(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// 基本連線檢查
 	response := APIResponse{
 		Message: "Successfully connected to PanelBase",
 		Status:  "success",
@@ -156,4 +157,4 @@ func (h *ExternalHandler) handleConnect(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(response)
 }
 
-// TODO: Implement external request handlers 
+// TODO: Implement external request handlers
