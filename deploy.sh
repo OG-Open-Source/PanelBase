@@ -49,6 +49,21 @@ start_service() {
 		return
 	fi
 
+	# 檢查 Go 版本
+	GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
+	MAJOR_VERSION=$(echo $GO_VERSION | cut -d. -f1)
+	MINOR_VERSION=$(echo $GO_VERSION | cut -d. -f2)
+
+	if [[ "$MAJOR_VERSION" != "1" || "$MINOR_VERSION" -gt "19" ]]; then
+		echo "Warning: PanelBase requires Go version 1.19 or lower"
+		echo "Current Go version: $GO_VERSION"
+		read -p "Do you want to continue? (y/n) " -n 1 -r
+		echo
+		if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+			exit 1
+		fi
+	fi
+
 	# 下載最新版本
 	echo "Downloading PanelBase..."
 	if [ -d "PanelBase" ]; then
@@ -56,6 +71,11 @@ start_service() {
 	fi
 	git clone https://github.com/OG-Open-Source/PanelBase.git
 	cd PanelBase
+
+	# 初始化 Go 模組
+	echo "Initializing Go module..."
+	go mod init github.com/OG-Open-Source/PanelBase
+	go mod tidy
 
 	# 設置環境變數
 	PORT=$(get_port)
