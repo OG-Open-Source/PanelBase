@@ -3,39 +3,12 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/http"
-	"github.com/OG-Open-Source/PanelBase/internal/config"
-	"github.com/OG-Open-Source/PanelBase/internal/handlers"
-	"github.com/OG-Open-Source/PanelBase/pkg/utils"
-	"github.com/gorilla/mux"
-	"github.com/OG-Open-Source/PanelBase/internal/commands/clean"
-	"github.com/sirupsen/logrus"
+	"os"
 )
 
-var logger = logrus.New()
-
 func main() {
-	// 初始化日誌
-	logger.SetFormatter(&logrus.JSONFormatter{})
-	logger.Info("Starting PanelBase agent")
-
-	cfg := config.LoadConfig()
-
-	// 執行清理命令示例
-	if err := clean.Execute(nil); err != nil {
-		panic(err)
-	}
-
-	routeManager := utils.NewRouteManager()
-	themeManager := utils.NewThemeManager(routeManager)
-
-	externalHandler := handlers.NewExternalHandler(themeManager, routeManager)
-
-	router := mux.NewRouter()
-
-	externalHandler.SetupRoutes(router)
-
-	addr := fmt.Sprintf(":%d", cfg.Port)
-	log.Printf("PanelBase agent is running on http://0.0.0.0:%d/%s\n", cfg.Port, cfg.SecurityEntry)
-	log.Fatal(http.ListenAndServe(addr, router))
-}
+	// TODO: Initialize configuration
+	// TODO: Setup routes
+	// TODO: Start server
+	fmt.Println("PanelBase starting...")
+} 
