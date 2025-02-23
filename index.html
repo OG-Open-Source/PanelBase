@@ -83,6 +83,47 @@
       .main-content.show {
         display: block;
       }
+
+      .notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        border-radius: 4px;
+        color: white;
+        opacity: 0;
+        transform: translateX(100%);
+        transition: all 0.3s ease-in-out;
+      }
+
+      .notification.show {
+        opacity: 1;
+        transform: translateX(0);
+      }
+
+      .notification.success {
+        background-color: var(--success-color, #4caf50);
+      }
+
+      .notification.error {
+        background-color: var(--error-color, #f44336);
+      }
+
+      .status {
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-weight: bold;
+      }
+
+      .status.connected {
+        background-color: var(--success-color, #4caf50);
+        color: white;
+      }
+
+      .status.disconnected {
+        background-color: var(--error-color, #f44336);
+        color: white;
+      }
     </style>
   </head>
   <body>
@@ -127,6 +168,8 @@
       </div>
     </div>
 
+    <div id="notification" class="notification"></div>
+
     <script>
       let API_BASE = "";
       let currentTheme = null;
@@ -134,60 +177,58 @@
       let connectionCheckInterval;
 
       async function connectToAgent() {
-        stopConnectionCheck();
         const ip = document.getElementById("agent-ip").value;
         const port = document.getElementById("agent-port").value;
         const entry = document.getElementById("agent-entry").value;
 
         if (!ip || !port || !entry) {
-          showError("Please fill in all connection details");
+          showNotification("Please fill in all connection details", "error");
           return;
         }
 
-        API_BASE = `http://${ip}:${port}/${entry}/`;
+        API_BASE = `/${entry}/`;
 
         try {
-          const response = await fetch(`${API_BASE}connect`, {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          });
-
+          const response = await fetch(`${API_BASE}connect`);
           if (!response.ok) {
             throw new Error("Connection failed");
           }
 
           const result = await response.json();
           if (result.status === "success") {
-            localStorage.setItem(
-              "panelbase_connection",
-              JSON.stringify({
-                ip,
-                port,
-                entry,
-              })
-            );
-
             document.getElementById("connection-form").classList.remove("show");
             document.getElementById("main-content").classList.add("show");
 
-            init();
+            const statusElement = document.getElementById("connection-status");
+            statusElement.textContent = "Connected";
+            statusElement.className = "status connected";
+
+            showNotification("Successfully connected to PanelBase");
+
+            await loadCommands();
             startConnectionCheck();
           } else {
             throw new Error(result.message || "Connection failed");
           }
         } catch (error) {
-          showError(`Connection failed: ${error.message}`);
+          showNotification(`Connection failed: ${error.message}`, "error");
+
+          const statusElement = document.getElementById("connection-status");
+          statusElement.textContent = "Disconnected";
+          statusElement.className = "status disconnected";
         }
       }
 
+      // 頁面加載時自動連線
       window.addEventListener("load", () => {
-        const savedConnection = localStorage.getItem("panelbase_connection");
-        if (savedConnection) {
-          const { ip, port, entry } = JSON.parse(savedConnection);
-          document.getElementById("agent-ip").value = ip;
-          document.getElementById("agent-port").value = port;
+        // 從當前 URL 獲取 entry
+        const pathParts = window.location.pathname.split("/");
+        const entry = pathParts[1]; // 假設 URL 格式為 /entry/...
+
+        if (entry) {
+          document.getElementById("agent-ip").value = window.location.hostname;
+          document.getElementById("agent-port").value =
+            window.location.port || "80";
           document.getElementById("agent-entry").value = entry;
           connectToAgent();
         }
@@ -215,37 +256,45 @@
                 `;
         } catch (error) {
           console.error("Theme loading failed:", error);
-          showError("Failed to load theme");
+          showNotification("Failed to load theme", "error");
         }
       }
 
       async function loadCommands() {
         try {
-          const response = await fetch(`${API_BASE}commands`);
-          if (!response.ok) throw new Error("Failed to load commands");
+          const response = await fetch(`${API_BASE}commands`, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+
+          if (!response.ok) {
+            throw new Error("Failed to load commands");
+          }
 
           const commands = await response.json();
-          availableCommands = commands;
-
           const select = document.getElementById("command-select");
           select.innerHTML = '<option value="">Select a command...</option>';
 
-          Object.entries(commands).forEach(([path, command]) => {
+          for (const [path, command] of Object.entries(commands)) {
             const option = document.createElement("option");
             option.value = path;
-            option.textContent = `${command.metadata.name} (v${command.metadata.version})`;
+            option.textContent = `${command.name} - ${command.description}`;
             select.appendChild(option);
-          });
+          }
+
+          availableCommands = commands;
         } catch (error) {
           console.error("Commands loading failed:", error);
-          showError("Failed to load available commands");
+          showNotification("Failed to load available commands", "error");
         }
       }
 
       async function executeCommand() {
         const commandPath = document.getElementById("command-select").value;
         if (!commandPath) {
-          showError("Please select a command");
+          showNotification("Please select a command", "error");
           return;
         }
 
@@ -259,26 +308,31 @@
 
         try {
           const response = await fetch(`${API_BASE}${commandPath}`, {
-            method: command.method,
+            method: command.method || "POST",
             headers: {
               "Content-Type": "application/json",
             },
             body: JSON.stringify(params),
           });
 
-          if (!response.ok) throw new Error("Command execution failed");
+          if (!response.ok) {
+            throw new Error("Command execution failed");
+          }
 
           const result = await response.json();
           showOutput(result.output);
 
           if (result.status === "success") {
-            showSuccess("Command executed successfully");
+            showNotification("Command executed successfully");
           } else {
-            showError(result.message || "Command execution failed");
+            showNotification(
+              result.message || "Command execution failed",
+              "error"
+            );
           }
         } catch (error) {
           console.error("Command execution failed:", error);
-          showError("Failed to execute command");
+          showNotification("Failed to execute command", "error");
         }
       }
 
@@ -370,6 +424,20 @@
         if (connectionCheckInterval) {
           clearInterval(connectionCheckInterval);
         }
+      }
+
+      function showNotification(message, type = "success") {
+        const notification = document.getElementById("notification");
+        notification.textContent = message;
+        notification.className = `notification ${type}`;
+
+        notification.offsetHeight;
+
+        notification.classList.add("show");
+
+        setTimeout(() => {
+          notification.classList.remove("show");
+        }, 3000);
       }
     </script>
   </body>

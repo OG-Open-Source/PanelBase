@@ -97,9 +97,6 @@ func main() {
 	updateDisplay := func() {
 		fmt.Print("\033[2J")
 		fmt.Print("\033[H")
-		fmt.Print("\033[J")
-		fmt.Print("\033[?7l")
-		defer fmt.Print("\033[?7h")
 
 		fmt.Println("============================================")
 		fmt.Println("PanelBase Agent Connection Details")
@@ -114,15 +111,9 @@ func main() {
 		logFile := filepath.Join("logs", fmt.Sprintf("%s.log", time.Now().Format("2006-01-02")))
 		if logs, err := ioutil.ReadFile(logFile); err == nil {
 			lines := strings.Split(string(logs), "\n")
-			maxLines := 20
-			startIndex := len(lines) - 1
-			if startIndex > maxLines {
-				startIndex = maxLines
-			}
-			for i := startIndex; i >= 0; i-- {
-				line := strings.TrimSpace(lines[i])
-				if line != "" {
-					fmt.Printf(" %s\n", line)
+			for _, line := range lines {
+				if line = strings.TrimSpace(line); line != "" {
+					fmt.Println(line)
 				}
 			}
 		}
@@ -143,7 +134,7 @@ func main() {
 	}()
 
 	http.Handle("/"+entry+"/", handler)
-	http.Handle("/", http.FileServer(http.Dir("web")))
+	http.Handle("/", http.FileServer(http.Dir(".")))
 
 	addr := fmt.Sprintf(":%s", port)
 	utils.Log(utils.INFO, "Server starting on port %s with entry point /%s", port, entry)

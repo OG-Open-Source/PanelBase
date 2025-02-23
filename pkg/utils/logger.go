@@ -46,11 +46,12 @@ func InitLogger() error {
 		return fmt.Errorf("failed to open log file: %v", err)
 	}
 
+	flags := log.Ldate | log.Ltime
 	defaultLogger = &Logger{
-		dbugLogger: log.New(file, "[DBUG] ", log.Ldate|log.Ltime|log.Lshortfile),
-		infoLogger: log.New(file, "[INFO] ", log.Ldate|log.Ltime|log.Lshortfile),
-		warnLogger: log.New(file, "[WARN] ", log.Ldate|log.Ltime|log.Lshortfile),
-		erorLogger: log.New(file, "[EROR] ", log.Ldate|log.Ltime|log.Lshortfile),
+		dbugLogger: log.New(file, "[DBUG] ", flags),
+		infoLogger: log.New(file, "[INFO] ", flags),
+		warnLogger: log.New(file, "[WARN] ", flags),
+		erorLogger: log.New(file, "[EROR] ", flags),
 	}
 
 	return nil
@@ -65,18 +66,20 @@ func Log(level LogLevel, format string, v ...interface{}) {
 	}
 
 	msg := fmt.Sprintf(format, v...)
+	timeStr := time.Now().Format("2006/01/02 15:04:05")
+
 	switch level {
 	case DBUG:
 		defaultLogger.dbugLogger.Output(2, msg)
-		fmt.Printf("%s[DBUG]%s %s\n", colorPurple, colorReset, msg)
+		fmt.Printf("%s[DBUG]%s %s %s\n", colorPurple, colorReset, timeStr, msg)
 	case INFO:
 		defaultLogger.infoLogger.Output(2, msg)
-		fmt.Printf("%s[INFO]%s %s\n", colorBlue, colorReset, msg)
+		fmt.Printf("%s[INFO]%s %s %s\n", colorBlue, colorReset, timeStr, msg)
 	case WARN:
 		defaultLogger.warnLogger.Output(2, msg)
-		fmt.Printf("%s[WARN]%s %s\n", colorYellow, colorReset, msg)
+		fmt.Printf("%s[WARN]%s %s %s\n", colorYellow, colorReset, timeStr, msg)
 	case EROR:
 		defaultLogger.erorLogger.Output(2, msg)
-		fmt.Printf("%s[EROR]%s %s\n", colorRed, colorReset, msg)
+		fmt.Printf("%s[EROR]%s %s %s\n", colorRed, colorReset, timeStr, msg)
 	}
-} 
+}

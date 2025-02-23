@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"github.com/OG-Open-Source/PanelBase/pkg/utils"
@@ -34,26 +33,17 @@ func (h *ExternalHandler) Init() error {
 }
 
 func (h *ExternalHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	origin := r.Header.Get("Origin")
-	if origin != "" {
-		u, err := url.Parse(origin)
-		if err != nil {
-			utils.Log(utils.EROR, "Invalid origin: %v", err)
-			http.Error(w, "Forbidden", http.StatusForbidden)
-			return
-		}
 
-		if u.Host != "panel.ogtt.tk" && u.Host != "localhost" && !strings.HasPrefix(u.Host, "127.0.0.1") {
-			utils.Log(utils.WARN, "Unauthorized access attempt from: %s", origin)
-			http.Error(w, "Forbidden", http.StatusForbidden)
-			return
-		}
-
-		w.Header().Set("Access-Control-Allow-Origin", origin)
-	} else {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+	remoteIP := r.RemoteAddr
+	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+		remoteIP = strings.Split(forwarded, ",")[0]
 	}
+	clientIP := strings.Split(remoteIP, ":")[0]
 
+
+	utils.Log(utils.INFO, "[%s] %s %s", clientIP, r.Method, r.URL.Path)
+
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
@@ -140,6 +130,14 @@ func (h *ExternalHandler) handlePost(w http.ResponseWriter, r *http.Request, rou
 }
 
 func (h *ExternalHandler) handleConnect(w http.ResponseWriter, r *http.Request) {
+	remoteIP := r.RemoteAddr
+	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+		remoteIP = strings.Split(forwarded, ",")[0]
+	}
+	clientIP := strings.Split(remoteIP, ":")[0]
+
+	utils.Log(utils.INFO, "[%s] Connection attempt", clientIP)
+
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
