@@ -1,11 +1,11 @@
-// @commands: time
-// @pkg_manager: apk, apt, opkg, pacman, yum, zypper, dnf
+// @command: time
+// @pkg_managers: apk, apt, opkg, pacman, yum, zypper, dnf
 // @dependencies: golang
-// @author: PanelBase Team
+// @authors: PanelBase Team
 // @version: 1.0.0
 // @description: Returns the current server time
 
-package commands
+package scripts
 
 import (
 	"fmt"
