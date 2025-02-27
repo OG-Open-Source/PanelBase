@@ -1,4 +1,4 @@
-// @command: time
+// @script: time
 // @pkg_managers: apk, apt, opkg, pacman, yum, zypper, dnf
 // @dependencies: golang
 // @authors: PanelBase Team

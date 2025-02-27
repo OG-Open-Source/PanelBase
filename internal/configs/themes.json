@@ -1,8 +1,16 @@
 {
-  "主題名稱": {
-    "name": "主題顯示名稱",
-    "authors": "作者",
-    "version": "版本",
-    "description": "描述"
+  "主題名稱1": {
+    "name": "主題顯示名稱1",
+    "authors": "作者1",
+    "version": "版本1",
+    "description": "描述1",
+    "file": "連結1"
+  },
+  "主題名稱2": {
+    "name": "主題顯示名稱2",
+    "authors": "作者2",
+    "version": "版本2",
+    "description": "描述2",
+    "file": "連結2"
   }
 }
