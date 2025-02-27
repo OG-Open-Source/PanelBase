@@ -1,5 +1,5 @@
 #!/bin/bash
-# @script: run
+# @script: run+command
 # @pkg_managers: apk, apt, opkg, pacman, yum, zypper, dnf
 # @dependencies: null
 # @authors: PanelBase Team
