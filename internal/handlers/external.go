@@ -73,11 +73,11 @@ func (h *Handler) SetupRoutes(entry string) *mux.Router {
 
 // 處理函數佔位符
 func (h *Handler) executeHandler(w http.ResponseWriter, r *http.Request) {
-	h.respondJSON(w, Response{Status: "success", Message: "Execute endpoint placeholder"})
+	h.respondJSON(w, Response{Status: "success", Message: "Execute endpoint is ready"})
 }
 
 func (h *Handler) wsExecuteHandler(w http.ResponseWriter, r *http.Request) {
-	h.respondJSON(w, Response{Status: "success", Message: "WebSocket endpoint placeholder"})
+	h.respondJSON(w, Response{Status: "success", Message: "WebSocket endpoint is ready"})
 }
 
 // 主題處理函數
@@ -178,30 +178,6 @@ func (h *Handler) respondJSON(w http.ResponseWriter, response Response) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// HandleThemeMetadata 處理主題元數據請求
-func (h *Handler) HandleThemeMetadata(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		h.respondJSON(w, Response{Status: "failure", Message: "Method not allowed"})
-		return
-	}
-
-	var req struct {
-		URL string `json:"url"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.respondJSON(w, Response{Status: "failure", Message: "Invalid request body"})
-		return
-	}
-
-	metadata, err := h.metadata.FetchThemeMetadata(req.URL, true)
-	if err != nil {
-		h.respondJSON(w, Response{Status: "failure", Message: err.Error()})
-		return
-	}
-
-	h.respondJSON(w, Response{Status: "success", Message: "Metadata fetched successfully", Data: metadata})
-}
-
 // HandleRouteMetadata 處理路由元數據請求
 func (h *Handler) HandleRouteMetadata(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -210,20 +186,78 @@ func (h *Handler) HandleRouteMetadata(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		URL string `json:"url"`
+		URL    string `json:"url,omitempty"`
+		Script string `json:"script,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.respondJSON(w, Response{Status: "failure", Message: "Invalid request body"})
+		h.respondJSON(w, Response{Status: "failure", Message: "Either URL or Script must be provided"})
 		return
 	}
 
-	metadata, err := h.metadata.FetchRouteMetadata(req.URL, true)
-	if err != nil {
-		h.respondJSON(w, Response{Status: "failure", Message: err.Error()})
+	// 如果提供了 URL，從遠程獲取
+	if req.URL != "" {
+		metadata, err := h.metadata.FetchRouteMetadata(req.URL, true)
+		if err != nil {
+			h.respondJSON(w, Response{Status: "failure", Message: err.Error()})
+			return
+		}
+		h.respondJSON(w, Response{Status: "success", Message: "Metadata fetched successfully", Data: metadata})
 		return
 	}
 
-	h.respondJSON(w, Response{Status: "success", Message: "Metadata fetched successfully", Data: metadata})
+	// 如果提供了 Script，從本地獲取
+	if req.Script != "" {
+		metadata, err := h.metadata.FetchRouteMetadata(req.Script, false)
+		if err != nil {
+			h.respondJSON(w, Response{Status: "failure", Message: err.Error()})
+			return
+		}
+		h.respondJSON(w, Response{Status: "success", Message: "Metadata fetched successfully", Data: metadata})
+		return
+	}
+
+	h.respondJSON(w, Response{Status: "failure", Message: "Either URL or Script must be provided"})
+}
+
+// HandleThemeMetadata 處理主題元數據請求
+func (h *Handler) HandleThemeMetadata(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		h.respondJSON(w, Response{Status: "failure", Message: "Method not allowed"})
+		return
+	}
+
+	var req struct {
+		URL  string `json:"url,omitempty"`
+		Name string `json:"name,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.respondJSON(w, Response{Status: "failure", Message: "Either URL or Name must be provided"})
+		return
+	}
+
+	// 如果提供了 URL，從遠程獲取
+	if req.URL != "" {
+		metadata, err := h.metadata.FetchThemeMetadata(req.URL, true)
+		if err != nil {
+			h.respondJSON(w, Response{Status: "failure", Message: err.Error()})
+			return
+		}
+		h.respondJSON(w, Response{Status: "success", Message: "Metadata fetched successfully", Data: metadata})
+		return
+	}
+
+	// 如果提供了 Name，從本地獲取
+	if req.Name != "" {
+		metadata, err := h.metadata.FetchThemeMetadata(req.Name, false)
+		if err != nil {
+			h.respondJSON(w, Response{Status: "failure", Message: err.Error()})
+			return
+		}
+		h.respondJSON(w, Response{Status: "success", Message: "Metadata fetched successfully", Data: metadata})
+		return
+	}
+
+	h.respondJSON(w, Response{Status: "failure", Message: "Either URL or Name must be provided"})
 }
 
 // handleConnect 處理連接測試請求

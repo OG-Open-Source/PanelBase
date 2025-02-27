@@ -60,12 +60,12 @@ func NewMetadataManager(routesConfigPath, themesConfigPath, scriptsPath, themesP
 func (mm *MetadataManager) LoadRouteConfig() (RouteConfig, error) {
 	data, err := ioutil.ReadFile(mm.routesConfigPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read routes config: %v", err)
+		return nil, fmt.Errorf("Failed to read routes config: %v", err)
 	}
 
 	var config RouteConfig
 	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("failed to parse routes config: %v", err)
+		return nil, fmt.Errorf("Failed to parse routes config: %v", err)
 	}
 
 	return config, nil
@@ -75,11 +75,11 @@ func (mm *MetadataManager) LoadRouteConfig() (RouteConfig, error) {
 func (mm *MetadataManager) SaveRouteConfig(config RouteConfig) error {
 	data, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal routes config: %v", err)
+		return fmt.Errorf("Failed to marshal routes config: %v", err)
 	}
 
 	if err := ioutil.WriteFile(mm.routesConfigPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write routes config: %v", err)
+		return fmt.Errorf("Failed to write routes config: %v", err)
 	}
 
 	return nil
@@ -89,12 +89,12 @@ func (mm *MetadataManager) SaveRouteConfig(config RouteConfig) error {
 func (mm *MetadataManager) LoadThemeConfig() (ThemeConfig, error) {
 	data, err := ioutil.ReadFile(mm.themesConfigPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read themes config: %v", err)
+		return nil, fmt.Errorf("Failed to read themes config: %v", err)
 	}
 
 	var config ThemeConfig
 	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("failed to parse themes config: %v", err)
+		return nil, fmt.Errorf("Failed to parse themes config: %v", err)
 	}
 
 	return config, nil
@@ -104,11 +104,11 @@ func (mm *MetadataManager) LoadThemeConfig() (ThemeConfig, error) {
 func (mm *MetadataManager) SaveThemeConfig(config ThemeConfig) error {
 	data, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal themes config: %v", err)
+		return fmt.Errorf("Failed to marshal themes config: %v", err)
 	}
 
 	if err := ioutil.WriteFile(mm.themesConfigPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write themes config: %v", err)
+		return fmt.Errorf("Failed to write themes config: %v", err)
 	}
 
 	return nil
@@ -167,64 +167,61 @@ func (mm *MetadataManager) FetchRouteMetadata(urlOrPath string, isURL bool) (*Ro
 	if isURL {
 		resp, err := http.Get(urlOrPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch URL: %v", err)
+			return nil, fmt.Errorf("Failed to fetch URL: %v", err)
 		}
 		defer resp.Body.Close()
 		reader = resp.Body
 	} else {
 		file, err := os.Open(filepath.Join(mm.scriptsPath, urlOrPath))
 		if err != nil {
-			return nil, fmt.Errorf("failed to open file: %v", err)
+			return nil, fmt.Errorf("Failed to open script file: %v", err)
 		}
 		defer file.Close()
 		reader = file
 	}
 
-	return mm.parseRouteMetadata(reader)
+	metadata, err := parseRouteMetadata(reader)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to parse route metadata: %v", err)
+	}
+
+	return metadata, nil
 }
 
-// parseRouteMetadata 解析路由元數據（僅解析前10行）
-func (mm *MetadataManager) parseRouteMetadata(r io.Reader) (*RouteMetadata, error) {
-	scanner := bufio.NewScanner(r)
+// parseRouteMetadata 解析路由元數據
+func parseRouteMetadata(reader io.Reader) (*RouteMetadata, error) {
+	scanner := bufio.NewScanner(reader)
 	result := &RouteMetadata{}
-	lineCount := 0
 	foundMetadata := make(map[string]bool)
+	lineCount := 0
+
+	commentPattern := regexp.MustCompile(`^[#/]+\s*@(\w+):\s*(.+)$`)
 
 	for scanner.Scan() && lineCount < 10 {
 		line := scanner.Text()
 		lineCount++
 
-		if strings.HasPrefix(line, "#") || strings.HasPrefix(line, "//") {
-			line = strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(line, "#"), "//"))
-			if !strings.HasPrefix(line, "@") {
-				continue
-			}
-
-			parts := strings.SplitN(line, ":", 2)
-			if len(parts) != 2 {
-				continue
-			}
-
-			key := strings.TrimSpace(parts[0])
-			value := strings.TrimSpace(parts[1])
+		if matches := commentPattern.FindStringSubmatch(line); len(matches) == 3 {
+			key := matches[1]
+			value := strings.TrimSpace(matches[2])
 
 			switch key {
-			case "@script":
+			case "script":
 				result.Script = value
 				foundMetadata["script"] = true
-			case "@pkg_managers":
+			case "pkg_managers":
 				result.PkgManagers = strings.Split(value, ",")
 				foundMetadata["pkg_managers"] = true
-			case "@dependencies":
+			case "dependencies":
 				result.Dependencies = strings.Split(value, ",")
 				foundMetadata["dependencies"] = true
-			case "@authors":
+			case "authors":
 				result.Authors = value
 				foundMetadata["authors"] = true
-			case "@version":
+			case "version":
 				result.Version = value
 				foundMetadata["version"] = true
-			case "@description":
+			case "description":
 				result.Description = value
 				foundMetadata["description"] = true
 			}
@@ -232,13 +229,13 @@ func (mm *MetadataManager) parseRouteMetadata(r io.Reader) (*RouteMetadata, erro
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error reading metadata: %v", err)
+		return nil, fmt.Errorf("Failed to read metadata: %v", err)
 	}
 
 	requiredMetadata := []string{"script", "pkg_managers", "dependencies", "authors", "version", "description"}
 	for _, key := range requiredMetadata {
 		if !foundMetadata[key] {
-			return nil, fmt.Errorf("metadata @%s not found in first 10 lines", key)
+			return nil, fmt.Errorf("Required metadata @%s not found in first 10 lines", key)
 		}
 	}
 
@@ -252,29 +249,22 @@ func (mm *MetadataManager) FetchThemeMetadata(urlOrPath string, isURL bool) (*Th
 	if isURL {
 		resp, err := http.Get(urlOrPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch URL: %v", err)
+			return nil, fmt.Errorf("Failed to fetch URL: %v", err)
 		}
 		defer resp.Body.Close()
 		reader = resp.Body
 	} else {
-		// 從 themes.json 中讀取
-		config, err := mm.LoadThemeConfig()
+		file, err := os.Open(filepath.Join(mm.themesPath, urlOrPath, "theme.json"))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("Failed to open theme file: %v", err)
 		}
-
-		theme, exists := config[urlOrPath]
-		if !exists {
-			return nil, fmt.Errorf("theme %s not found", urlOrPath)
-		}
-
-		return &theme, nil
+		defer file.Close()
+		reader = file
 	}
 
-	// 解析遠程主題元數據
 	var themeInfo ThemeInfo
 	if err := json.NewDecoder(reader).Decode(&themeInfo); err != nil {
-		return nil, fmt.Errorf("failed to parse theme metadata: %v", err)
+		return nil, fmt.Errorf("Failed to parse theme metadata: %v", err)
 	}
 
 	return &themeInfo, nil
