@@ -286,7 +286,7 @@ func (mm *MetadataManager) InstallRoute(url string) error {
 
 	// 檢查路由是否已存在
 	if _, exists := config[metadata.Script]; exists {
-		return fmt.Errorf("route %s already exists", metadata.Script)
+		return fmt.Errorf("Route %s already exists", metadata.Script)
 	}
 
 	// TODO: 下載腳本到 scripts 目錄
@@ -312,7 +312,7 @@ func (mm *MetadataManager) InstallTheme(url string) error {
 
 	// 檢查主題是否已存在
 	if _, exists := config[themeInfo.Name]; exists {
-		return fmt.Errorf("theme %s already exists", themeInfo.Name)
+		return fmt.Errorf("Theme %s already exists", themeInfo.Name)
 	}
 
 	// TODO: 下載主題文件到 themes 目錄
@@ -333,13 +333,13 @@ func (mm *MetadataManager) DeleteRoute(name string) error {
 	// 檢查路由是否存在
 	scriptName, exists := config[name]
 	if !exists {
-		return fmt.Errorf("route %s not found", name)
+		return fmt.Errorf("Route %s not found", name)
 	}
 
 	// 刪除腳本文件
 	scriptPath := filepath.Join(mm.scriptsPath, scriptName)
 	if err := os.Remove(scriptPath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to delete script file: %v", err)
+		return fmt.Errorf("Failed to delete script file: %v", err)
 	}
 
 	// 從配置中移除
@@ -357,13 +357,13 @@ func (mm *MetadataManager) DeleteTheme(name string) error {
 
 	// 檢查主題是否存在
 	if _, exists := config[name]; !exists {
-		return fmt.Errorf("theme %s not found", name)
+		return fmt.Errorf("Theme %s not found", name)
 	}
 
 	// 刪除主題目錄
 	themePath := filepath.Join(mm.themesPath, name)
 	if err := os.RemoveAll(themePath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to delete theme directory: %v", err)
+		return fmt.Errorf("Failed to delete theme directory: %v", err)
 	}
 
 	// 從配置中移除
