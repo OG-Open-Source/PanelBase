@@ -83,11 +83,12 @@ type ThemeConfig map[string]ThemeStructure
 
 // ThemeStructure 表示主題結構
 type ThemeStructure struct {
-	Name        string                 `json:"name"`
-	Authors     string                 `json:"authors"`
-	Version     string                 `json:"version"`
-	Description string                 `json:"description"`
-	Structure   map[string]interface{} `json:"structure"`
+	Theme       string                 `json:"theme"`       // 主題目錄名
+	Name        string                 `json:"name"`        // 主題顯示名稱
+	Authors     string                 `json:"authors"`     // 作者
+	Version     string                 `json:"version"`     // 版本
+	Description string                 `json:"description"` // 描述
+	Structure   map[string]interface{} `json:"structure"`   // 文件結構
 }
 
 // RouteMetadata 路由元數據結構
@@ -298,29 +299,21 @@ func (mm *MetadataManager) FetchThemeMetadata(url string, validate bool) (*Theme
 		return nil, fmt.Errorf("Theme config must contain exactly one theme")
 	}
 
-	// 獲取主題結構
+	// 獲取主題名稱和結構
+	var themeName string
 	var themeStructure ThemeStructure
-	for _, structure := range themeConfig {
+	for name, structure := range themeConfig {
+		themeName = name
 		themeStructure = structure
+		// 設置主題目錄名
+		themeStructure.Theme = name
 		break
 	}
 
 	// 驗證主題結構
 	if validate {
-		if themeStructure.Name == "" {
-			return nil, fmt.Errorf("missing name field")
-		}
-		if themeStructure.Authors == "" {
-			return nil, fmt.Errorf("missing authors field")
-		}
-		if themeStructure.Version == "" {
-			return nil, fmt.Errorf("missing version field")
-		}
-		if themeStructure.Description == "" {
-			return nil, fmt.Errorf("missing description field")
-		}
-		if themeStructure.Structure == nil {
-			return nil, fmt.Errorf("missing structure field")
+		if err := mm.ValidateThemeStructure(themeName, themeStructure); err != nil {
+			return nil, err
 		}
 	}
 
@@ -528,9 +521,14 @@ func downloadThemeFiles(baseDir string, currentPath string, structure interface{
 		for key, value := range v {
 			newPath := filepath.Join(currentPath, key)
 			dirPath := filepath.Join(baseDir, currentPath, key)
-			if err := os.MkdirAll(dirPath, 0755); err != nil {
-				return fmt.Errorf("Failed to create directory %s: %v", dirPath, err)
+			
+			// 只有當值是 map 時才創建目錄
+			if _, isMap := value.(map[string]interface{}); isMap {
+				if err := os.MkdirAll(dirPath, 0755); err != nil {
+					return fmt.Errorf("Failed to create directory %s: %v", dirPath, err)
+				}
 			}
+			
 			if err := downloadThemeFiles(baseDir, newPath, value); err != nil {
 				return err
 			}
@@ -539,6 +537,14 @@ func downloadThemeFiles(baseDir string, currentPath string, structure interface{
 		// 處理文件
 		fileURL := v
 		filePath := filepath.Join(baseDir, currentPath)
+		
+		// 確保父目錄存在
+		parentDir := filepath.Dir(filePath)
+		if err := os.MkdirAll(parentDir, 0755); err != nil {
+			return fmt.Errorf("Failed to create parent directory for %s: %v", filePath, err)
+		}
+		
+		// 下載文件
 		if err := downloadFile(fileURL, filePath); err != nil {
 			return fmt.Errorf("Failed to download file %s: %v", filePath, err)
 		}

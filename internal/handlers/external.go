@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"path/filepath"
+	"os"
+	"strings"
+	"fmt"
 
 	"github.com/gorilla/mux"
 	"github.com/OG-Open-Source/PanelBase/pkg/utils"
@@ -69,7 +72,70 @@ func (h *Handler) SetupRoutes(entry string) *mux.Router {
 	api.HandleFunc("/route/metadata", h.HandleRouteMetadata).Methods("GET")
 	api.HandleFunc("/route/delete", h.routeDeleteHandler).Methods("POST")
 
+	// 添加靜態文件服務
+	api.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 獲取當前使用的主題
+		theme := os.Getenv("THEME")
+		if theme == "" {
+			// 如果沒有設置主題，檢查是否有可用主題
+			themesDir := filepath.Join("internal", "themes")
+			entries, err := os.ReadDir(themesDir)
+			if err != nil || len(entries) == 0 {
+				http.Error(w, "No theme available", http.StatusInternalServerError)
+				return
+			}
+			// 使用第一個主題作為默認主題
+			theme = entries[0].Name()
+			// 更新 .env 文件
+			if err := h.updateEnvTheme(theme); err != nil {
+				http.Error(w, "Failed to set default theme", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		// 如果請求根路徑，重定向到 index.html
+		if r.URL.Path == "/"+entry || r.URL.Path == "/"+entry+"/" {
+			http.Redirect(w, r, "/"+entry+"/index.html", http.StatusFound)
+			return
+		}
+
+		// 從主題目錄提供文件
+		filePath := filepath.Join("internal", "themes", theme, strings.TrimPrefix(r.URL.Path, "/"+entry))
+		http.ServeFile(w, r, filePath)
+	})
+
 	return r
+}
+
+// updateEnvTheme 更新 .env 文件中的主題設置
+func (h *Handler) updateEnvTheme(theme string) error {
+	envFile := ".env"
+	
+	// 讀取當前的 .env 文件
+	content, err := os.ReadFile(envFile)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	lines := strings.Split(string(content), "\n")
+	themeFound := false
+	
+	// 更新 THEME 變量
+	for i, line := range lines {
+		if strings.HasPrefix(line, "THEME=") {
+			lines[i] = "THEME=" + theme
+			themeFound = true
+			break
+		}
+	}
+
+	// 如果沒有找到 THEME 變量，添加它
+	if !themeFound {
+		lines = append(lines, "THEME="+theme)
+	}
+
+	// 寫回文件
+	return os.WriteFile(envFile, []byte(strings.Join(lines, "\n")), 0644)
 }
 
 // executeHandler 處理執行請求
@@ -79,7 +145,7 @@ func (h *Handler) executeHandler(w http.ResponseWriter, r *http.Request) {
 	// 解析請求體
 	var req executor.ExecuteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.Error("Failed to decode request body: [%v]", err)
+		utils.Error("Failed to decode request body: '%v'", err)
 		h.respondJSON(w, Response{Status: "failure", Message: "Invalid request body"})
 		return
 	}
@@ -123,7 +189,7 @@ func (h *Handler) wsExecuteHandler(w http.ResponseWriter, r *http.Request) {
 	h.respondJSON(w, Response{Status: "success", Message: "WebSocket endpoint is ready"})
 }
 
-// 主題處理函數
+// themeInstallHandler 處理主題安裝
 func (h *Handler) themeInstallHandler(w http.ResponseWriter, r *http.Request) {
 	var req utils.ThemeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -131,9 +197,39 @@ func (h *Handler) themeInstallHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 從 URL 中提取主題配置
+	themeConfig, err := h.metadata.FetchThemeMetadata(req.URL, true)
+	if err != nil {
+		h.respondJSON(w, Response{Status: "failure", Message: err.Error()})
+		return
+	}
+
+	// 檢查主題是否已存在
+	currentConfig, err := h.metadata.LoadThemeConfig()
+	if err != nil {
+		h.respondJSON(w, Response{Status: "failure", Message: "Failed to load theme config"})
+		return
+	}
+
+	// 使用主題配置中的 theme 字段作為目錄名
+	themeDirName := themeConfig.Theme
+	if _, exists := currentConfig[themeDirName]; exists {
+		h.respondJSON(w, Response{Status: "failure", Message: fmt.Sprintf("Theme [%s] already exists", themeDirName)})
+		return
+	}
+
+	// 安裝主題
 	if err := h.themeManager.Install(req); err != nil {
 		h.respondJSON(w, Response{Status: "failure", Message: err.Error()})
 		return
+	}
+
+	// 檢查是否需要設置為默認主題
+	if os.Getenv("THEME") == "" {
+		if err := h.updateEnvTheme(themeDirName); err != nil {
+			h.respondJSON(w, Response{Status: "failure", Message: "Failed to set default theme"})
+			return
+		}
 	}
 
 	h.respondJSON(w, Response{Status: "success", Message: "Theme installed successfully"})
