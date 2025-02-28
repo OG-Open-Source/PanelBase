@@ -97,11 +97,11 @@
 						<span class="value" data-command="get_info" data-args='["load_average"]' data-interval="3000"></span>
 					</div>
 					<div class="action-buttons">
-						<button class="long-btn" data-command="get_info" data-args='["sys_update"]'>
+						<button class="long-btn" data-command="run" data-args='["apt update"]' data-modal="progressModal" data-title="系统更新">
 							<i class="fas fa-sync"></i>
 							<span>系统更新</span>
 						</button>
-						<button class="long-btn" data-command="get_info" data-args='["sys_clean"]'>
+						<button class="long-btn" data-command="run" data-args='["sys_clean"]' data-modal="progressModal" data-title="系统清理">
 							<i class="fas fa-broom"></i>
 							<span>系统清理</span>
 						</button>
@@ -374,21 +374,13 @@
 				<h3 id="modalTitle">系统更新</h3>
 			</div>
 			<div class="modal-body">
-				<div class="progress-wrapper">
-					<div class="progress-bar">
-						<div class="progress" id="modalProgress"></div>
-					</div>
-					<div class="progress-text" id="progressText">0%</div>
-				</div>
-				<div class="status-message" id="statusMessage">正在准备...</div>
+				<div class="status-message" id="statusMessage">正在执行...</div>
 				<div class="log-container" id="logContainer">
-					<!-- 日志内容将在这里动态显示 -->
+					<!-- 命令輸出將在這裡顯示 -->
 				</div>
 			</div>
 			<div class="modal-footer">
-				<button class="modal-btn" id="modalCloseBtn" style="display: none">
-					关闭
-				</button>
+				<button class="modal-btn" id="modalCloseBtn">关闭</button>
 			</div>
 		</div>
 	</div>

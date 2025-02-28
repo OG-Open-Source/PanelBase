@@ -4,6 +4,7 @@ class PanelBase {
 		this.baseUrl = 'http://192.168.1.170:8080/api';
 		this.activeRequests = new Map();
 		this.ws = null;
+		this.activeModal = null;
 		this.init();
 	}
 
@@ -45,16 +46,59 @@ class PanelBase {
 
 			const name = element.dataset.command;
 			const args = JSON.parse(element.dataset.args || '[]');
+			const modalId = element.dataset.modal;
+			const modalTitle = element.dataset.title;
 
 			if (!name) {
 				console.error('Command name is required');
 				return;
 			}
 
+			// 如果有指定模態框，則顯示它
+			if (modalId) {
+				const modal = document.getElementById(modalId);
+				const titleElement = modal.querySelector('#modalTitle');
+				const statusElement = modal.querySelector('#statusMessage');
+				const logElement = modal.querySelector('#logContainer');
+				const closeBtn = modal.querySelector('#modalCloseBtn');
+
+				if (titleElement && modalTitle) {
+					titleElement.textContent = modalTitle;
+				}
+				if (statusElement) {
+					statusElement.textContent = '正在执行...';
+				}
+				if (logElement) {
+					logElement.textContent = '';
+				}
+				if (closeBtn) {
+					closeBtn.style.display = 'none';
+				}
+
+				modal.style.display = 'block';
+
+				// 保存模態框元素以供 WebSocket 消息處理使用
+				this.activeModal = {
+					id: modalId,
+					command: args[0],
+					elements: {
+						status: statusElement,
+						log: logElement,
+						close: closeBtn
+					}
+				};
+			}
+
 			try {
 				await this.executeCommand(name, args);
 			} catch (error) {
 				console.error('Command execution failed:', error);
+				if (this.activeModal?.elements.status) {
+					this.activeModal.elements.status.textContent = '执行失败';
+				}
+				if (this.activeModal?.elements.close) {
+					this.activeModal.elements.close.style.display = 'block';
+				}
 			}
 		});
 	}
@@ -173,6 +217,43 @@ class PanelBase {
 				}
 			}
 		});
+
+		// 處理模態框顯示
+		if (this.activeModal && response.command === this.activeModal.command) {
+			const { status, log, close } = this.activeModal.elements;
+
+			if (status) {
+				// 更新狀態文本
+				status.textContent = response.status === 'success' ? '执行中...' : '执行失败';
+			}
+			
+			if (log) {
+				// 追加新的輸出到日誌容器
+				const newOutput = response.data || response.message || '';
+				if (newOutput) {
+					// 如果日誌容器為空，直接設置內容
+					if (!log.textContent) {
+						log.textContent = newOutput;
+					} else {
+						// 否則追加新行
+						log.textContent += '\n' + newOutput;
+					}
+					// 自動滾動到底部
+					log.scrollTop = log.scrollHeight;
+				}
+			}
+
+			// 只在命令完成時顯示關閉按鈕和更新最終狀態
+			if (response.status === 'success' || response.status === 'error') {
+				if (status) {
+					status.textContent = response.status === 'success' ? '执行成功' : '执行失败';
+				}
+				if (close) {
+					close.style.display = 'block';
+				}
+				this.activeModal = null;
+			}
+		}
 	}
 
 	// 清理資源
@@ -190,4 +271,15 @@ class PanelBase {
 // 當 DOM 加載完成後初始化
 document.addEventListener('DOMContentLoaded', () => {
 	window.panelbase = new PanelBase();
+
+	// 添加模態框關閉按鈕事件處理
+	const closeButtons = document.querySelectorAll('.modal .modal-btn');
+	closeButtons.forEach(button => {
+		button.addEventListener('click', () => {
+			const modal = button.closest('.modal');
+			if (modal) {
+				modal.style.display = 'none';
+			}
+		});
+	});
 }); 

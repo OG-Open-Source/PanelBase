@@ -1,7 +1,7 @@
 package executor
 
 import (
-	"bytes"
+	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
@@ -26,6 +26,7 @@ type ExecuteRequest struct {
 type Executor struct {
 	scriptsPath     string              // 腳本目錄路徑
 	routesConfig    utils.RouteConfig   // 路由配置
+	outputCallback  func(string)        // 輸出回調函數
 }
 
 // NewExecutor 創建新的執行器
@@ -44,10 +45,14 @@ func NewExecutor(scriptsPath, routesConfigPath string) *Executor {
 	}
 }
 
+// SetOutputCallback 設置輸出回調
+func (e *Executor) SetOutputCallback(callback func(string)) {
+	e.outputCallback = callback
+}
+
 // Execute 執行指令列表
 func (e *Executor) Execute(req ExecuteRequest) (string, error) {
-	var results []string
-	var lastOutput string
+	var output strings.Builder
 
 	utils.Debug("Starting execution of [%d] commands", len(req.Commands))
 
@@ -73,7 +78,7 @@ func (e *Executor) Execute(req ExecuteRequest) (string, error) {
 
 		// 複製腳本到沙盒並處理變量
 		sandboxScript := filepath.Join(tmpDir, scriptName)
-		if err := copyAndProcessScript(originalScript, sandboxScript, cmd.Args, lastOutput); err != nil {
+		if err := copyAndProcessScript(originalScript, sandboxScript, cmd.Args, ""); err != nil {
 			return "", fmt.Errorf("Failed to prepare script: '%v'", err)
 		}
 
@@ -93,29 +98,37 @@ func (e *Executor) Execute(req ExecuteRequest) (string, error) {
 		// 設置工作目錄為沙盒目錄
 		execCmd.Dir = tmpDir
 
-		// 捕獲輸出
-		var stdout, stderr bytes.Buffer
-		execCmd.Stdout = &stdout
-		execCmd.Stderr = &stderr
-
-		// 執行指令
-		if err := execCmd.Run(); err != nil {
-			return "", fmt.Errorf("Failed to execute route [%s] (script: '%s'): '%v'\nStderr: '%s'", 
-				cmd.Name, scriptName, err, stderr.String())
+		// 創建管道來捕獲輸出
+		stdout, err := execCmd.StdoutPipe()
+		if err != nil {
+			return "", err
 		}
 
-		// 保存輸出
-		output := stdout.String()
-		lastOutput = output
-		results = append(results, output)
+		if err := execCmd.Start(); err != nil {
+			return "", err
+		}
+
+		// 實時讀取輸出
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			line := scanner.Text() + "\n"
+			output.WriteString(line)
+			
+			// 如果設置了回調，則調用它
+			if e.outputCallback != nil {
+				e.outputCallback(line)
+			}
+		}
+
+		if err := execCmd.Wait(); err != nil {
+			return "", err
+		}
 
 		utils.Debug("Command [%d] completed successfully", i+1)
 	}
 
-	// 合併所有輸出
-	finalOutput := strings.Join(results, "\n")
 	utils.Debug("All commands completed successfully")
-	return finalOutput, nil
+	return output.String(), nil
 }
 
 // copyAndProcessScript 複製腳本到沙盒並處理變量

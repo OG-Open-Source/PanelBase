@@ -7,6 +7,25 @@ import (
 	"sync"
 )
 
+// WebSocket 相關類型定義
+type WebSocketMessage struct {
+	Status  string `json:"status"`  // success, failure, running 等
+	Message string `json:"message"` // 消息文本
+	Data    string `json:"data"`    // 數據內容
+	Command string `json:"command"` // 命令名稱
+}
+
+// CommandRequest 命令請求結構
+type CommandRequest struct {
+	Commands []Command `json:"commands"`
+}
+
+// Command 命令結構
+type Command struct {
+	Name string   `json:"name"`
+	Args []string `json:"args"`
+}
+
 // WebSocketManager 管理 WebSocket 連接
 type WebSocketManager struct {
 	// 升級器用於將 HTTP 連接升級為 WebSocket
@@ -15,14 +34,6 @@ type WebSocketManager struct {
 	connections map[*websocket.Conn]*sync.Mutex
 	// 互斥鎖保護連接映射
 	mutex sync.RWMutex
-}
-
-// WebSocketMessage WebSocket 消息結構
-type WebSocketMessage struct {
-	Status  string      `json:"status"`            // 狀態：success 或 error
-	Message string      `json:"message,omitempty"` // 消息內容
-	Data    interface{} `json:"data,omitempty"`    // 數據
-	Command string      `json:"command,omitempty"` // 命令參數
 }
 
 // NewWebSocketManager 創建新的 WebSocket 管理器

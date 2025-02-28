@@ -166,58 +166,56 @@ func (h *Handler) updateEnvTheme(theme string) error {
 
 // executeHandler 處理執行請求
 func (h *Handler) executeHandler(w http.ResponseWriter, r *http.Request) {
-	utils.Debug("Handling execute request")
-
-	// 解析請求體
-	var req executor.ExecuteRequest
+	var req utils.CommandRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.Error("Failed to decode request body: '%v'", err)
 		h.respondJSON(w, Response{Status: "failure", Message: "Invalid request body"})
 		return
 	}
 
-	// 檢查請求是否為空
-	if len(req.Commands) == 0 {
-		utils.Warn("Empty commands list received")
-		h.respondJSON(w, Response{Status: "failure", Message: "No commands provided"})
-		return
-	}
-
-	// 創建執行器，傳入腳本目錄和路由配置文件路徑
+	// 創建命令執行器，使用默認的腳本和路由配置路徑
 	scriptsPath := filepath.Join("internal", "scripts")
 	routesConfigPath := filepath.Join("internal", "configs", "routes.json")
 	exec := executor.NewExecutor(scriptsPath, routesConfigPath)
-
-	// 檢查執行器是否創建成功
-	if exec == nil {
-		utils.Error("Failed to create executor")
-		h.respondJSON(w, Response{Status: "failure", Message: "Internal server error"})
-		return
-	}
-
-	// 執行指令
-	output, err := exec.Execute(req)
-	if err != nil {
-		utils.Error("Execution failed: '%v'", err)
-		h.respondJSON(w, Response{Status: "failure", Message: err.Error()})
-		return
-	}
-
-	// 通過 WebSocket 發送執行結果
-	if len(req.Commands) > 0 {
+	
+	// 設置輸出回調
+	exec.SetOutputCallback(func(output string) {
+		// 實時發送命令輸出
 		h.wsManager.Broadcast(utils.WebSocketMessage{
-			Status:  "success",
-			Message: "Command executed successfully",
+			Status:  "running",
 			Data:    output,
 			Command: req.Commands[0].Args[0],
 		})
+	})
+
+	// 轉換請求格式
+	execReq := executor.ExecuteRequest{
+		Commands: make([]executor.Command, len(req.Commands)),
+	}
+	for i, cmd := range req.Commands {
+		execReq.Commands[i] = executor.Command{
+			Name: cmd.Name,
+			Args: cmd.Args,
+		}
 	}
 
-	// 返回 HTTP 響應
-	h.respondJSON(w, Response{
+	// 執行命令
+	output, err := exec.Execute(execReq)
+	
+	// 發送最終結果
+	if err != nil {
+		h.wsManager.Broadcast(utils.WebSocketMessage{
+			Status:  "failure",
+			Message: err.Error(),
+			Command: req.Commands[0].Args[0],
+		})
+		return
+	}
+
+	h.wsManager.Broadcast(utils.WebSocketMessage{
 		Status:  "success",
-		Message: "Commands executed successfully",
+		Message: "Command executed successfully",
 		Data:    output,
+		Command: req.Commands[0].Args[0],
 	})
 }
 
