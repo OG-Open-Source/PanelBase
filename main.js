@@ -1,7 +1,7 @@
 // PanelBase API 管理類
 class PanelBase {
 	constructor() {
-		this.baseUrl = 'http://192.168.1.170:8080/api';
+		this.baseUrl = 'http://IP:PORT/ENTRY';
 		this.activeRequests = new Map();
 		this.ws = null;
 		this.activeModal = null;
@@ -22,7 +22,7 @@ class PanelBase {
 		document.querySelectorAll('[data-command]').forEach(element => {
 			const interval = parseInt(element.dataset.interval);
 			const maxCalls = parseInt(element.dataset.maxCalls);
-			
+
 			if (interval || (maxCalls === 1)) {
 				this.setupActiveRequest(element, interval, maxCalls);
 			} else {
@@ -58,15 +58,11 @@ class PanelBase {
 			if (modalId) {
 				const modal = document.getElementById(modalId);
 				const titleElement = modal.querySelector('#modalTitle');
-				const statusElement = modal.querySelector('#statusMessage');
 				const logElement = modal.querySelector('#logContainer');
 				const closeBtn = modal.querySelector('#modalCloseBtn');
 
 				if (titleElement && modalTitle) {
 					titleElement.textContent = modalTitle;
-				}
-				if (statusElement) {
-					statusElement.textContent = '正在执行...';
 				}
 				if (logElement) {
 					logElement.textContent = '';
@@ -82,7 +78,6 @@ class PanelBase {
 					id: modalId,
 					command: args[0],
 					elements: {
-						status: statusElement,
 						log: logElement,
 						close: closeBtn
 					}
@@ -93,9 +88,6 @@ class PanelBase {
 				await this.executeCommand(name, args);
 			} catch (error) {
 				console.error('Command execution failed:', error);
-				if (this.activeModal?.elements.status) {
-					this.activeModal.elements.status.textContent = '执行失败';
-				}
 				if (this.activeModal?.elements.close) {
 					this.activeModal.elements.close.style.display = 'block';
 				}
@@ -156,28 +148,25 @@ class PanelBase {
 	// WebSocket 連接
 	connectWebSocket() {
 		const ws = new WebSocket(`ws://${this.baseUrl.replace('http://', '')}/ws-execute`);
-		
+
 		ws.onopen = () => {
 			console.log('WebSocket connected');
 		};
-		
+
 		ws.onmessage = (event) => {
 			try {
 				const response = JSON.parse(event.data);
 				console.log('WebSocket message:', response);
-				
-				// 處理 WebSocket 消息
 				this.handleWebSocketMessage(response);
-				
 			} catch (error) {
 				console.error('Failed to parse WebSocket message:', error);
 			}
 		};
-		
+
 		ws.onerror = (error) => {
 			console.error('WebSocket error:', error);
 		};
-		
+
 		ws.onclose = () => {
 			console.log('WebSocket closed');
 			setTimeout(() => this.initWebSocket(), 5000);
@@ -188,6 +177,8 @@ class PanelBase {
 
 	// 處理 WebSocket 消息
 	handleWebSocketMessage(response) {
+		console.log('WebSocket message:', response);
+
 		// 查找所有帶有 data-command 的元素
 		document.querySelectorAll('[data-command]').forEach(element => {
 			const command = element.dataset.command;
@@ -220,13 +211,8 @@ class PanelBase {
 
 		// 處理模態框顯示
 		if (this.activeModal && response.command === this.activeModal.command) {
-			const { status, log, close } = this.activeModal.elements;
+			const { log, close } = this.activeModal.elements;
 
-			if (status) {
-				// 更新狀態文本
-				status.textContent = response.status === 'success' ? '执行中...' : '执行失败';
-			}
-			
 			if (log) {
 				// 追加新的輸出到日誌容器
 				const newOutput = response.data || response.message || '';
@@ -243,11 +229,8 @@ class PanelBase {
 				}
 			}
 
-			// 只在命令完成時顯示關閉按鈕和更新最終狀態
+			// 命令完成時
 			if (response.status === 'success' || response.status === 'error') {
-				if (status) {
-					status.textContent = response.status === 'success' ? '执行成功' : '执行失败';
-				}
 				if (close) {
 					close.style.display = 'block';
 				}

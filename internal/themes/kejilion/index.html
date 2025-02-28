@@ -78,30 +78,37 @@
 					</div>
 					<div class="info-item">
 						<span class="label">CPU使用率:</span>
-						<span class="value" data-command="get_info" data-args='["cpu_usage"]' data-interval="3000"></span>
+						<span class="value" data-command="get_info" data-args='["cpu_usage"]'
+							data-interval="3000"></span>
 					</div>
 					<div class="info-item">
 						<span class="label">内存使用:</span>
-						<span class="value" data-command="get_info" data-args='["mem_usage"]' data-interval="3000"></span>
+						<span class="value" data-command="get_info" data-args='["mem_usage"]'
+							data-interval="3000"></span>
 					</div>
 					<div class="info-item">
 						<span class="label">虚拟内存:</span>
-						<span class="value" data-command="get_info" data-args='["swap_usage"]' data-interval="3000"></span>
+						<span class="value" data-command="get_info" data-args='["swap_usage"]'
+							data-interval="3000"></span>
 					</div>
 					<div class="info-item">
 						<span class="label">磁盘使用:</span>
-						<span class="value" data-command="get_info" data-args='["disk_usage"]' data-interval="5000"></span>
+						<span class="value" data-command="get_info" data-args='["disk_usage"]'
+							data-interval="5000"></span>
 					</div>
 					<div class="info-item">
 						<span class="label">系统负载:</span>
-						<span class="value" data-command="get_info" data-args='["load_average"]' data-interval="3000"></span>
+						<span class="value" data-command="get_info" data-args='["load_average"]'
+							data-interval="3000"></span>
 					</div>
 					<div class="action-buttons">
-						<button class="long-btn" data-command="run" data-args='["apt update"]' data-modal="progressModal" data-title="系统更新">
+						<button class="long-btn" data-command="run" data-args='["apt update"]'
+							data-modal="progressModal" data-title="系统更新">
 							<i class="fas fa-sync"></i>
 							<span>系统更新</span>
 						</button>
-						<button class="long-btn" data-command="run" data-args='["sys_clean"]' data-modal="progressModal" data-title="系统清理">
+						<button class="long-btn" data-command="run" data-args='["sys_clean"]' data-modal="progressModal"
+							data-title="系统清理">
 							<i class="fas fa-broom"></i>
 							<span>系统清理</span>
 						</button>
@@ -365,16 +372,15 @@
 			</div>
 		</div>
 	</div>
-	<script src="script.js"></script>
-	<script src="nav.js"></script>
-	<script src="js/panelbase.js"></script>
+	<script src="js/script.js"></script>
+	<script src="js/nav.js"></script>
+	<script src="main.js"></script>
 	<div class="modal" id="progressModal">
 		<div class="modal-content">
 			<div class="modal-header">
-				<h3 id="modalTitle">系统更新</h3>
+				<h3 id="modalTitle">执行命令</h3>
 			</div>
 			<div class="modal-body">
-				<div class="status-message" id="statusMessage">正在执行...</div>
 				<div class="log-container" id="logContainer">
 					<!-- 命令輸出將在這裡顯示 -->
 				</div>

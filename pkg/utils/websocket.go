@@ -2,8 +2,11 @@ package utils
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gorilla/websocket"
 	"net/http"
+	"os"
+	"strings"
 	"sync"
 )
 
@@ -26,7 +29,7 @@ type Command struct {
 	Args []string `json:"args"`
 }
 
-// WebSocketManager 管理 WebSocket 連接
+// WebSocketManager WebSocket 管理器
 type WebSocketManager struct {
 	// 升級器用於將 HTTP 連接升級為 WebSocket
 	upgrader websocket.Upgrader
@@ -34,18 +37,75 @@ type WebSocketManager struct {
 	connections map[*websocket.Conn]*sync.Mutex
 	// 互斥鎖保護連接映射
 	mutex sync.RWMutex
+	baseURL string
 }
 
 // NewWebSocketManager 創建新的 WebSocket 管理器
 func NewWebSocketManager() *WebSocketManager {
-	return &WebSocketManager{
+	// 從環境變量讀取配置
+	ip := os.Getenv("IP")
+	if ip == "" {
+		Error("Environment variable 'IP' is not set")
+		return nil
+	}
+	
+	port := os.Getenv("PORT")
+	if port == "" {
+		Error("Environment variable 'PORT' is not set")
+		return nil
+	}
+	
+	entry := os.Getenv("ENTRY")
+	if entry == "" {
+		Error("Environment variable 'ENTRY' is not set")
+		return nil
+	}
+
+	// 構建基礎 URL
+	baseURL := fmt.Sprintf("http://%s:%s/%s", ip, port, entry)
+
+	// 創建 WebSocket 管理器
+	manager := &WebSocketManager{
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
-				return true // 允許所有來源
+				return true
 			},
 		},
 		connections: make(map[*websocket.Conn]*sync.Mutex),
+		baseURL:     baseURL,
 	}
+
+	// 生成 main.js 文件
+	if err := manager.generateMainJS(); err != nil {
+		Error("Failed to generate main.js: %v", err)
+		return nil
+	}
+
+	return manager
+}
+
+// generateMainJS 生成 main.js 文件
+func (m *WebSocketManager) generateMainJS() error {
+	// 讀取原始的 main.js
+	content, err := os.ReadFile("main.js")
+	if err != nil {
+		return fmt.Errorf("failed to read main.js: %v", err)
+	}
+
+	// 替換 baseUrl
+	processed := strings.Replace(
+		string(content),
+		`this.baseUrl = 'http://IP:PORT/ENTRY';`,
+		fmt.Sprintf(`this.baseUrl = '%s';`, m.baseURL),
+		1,
+	)
+
+	// 寫入回原始文件
+	if err := os.WriteFile("main.js", []byte(processed), 0644); err != nil {
+		return fmt.Errorf("failed to write main.js: %v", err)
+	}
+
+	return nil
 }
 
 // HandleConnection 處理新的 WebSocket 連接

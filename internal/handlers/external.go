@@ -62,6 +62,10 @@ type Response struct {
 // SetupRoutes 設置所有路由
 func (h *Handler) SetupRoutes(entry string) *mux.Router {
 	r := mux.NewRouter()
+	
+	// 添加根目錄的 main.js 路由
+	r.HandleFunc("/main.js", h.mainJSHandler).Methods("GET")
+
 	api := r.PathPrefix("/" + entry).Subrouter()
 
 	// 連接測試
@@ -123,7 +127,13 @@ func (h *Handler) SetupRoutes(entry string) *mux.Router {
 		}
 		utils.Debug("Processed path: %s", path)
 
-		// 從主題目錄提供文件
+		// 如果請求的是 main.js，直接使用根目錄的文件
+		if strings.HasSuffix(path, "/main.js") {
+			http.ServeFile(w, r, "main.js")
+			return
+		}
+
+		// 從主題目錄提供其他文件
 		filePath := filepath.Join("internal", "themes", theme, strings.TrimPrefix(path, "/"))
 		utils.Debug("Serving file: %s", filePath)
 
@@ -440,4 +450,18 @@ func (h *Handler) HandleThemeMetadata(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleConnect(w http.ResponseWriter, r *http.Request) {
 	utils.Debug("Handling connect request")
 	h.respondJSON(w, Response{Status: "success", Message: "Connected successfully"})
+}
+
+// mainJSHandler 處理 main.js 請求
+func (h *Handler) mainJSHandler(w http.ResponseWriter, r *http.Request) {
+	// 讀取根目錄的 main.js 文件
+	content, err := os.ReadFile("main.js")
+	if err != nil {
+		h.respondJSON(w, Response{Status: "failure", Message: "Failed to read main.js"})
+		return
+	}
+
+	// 設置正確的 Content-Type
+	w.Header().Set("Content-Type", "application/javascript")
+	w.Write(content)
 }

@@ -1,4 +1,4 @@
 {
-  "get_info": "info.sh",
-  "run": "run.sh"
+	"get_info": "info.sh",
+	"run": "run.sh"
 }
