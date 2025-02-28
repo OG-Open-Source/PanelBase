@@ -617,7 +617,7 @@ function submitSwapSize() {
 }
 
 // 点击模态框外部关闭
-window.onclick = function(event) {
+window.onclick = function (event) {
     const modal = document.getElementById('swapModal');
     if (event.target === modal) {
         closeSwapModal();

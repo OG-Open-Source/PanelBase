@@ -17,14 +17,24 @@ type Handler struct {
 	routeManager *utils.RouteManager
 	themeManager *utils.ThemeManager
 	metadata     *utils.MetadataManager
+	wsManager    *utils.WebSocketManager
 }
 
 // NewHandler 創建新的處理器
 func NewHandler(configPath string) *Handler {
+	// 打印路徑以進行調試
+	utils.Debug("Config path: '%s'", configPath)
+	
 	scriptsPath := filepath.Join("internal", "scripts")
 	themesPath := filepath.Join("internal", "themes")
 	routesConfigPath := filepath.Join(configPath, "routes.json")
 	themesConfigPath := filepath.Join(configPath, "themes.json")
+
+	// 打印所有路徑以進行調試
+	utils.Debug("Scripts path: '%s'", scriptsPath)
+	utils.Debug("Themes path: '%s'", themesPath)
+	utils.Debug("Routes config path: '%s'", routesConfigPath)
+	utils.Debug("Themes config path: '%s'", themesConfigPath)
 
 	// 創建 MetadataManager
 	metadata := utils.NewMetadataManager(
@@ -38,6 +48,7 @@ func NewHandler(configPath string) *Handler {
 		routeManager: utils.NewRouteManager(routesConfigPath, scriptsPath),
 		themeManager: utils.NewThemeManager(themesConfigPath, themesPath),
 		metadata:     metadata,
+		wsManager:    utils.NewWebSocketManager(),
 	}
 }
 
@@ -72,35 +83,50 @@ func (h *Handler) SetupRoutes(entry string) *mux.Router {
 	api.HandleFunc("/route/metadata", h.HandleRouteMetadata).Methods("GET")
 	api.HandleFunc("/route/delete", h.routeDeleteHandler).Methods("POST")
 
-	// 添加靜態文件服務
+	// 靜態文件服務
 	api.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		utils.Debug("Handling static file request: %s", r.URL.Path)
+		
 		// 獲取當前使用的主題
 		theme := os.Getenv("THEME")
+		utils.Debug("Current theme: %s", theme)
+		
 		if theme == "" {
 			// 如果沒有設置主題，檢查是否有可用主題
 			themesDir := filepath.Join("internal", "themes")
 			entries, err := os.ReadDir(themesDir)
-			if err != nil || len(entries) == 0 {
+			if err != nil {
+				utils.Error("Failed to read themes directory: %v", err)
+				http.Error(w, "No theme available", http.StatusInternalServerError)
+				return
+			}
+			if len(entries) == 0 {
+				utils.Error("No themes found in directory")
 				http.Error(w, "No theme available", http.StatusInternalServerError)
 				return
 			}
 			// 使用第一個主題作為默認主題
 			theme = entries[0].Name()
+			utils.Debug("Using default theme: %s", theme)
 			// 更新 .env 文件
 			if err := h.updateEnvTheme(theme); err != nil {
+				utils.Error("Failed to set default theme: %v", err)
 				http.Error(w, "Failed to set default theme", http.StatusInternalServerError)
 				return
 			}
 		}
 
-		// 如果請求根路徑，重定向到 index.html
-		if r.URL.Path == "/"+entry || r.URL.Path == "/"+entry+"/" {
-			http.Redirect(w, r, "/"+entry+"/index.html", http.StatusFound)
-			return
+		// 處理根路徑請求
+		path := strings.TrimPrefix(r.URL.Path, "/"+entry)
+		if path == "" || path == "/" {
+			path = "/index.html"
 		}
+		utils.Debug("Processed path: %s", path)
 
 		// 從主題目錄提供文件
-		filePath := filepath.Join("internal", "themes", theme, strings.TrimPrefix(r.URL.Path, "/"+entry))
+		filePath := filepath.Join("internal", "themes", theme, strings.TrimPrefix(path, "/"))
+		utils.Debug("Serving file: %s", filePath)
+
 		http.ServeFile(w, r, filePath)
 	})
 
@@ -177,7 +203,17 @@ func (h *Handler) executeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 返回成功結果
+	// 通過 WebSocket 發送執行結果
+	if len(req.Commands) > 0 {
+		h.wsManager.Broadcast(utils.WebSocketMessage{
+			Status:  "success",
+			Message: "Command executed successfully",
+			Data:    output,
+			Command: req.Commands[0].Args[0],
+		})
+	}
+
+	// 返回 HTTP 響應
 	h.respondJSON(w, Response{
 		Status:  "success",
 		Message: "Commands executed successfully",
@@ -186,7 +222,10 @@ func (h *Handler) executeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) wsExecuteHandler(w http.ResponseWriter, r *http.Request) {
-	h.respondJSON(w, Response{Status: "success", Message: "WebSocket endpoint is ready"})
+	if err := h.wsManager.HandleConnection(w, r); err != nil {
+		utils.Error("WebSocket connection failed: %v", err)
+		return
+	}
 }
 
 // themeInstallHandler 處理主題安裝
@@ -224,12 +263,10 @@ func (h *Handler) themeInstallHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 檢查是否需要設置為默認主題
-	if os.Getenv("THEME") == "" {
-		if err := h.updateEnvTheme(themeDirName); err != nil {
-			h.respondJSON(w, Response{Status: "failure", Message: "Failed to set default theme"})
-			return
-		}
+	// 更新 .env 文件中的主題設置
+	if err := h.updateEnvTheme(themeDirName); err != nil {
+		h.respondJSON(w, Response{Status: "failure", Message: "Failed to update theme in .env"})
+		return
 	}
 
 	h.respondJSON(w, Response{Status: "success", Message: "Theme installed successfully"})

@@ -1,4 +1,4 @@
 {
-  "get-time": "time.go",
+  "get_info": "info.sh",
   "run": "run.sh"
 }

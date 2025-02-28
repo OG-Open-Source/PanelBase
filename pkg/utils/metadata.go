@@ -142,16 +142,71 @@ func (mm *MetadataManager) SaveRouteConfig(config RouteConfig) error {
 
 // LoadThemeConfig 載入主題配置
 func (mm *MetadataManager) LoadThemeConfig() (ThemeConfig, error) {
+	// 獲取當前工作目錄
+	cwd, err := os.Getwd()
+	Debug("Current working directory: '%s'", cwd)
+	Debug("Loading theme config from: '%s'", mm.themesConfigPath)
+
+	// 檢查配置路徑
+	if mm.themesConfigPath == "" {
+		return nil, fmt.Errorf("Theme config path is empty")
+	}
+
+	// 檢查文件是否存在
+	fileInfo, err := os.Stat(mm.themesConfigPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			Debug("Theme config file does not exist at: '%s'", mm.themesConfigPath)
+			// 如果文件不存在，創建一個空的配置
+			emptyConfig := make(ThemeConfig)
+			if err := mm.SaveThemeConfig(emptyConfig); err != nil {
+				return nil, fmt.Errorf("Failed to create empty theme config at '%s': %v", mm.themesConfigPath, err)
+			}
+			return emptyConfig, nil
+		}
+		return nil, fmt.Errorf("Failed to stat theme config file: '%v'", err)
+	}
+
+	Debug("Theme config file size: %d bytes", fileInfo.Size())
+
+	// 讀取配置文件
 	data, err := os.ReadFile(mm.themesConfigPath)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to read themes config: '%v'", err)
+		return nil, fmt.Errorf("Failed to read themes config from '%s': %v", mm.themesConfigPath, err)
 	}
 
-	var config ThemeConfig
-	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("Failed to parse themes config: '%v'", err)
+	Debug("Read %d bytes from theme config file", len(data))
+	Debug("File content: '%s'", string(data))
+
+	// 首先解析為通用的 map 結構
+	var rawConfig map[string]map[string]interface{}
+	if err := json.Unmarshal(data, &rawConfig); err != nil {
+		Debug("Failed to parse JSON: '%v'", err)
+		return nil, fmt.Errorf("Failed to parse themes config from '%s': %v", mm.themesConfigPath, err)
 	}
 
+	// 轉換為 ThemeConfig
+	config := make(ThemeConfig)
+	for themeName, rawTheme := range rawConfig {
+		// 只處理有效的主題配置
+		if rawTheme["name"] != nil && rawTheme["authors"] != nil && 
+		   rawTheme["version"] != nil && rawTheme["description"] != nil {
+			theme := ThemeStructure{
+				Name:        rawTheme["name"].(string),
+				Authors:     rawTheme["authors"].(string),
+				Version:     rawTheme["version"].(string),
+				Description: rawTheme["description"].(string),
+			}
+			
+			// 處理 structure 字段
+			if structure, ok := rawTheme["structure"].(map[string]interface{}); ok {
+				theme.Structure = structure
+				config[themeName] = theme
+			}
+		}
+	}
+
+	Debug("Successfully loaded theme config with %d themes", len(config))
 	return config, nil
 }
 
@@ -281,22 +336,24 @@ func parseRouteMetadata(reader io.Reader) (*RouteMetadata, error) {
 
 // FetchThemeMetadata 獲取主題元數據
 func (mm *MetadataManager) FetchThemeMetadata(url string, validate bool) (*ThemeStructure, error) {
+	Debug("Fetching theme metadata from URL: '%s'", url)
+	
 	// 下載主題配置
 	resp, err := http.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to download theme metadata: '%v'", err)
+		return nil, NewErrorFailedToDownloadTheme(err)
 	}
 	defer resp.Body.Close()
 
 	// 解析主題配置
 	var themeConfig map[string]ThemeStructure
 	if err := json.NewDecoder(resp.Body).Decode(&themeConfig); err != nil {
-		return nil, fmt.Errorf("Failed to parse theme metadata: '%v'", err)
+		return nil, NewErrorFailedToParseThemeMetadata(err)
 	}
 
 	// 確保只有一個主題
 	if len(themeConfig) != 1 {
-		return nil, fmt.Errorf("Theme config must contain exactly one theme")
+		return nil, NewErrorInvalidThemeMetadata("Theme config must contain exactly one theme")
 	}
 
 	// 獲取主題名稱和結構
@@ -306,9 +363,12 @@ func (mm *MetadataManager) FetchThemeMetadata(url string, validate bool) (*Theme
 		themeName = name
 		themeStructure = structure
 		// 設置主題目錄名
-		themeStructure.Theme = name
+		themeStructure.Theme = themeName
 		break
 	}
+
+	Debug("Theme name: '%s'", themeName)
+	Debug("Theme structure: %+v", themeStructure)
 
 	// 驗證主題結構
 	if validate {
@@ -371,6 +431,8 @@ func (mm *MetadataManager) InstallRoute(url string) error {
 
 // InstallTheme 安裝主題
 func (mm *MetadataManager) InstallTheme(themeURL string) error {
+	Debug("Installing theme from URL: '%s'", themeURL)
+	
 	// 下載主題配置
 	resp, err := http.Get(themeURL)
 	if err != nil {
@@ -395,22 +457,49 @@ func (mm *MetadataManager) InstallTheme(themeURL string) error {
 	for name, structure := range themeConfig {
 		themeName = name
 		themeStructure = structure
+		// 設置主題目錄名
+		themeStructure.Theme = themeName
 		break
 	}
 
+	Debug("Installing theme: '%s'", themeName)
+
+	// 載入當前配置
+	currentConfig, err := mm.LoadThemeConfig()
+	if err != nil {
+		return fmt.Errorf("Failed to load current theme config: '%v'", err)
+	}
+
+	// 檢查主題是否已存在於配置中
+	if _, exists := currentConfig[themeName]; exists {
+		// 如果存在於配置中，先刪除舊的主題目錄
+		themeDir := filepath.Join(mm.themesPath, themeName)
+		if err := os.RemoveAll(themeDir); err != nil {
+			return fmt.Errorf("Failed to remove existing theme directory: '%v'", err)
+		}
+		Debug("Removed existing theme directory: '%s'", themeDir)
+	}
+
 	// 創建主題目錄
-	themeDir := filepath.Join("internal", "themes", themeName)
+	themeDir := filepath.Join(mm.themesPath, themeName)
 	if err := os.MkdirAll(themeDir, 0755); err != nil {
 		return NewErrorFailedToCreateThemeDirectory(err)
 	}
 
+	Debug("Created theme directory: '%s'", themeDir)
+
 	// 下載並安裝文件
 	if err := downloadThemeFiles(themeDir, "", themeStructure.Structure); err != nil {
+		// 如果下載失敗，清理已創建的目錄
+		os.RemoveAll(themeDir)
 		return err
 	}
 
+	Debug("Downloaded theme files successfully")
+
 	// 更新主題配置
-	return mm.SaveThemeConfig(themeConfig)
+	currentConfig[themeName] = themeStructure
+	return mm.SaveThemeConfig(currentConfig)
 }
 
 // DeleteRoute 刪除路由
@@ -464,9 +553,12 @@ func (mm *MetadataManager) DeleteTheme(name string) error {
 
 // ValidateThemeStructure 驗證主題結構
 func (mm *MetadataManager) ValidateThemeStructure(themeName string, structure ThemeStructure) error {
+	// 驗證主題名稱格式
 	if !regexp.MustCompile(`^[a-z0-9_-]+$`).MatchString(themeName) {
 		return fmt.Errorf("Invalid theme name format: '%s'", themeName)
 	}
+
+	// 驗證必要字段
 	if structure.Name == "" {
 		return fmt.Errorf("missing name field")
 	}
@@ -483,29 +575,25 @@ func (mm *MetadataManager) ValidateThemeStructure(themeName string, structure Th
 		return fmt.Errorf("missing structure field")
 	}
 
-	// 獲取主題目錄
-	themeDir := filepath.Join("internal", "themes", themeName)
-	
-	// 遍歷結構並驗證
-	return validateStructure(themeDir, "", structure.Structure)
+	// 驗證結構格式
+	return validateStructureFormat("", structure.Structure)
 }
 
-// validateStructure 遞歸驗證結構
-func validateStructure(baseDir string, currentPath string, structure interface{}) error {
+// validateStructureFormat 只驗證結構格式，不檢查文件是否存在
+func validateStructureFormat(currentPath string, structure interface{}) error {
 	switch v := structure.(type) {
 	case map[string]interface{}:
 		// 處理目錄
 		for key, value := range v {
 			newPath := filepath.Join(currentPath, key)
-			if err := validateStructure(baseDir, newPath, value); err != nil {
+			if err := validateStructureFormat(newPath, value); err != nil {
 				return err
 			}
 		}
 	case string:
-		// 處理文件
-		fullPath := filepath.Join(baseDir, currentPath)
-		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-			return fmt.Errorf("Missing required file: %s", fullPath)
+		// 驗證 URL 格式
+		if !strings.HasPrefix(v, "http://") && !strings.HasPrefix(v, "https://") {
+			return fmt.Errorf("Invalid URL format for path %s: %s", currentPath, v)
 		}
 	default:
 		return fmt.Errorf("Invalid structure type for path %s", currentPath)
