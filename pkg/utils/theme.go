@@ -24,16 +24,19 @@ func NewThemeManager(themesConfigPath, themesPath string) *ThemeManager {
 
 // Install 安裝新主題
 func (tm *ThemeManager) Install(req ThemeRequest) error {
+	Info("Installing theme from URL: '%s'", req.URL)
 	return tm.metadata.InstallTheme(req.URL)
 }
 
 // Update 更新主題
 func (tm *ThemeManager) Update(req ThemeRequest) error {
-	return tm.metadata.InstallTheme(req.URL) // 使用相同的安裝邏輯
+	Info("Updating theme from URL: '%s'", req.URL)
+	return tm.metadata.InstallTheme(req.URL)
 }
 
 // Delete 刪除主題
 func (tm *ThemeManager) Delete(req ThemeRequest) error {
+	Info("Deleting theme: '%s'", req.Name)
 	return tm.metadata.DeleteTheme(req.Name)
 }
 
@@ -49,20 +52,20 @@ func NewErrorWithFormat(format string, args ...interface{}) error {
 
 // NewErrorThemeAlreadyExists 創建主題已存在的錯誤
 func NewErrorThemeAlreadyExists(theme string) error {
-	return fmt.Errorf("Theme %s already exists", theme)
+	return fmt.Errorf("Theme [%s] already exists", theme)
 }
 
 // NewErrorThemeNotFound 創建主題未找到的錯誤
 func NewErrorThemeNotFound(theme string) error {
-	return fmt.Errorf("Theme %s not found", theme)
+	return fmt.Errorf("Theme [%s] not found", theme)
 }
 
 // NewErrorFailedToDeleteThemeDirectory 創建刪除主題目錄失敗的錯誤
 func NewErrorFailedToDeleteThemeDirectory(err error) error {
-	return fmt.Errorf("Failed to delete theme directory: %v", err)
+	return fmt.Errorf("Failed to delete theme directory: '%v'", err)
 }
 
 // NewErrorFailedToValidateThemeMetadata 創建驗證主題元數據失敗的錯誤
 func NewErrorFailedToValidateThemeMetadata(err error) error {
-	return fmt.Errorf("Failed to validate theme metadata: %v", err)
+	return fmt.Errorf("Failed to validate theme metadata: '%v'", err)
 }

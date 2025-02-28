@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/OG-Open-Source/PanelBase/pkg/utils"
+	"github.com/OG-Open-Source/PanelBase/pkg/executor"
 )
 
 type Handler struct {
@@ -71,9 +72,51 @@ func (h *Handler) SetupRoutes(entry string) *mux.Router {
 	return r
 }
 
-// 處理函數佔位符
+// executeHandler 處理執行請求
 func (h *Handler) executeHandler(w http.ResponseWriter, r *http.Request) {
-	h.respondJSON(w, Response{Status: "success", Message: "Execute endpoint is ready"})
+	utils.Debug("Handling execute request")
+
+	// 解析請求體
+	var req executor.ExecuteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.Error("Failed to decode request body: [%v]", err)
+		h.respondJSON(w, Response{Status: "failure", Message: "Invalid request body"})
+		return
+	}
+
+	// 檢查請求是否為空
+	if len(req.Commands) == 0 {
+		utils.Warn("Empty commands list received")
+		h.respondJSON(w, Response{Status: "failure", Message: "No commands provided"})
+		return
+	}
+
+	// 創建執行器，傳入腳本目錄和路由配置文件路徑
+	scriptsPath := filepath.Join("internal", "scripts")
+	routesConfigPath := filepath.Join("internal", "configs", "routes.json")
+	exec := executor.NewExecutor(scriptsPath, routesConfigPath)
+
+	// 檢查執行器是否創建成功
+	if exec == nil {
+		utils.Error("Failed to create executor")
+		h.respondJSON(w, Response{Status: "failure", Message: "Internal server error"})
+		return
+	}
+
+	// 執行指令
+	output, err := exec.Execute(req)
+	if err != nil {
+		utils.Error("Execution failed: '%v'", err)
+		h.respondJSON(w, Response{Status: "failure", Message: err.Error()})
+		return
+	}
+
+	// 返回成功結果
+	h.respondJSON(w, Response{
+		Status:  "success",
+		Message: "Commands executed successfully",
+		Data:    output,
+	})
 }
 
 func (h *Handler) wsExecuteHandler(w http.ResponseWriter, r *http.Request) {
@@ -180,6 +223,7 @@ func (h *Handler) respondJSON(w http.ResponseWriter, response Response) {
 
 // HandleRouteMetadata 處理路由元數據請求
 func (h *Handler) HandleRouteMetadata(w http.ResponseWriter, r *http.Request) {
+	utils.Debug("Handling route metadata request")
 	if r.Method != http.MethodGet {
 		h.respondJSON(w, Response{Status: "failure", Message: "Method not allowed"})
 		return
@@ -221,6 +265,7 @@ func (h *Handler) HandleRouteMetadata(w http.ResponseWriter, r *http.Request) {
 
 // HandleThemeMetadata 處理主題元數據請求
 func (h *Handler) HandleThemeMetadata(w http.ResponseWriter, r *http.Request) {
+	utils.Debug("Handling theme metadata request")
 	if r.Method != http.MethodGet {
 		h.respondJSON(w, Response{Status: "failure", Message: "Method not allowed"})
 		return
@@ -262,5 +307,6 @@ func (h *Handler) HandleThemeMetadata(w http.ResponseWriter, r *http.Request) {
 
 // handleConnect 處理連接測試請求
 func (h *Handler) handleConnect(w http.ResponseWriter, r *http.Request) {
+	utils.Debug("Handling connect request")
 	h.respondJSON(w, Response{Status: "success", Message: "Connected successfully"})
 }

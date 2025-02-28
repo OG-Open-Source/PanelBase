@@ -25,23 +25,26 @@ func NewRouteManager(routesConfigPath, scriptsPath string) *RouteManager {
 
 // Install 安裝新路由
 func (rm *RouteManager) Install(req RouteRequest) error {
+	Info("Installing route from URL: '%s'", req.URL)
 	return rm.metadata.InstallRoute(req.URL)
 }
 
 // Update 更新路由
 func (rm *RouteManager) Update(req RouteRequest) error {
-	return rm.metadata.InstallRoute(req.URL) // 使用相同的安裝邏輯
+	Info("Updating route from URL: '%s'", req.URL)
+	return rm.metadata.InstallRoute(req.URL)
 }
 
 // Delete 刪除路由
 func (rm *RouteManager) Delete(req RouteRequest) error {
+	Info("Deleting route: '%s'", req.Name)
 	return rm.metadata.DeleteRoute(req.Name)
 }
 
 // Execute 執行路由腳本
 func (rm *RouteManager) Execute(script string, args []string) (string, error) {
-	// TODO: 實現腳本執行邏輯
+	Info("Executing script [%s] with args [%v]", script, args)
 	scriptPath := filepath.Join(rm.metadata.scriptsPath, script)
-	// 執行腳本並返回結果
-	return fmt.Sprintf("Executing script %s with args %v", scriptPath, args), nil
+	// TODO: 實現腳本執行邏輯
+	return fmt.Sprintf("Executing script [%s] with args [%v]", scriptPath, args), nil
 }

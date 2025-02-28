@@ -2,33 +2,22 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/OG-Open-Source/PanelBase/internal/handlers"
+	"github.com/OG-Open-Source/PanelBase/pkg/utils"
 )
 
-// logMessage 格式化日誌訊息
-func logMessage(message string) string {
-	return fmt.Sprintf("%s | %s", 
-		time.Now().UTC().Format("2006-01-02T15:04:05.000Z"),
-		message,
-	)
-}
-
-func init() {
-	// 設置 log 的輸出格式，移除預設的時間戳
-	log.SetFlags(0)
-}
-
 func main() {
+	// 確保程序結束時關閉日誌
+	defer utils.Close()
+
 	// 載入環境變數
 	if err := godotenv.Load(); err != nil {
-		log.Fatal(logMessage("Error loading .env file"))
+		utils.Fatal("Error loading .env file")
 	}
 
 	// 獲取必要的環境變數
@@ -37,7 +26,7 @@ func main() {
 	entry := os.Getenv("ENTRY")
 
 	if ip == "" || port == "" || entry == "" {
-		log.Fatal(logMessage("Missing required environment variables: IP, PORT, ENTRY"))
+		utils.Fatal("Missing required environment variables: IP, PORT, ENTRY")
 	}
 
 	// 創建配置目錄路徑
@@ -51,8 +40,8 @@ func main() {
 
 	// 啟動服務器
 	addr := fmt.Sprintf("%s:%s", ip, port)
-	log.Print(logMessage(fmt.Sprintf("PanelBase starting on http://%s:%s/%s", ip, port, entry)))
+	utils.Info("PanelBase starting on http://%s:%s/%s", ip, port, entry)
 	if err := http.ListenAndServe(addr, router); err != nil {
-		log.Fatal(logMessage(err.Error()))
+		utils.Fatal(err.Error())
 	}
 }

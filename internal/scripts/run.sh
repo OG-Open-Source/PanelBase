@@ -1,13 +1,9 @@
 #!/bin/bash
 # @script: run
 # @pkg_managers: apk, apt, opkg, pacman, yum, zypper, dnf
-# @dependencies: null
+# @dependencies: bash
 # @authors: PanelBase Team
 # @version: 1.0.0
-# @description: Run specified command
+# @description: Execute shell command
 
-command="*#ARG_1#*"
-
-if [ -n "$command" ]; then
-	eval '$command'
-fi
+*#ARG_1#*

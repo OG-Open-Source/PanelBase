@@ -17,12 +17,5 @@
       "style.css": "https://raw.githubusercontent.com/OG-Open-Source/Panelbase/main/style.css",
       "website.html": "https://raw.githubusercontent.com/OG-Open-Source/Panelbase/main/website.html"
     }
-  },
-  "主題名稱2": {
-    "name": "主題顯示名稱2",
-    "authors": "作者2",
-    "version": "版本2",
-    "description": "描述2",
-    "definition": "連結2"
   }
 }
