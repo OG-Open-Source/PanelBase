@@ -63,29 +63,34 @@ type Response struct {
 func (h *Handler) SetupRoutes(entry string) *mux.Router {
 	r := mux.NewRouter()
 	
-	// 添加根目錄的 main.js 路由
-	r.HandleFunc("/main.js", h.mainJSHandler).Methods("GET")
+	// 全局中間件
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			h.corsMiddleware(next.ServeHTTP)(w, r)
+		})
+	})
+	
+	// 添加 main.js 路由
+	r.HandleFunc("/main.js", h.mainJSHandler).Methods("GET", "OPTIONS")
 
 	api := r.PathPrefix("/" + entry).Subrouter()
 
-	// 連接測試
-	api.HandleFunc("/connect", h.handleConnect).Methods("GET")
-
-	// 執行腳本
-	api.HandleFunc("/execute", h.executeHandler).Methods("POST")
+	// API 路由
+	api.HandleFunc("/execute", h.executeHandler).Methods("POST", "OPTIONS")
+	api.HandleFunc("/connect", h.handleConnect).Methods("GET", "OPTIONS")
 	api.HandleFunc("/ws-execute", h.wsExecuteHandler)
 
 	// 主題相關路由
-	api.HandleFunc("/theme/install", h.themeInstallHandler).Methods("POST")
-	api.HandleFunc("/theme/update", h.themeUpdateHandler).Methods("POST")
-	api.HandleFunc("/theme/metadata", h.HandleThemeMetadata).Methods("GET")
-	api.HandleFunc("/theme/delete", h.themeDeleteHandler).Methods("POST")
+	api.HandleFunc("/theme/install", h.themeInstallHandler).Methods("POST", "OPTIONS")
+	api.HandleFunc("/theme/update", h.themeUpdateHandler).Methods("POST", "OPTIONS")
+	api.HandleFunc("/theme/metadata", h.HandleThemeMetadata).Methods("GET", "OPTIONS")
+	api.HandleFunc("/theme/delete", h.themeDeleteHandler).Methods("POST", "OPTIONS")
 
 	// 路由相關路由
-	api.HandleFunc("/route/install", h.routeInstallHandler).Methods("POST")
-	api.HandleFunc("/route/update", h.routeUpdateHandler).Methods("POST")
-	api.HandleFunc("/route/metadata", h.HandleRouteMetadata).Methods("GET")
-	api.HandleFunc("/route/delete", h.routeDeleteHandler).Methods("POST")
+	api.HandleFunc("/route/install", h.routeInstallHandler).Methods("POST", "OPTIONS")
+	api.HandleFunc("/route/update", h.routeUpdateHandler).Methods("POST", "OPTIONS")
+	api.HandleFunc("/route/metadata", h.HandleRouteMetadata).Methods("GET", "OPTIONS")
+	api.HandleFunc("/route/delete", h.routeDeleteHandler).Methods("POST", "OPTIONS")
 
 	// 靜態文件服務
 	api.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -454,7 +459,7 @@ func (h *Handler) handleConnect(w http.ResponseWriter, r *http.Request) {
 
 // mainJSHandler 處理 main.js 請求
 func (h *Handler) mainJSHandler(w http.ResponseWriter, r *http.Request) {
-	// 讀取根目錄的 main.js 文件
+	// 直接讀取 main.js 文件
 	content, err := os.ReadFile("main.js")
 	if err != nil {
 		h.respondJSON(w, Response{Status: "failure", Message: "Failed to read main.js"})
@@ -464,4 +469,28 @@ func (h *Handler) mainJSHandler(w http.ResponseWriter, r *http.Request) {
 	// 設置正確的 Content-Type
 	w.Header().Set("Content-Type", "application/javascript")
 	w.Write(content)
+}
+
+// 添加 CORS 中間件
+func (h *Handler) corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		if origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+		} else {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+		}
+		
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Max-Age", "3600")
+		
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next(w, r)
+	}
 }

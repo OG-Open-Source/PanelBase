@@ -92,7 +92,6 @@ header h1 {
 }
 
 .card:hover {
-	transform: translateY(-5px);
 	box-shadow: 0 8px 12px var(--hover-shadow);
 }
 
@@ -223,7 +222,6 @@ header h1 {
 
 .action-btn:hover {
 	background: var(--secondary-color);
-	transform: translateY(-2px);
 }
 
 .system-btn,
@@ -250,7 +248,6 @@ header h1 {
 .disk-btn:hover,
 .network-btn:hover {
 	background: linear-gradient(135deg, var(--gradient-end), var(--gradient-start));
-	transform: translateY(-2px);
 	box-shadow: 0 4px 8px var(--hover-shadow);
 }
 
@@ -394,7 +391,6 @@ header h1 {
 .long-btn:hover {
 	background: var(--primary-color);
 	color: white;
-	transform: translateY(-2px);
 	box-shadow: 0 4px 8px var(--shadow-color);
 }
 
@@ -701,7 +697,6 @@ header h1 {
 
 .kill-btn:hover {
 	background: #d32f2f;
-	transform: translateY(-1px);
 	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
@@ -811,7 +806,6 @@ header h1 {
 .tool-btn:hover {
 	background: var(--primary-color);
 	color: white;
-	transform: translateY(-2px);
 	box-shadow: 0 4px 8px var(--shadow-color);
 }
 

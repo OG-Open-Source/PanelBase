@@ -1,7 +1,7 @@
 // PanelBase API 管理類
 class PanelBase {
 	constructor() {
-		this.baseUrl = 'http://IP:PORT/ENTRY';
+		this.baseUrl = '/api';
 		this.activeRequests = new Map();
 		this.ws = null;
 		this.activeModal = null;
@@ -147,7 +147,9 @@ class PanelBase {
 
 	// WebSocket 連接
 	connectWebSocket() {
-		const ws = new WebSocket(`ws://${this.baseUrl.replace('http://', '')}/ws-execute`);
+		const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+		const wsUrl = `${wsProtocol}//${window.location.host}/api/ws-execute`;
+		const ws = new WebSocket(wsUrl);
 
 		ws.onopen = () => {
 			console.log('WebSocket connected');
@@ -184,9 +186,14 @@ class PanelBase {
 			const command = element.dataset.command;
 			const args = JSON.parse(element.dataset.args || '[]');
 			const displayType = element.dataset.display;
+			const interval = parseInt(element.dataset.interval);
+			const maxCalls = parseInt(element.dataset.maxCalls);
 
-			// 檢查命令和參數是否匹配
-			if (command === 'get_info' && args[0] === response.command) {
+			// 更新需要顯示數據的元素（有 data-display 屬性）或定時更新的元素
+			if ((displayType || interval || maxCalls === 1) && 
+				(command === response.command || 
+				(args.length > 0 && args[0] === response.command))) {
+				
 				// 根據 data-display 屬性顯示不同類型的信息
 				switch (displayType) {
 					case 'status':
