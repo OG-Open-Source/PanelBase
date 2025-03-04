@@ -3,6 +3,7 @@ package executor
 import (
 	"fmt"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 	"github.com/google/uuid"
@@ -22,21 +23,20 @@ func NewExecutor() *Executor {
 	}
 }
 
-func (e *Executor) CreateTask(name, command string, args []string, workDir string) (*Task, error) {
+func (e *Executor) CreateTask(name string, commands []Command, workDir string) (*Task, error) {
 	task := &Task{
-		ID:      uuid.New().String(),
-		Name:    name,
-		Command: command,
-		Args:    args,
-		WorkDir: workDir,
-		Status:  StatusPending,
+		ID:       uuid.New().String(),
+		Name:     name,
+		Commands: commands,
+		WorkDir:  workDir,
+		Status:   StatusPending,
 	}
 
 	e.mutex.Lock()
 	e.tasks[task.ID] = task
 	e.mutex.Unlock()
 
-	logger.Info(fmt.Sprintf("Created task: %s (%s)", task.Name, task.ID))
+	logger.Info(fmt.Sprintf("Created task: %s (%s) with %d commands", task.Name, task.ID, len(commands)))
 	return task, nil
 }
 
@@ -53,31 +53,39 @@ func (e *Executor) StartTask(taskID string) error {
 		return fmt.Errorf("task already running: %s", taskID)
 	}
 
-	// 設置任務開始時間和狀態
 	task.StartTime = time.Now().Unix()
 	task.Status = StatusRunning
+	var outputs []string
 
-	cmd := exec.Command(task.Command, task.Args...)
-	cmd.Dir = task.WorkDir
+	// 依序執行每個命令
+	for i, cmd := range task.Commands {
+		logger.Info(fmt.Sprintf("Executing command %d/%d: %s %v", i+1, len(task.Commands), cmd.Command, cmd.Args))
+		
+		command := exec.Command(cmd.Command, cmd.Args...)
+		command.Dir = task.WorkDir
 
-	// 捕獲輸出
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		task.Status = StatusFailed
-		task.Error = err.Error()
-		task.EndTime = time.Now().Unix()
-		logger.Error(fmt.Sprintf("Task failed: %s (%s): %v", task.Name, task.ID, err))
-		return err
+		output, err := command.CombinedOutput()
+		outputs = append(outputs, fmt.Sprintf("$ %s %s\n%s", 
+			cmd.Command, 
+			strings.Join(cmd.Args, " "), 
+			string(output)))
+
+		if err != nil {
+			task.Status = StatusFailed
+			task.Error = fmt.Sprintf("Command %d failed: %v", i+1, err)
+			task.EndTime = time.Now().Unix()
+			task.Output = strings.Join(outputs, "\n---\n")
+			logger.Error(fmt.Sprintf("Task failed: %s (%s): %v", task.Name, task.ID, err))
+			return err
+		}
 	}
 
-	task.Output = string(output)
 	task.Status = StatusCompleted
 	task.EndTime = time.Now().Unix()
+	task.Output = strings.Join(outputs, "\n---\n")
 	task.ExitCode = 0
 
 	logger.Info(fmt.Sprintf("Task completed: %s (%s)", task.Name, task.ID))
-	logger.Info(fmt.Sprintf("Output: %s", task.Output))
-
 	return nil
 }
 

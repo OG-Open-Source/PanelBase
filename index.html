@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>PanelBase API Helper</title>
+	<style>
+		:root {
+			--primary-color: #007bff;
+			--secondary-color: #6c757d;
+			--success-color: #28a745;
+			--danger-color: #dc3545;
+			--light-color: #f8f9fa;
+			--dark-color: #343a40;
+		}
+
+		body {
+			font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+			max-width: 1000px;
+			margin: 0 auto;
+			padding: 20px;
+			background-color: var(--light-color);
+			color: var(--dark-color);
+		}
+
+		.container {
+			background-color: white;
+			padding: 30px;
+			border-radius: 10px;
+			box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+		}
+
+		.form-group {
+			margin-bottom: 20px;
+		}
+
+		label {
+			display: block;
+			margin-bottom: 8px;
+			font-weight: 600;
+		}
+
+		input,
+		textarea {
+			width: 100%;
+			padding: 10px;
+			border: 1px solid #ced4da;
+			border-radius: 5px;
+			box-sizing: border-box;
+			font-size: 16px;
+			transition: border-color 0.3s ease-in-out;
+		}
+
+		input:focus,
+		textarea:focus {
+			border-color: var(--primary-color);
+			outline: none;
+		}
+
+		textarea {
+			height: 180px;
+			font-family: monospace;
+			resize: vertical;
+		}
+
+		button {
+			background-color: var(--primary-color);
+			color: white;
+			padding: 12px 20px;
+			border: none;
+			border-radius: 5px;
+			cursor: pointer;
+			margin: 5px 0;
+			font-size: 16px;
+			transition: background-color 0.3s ease-in-out;
+		}
+
+		button:hover {
+			background-color: #0056b3;
+		}
+
+		.result {
+			margin-top: 30px;
+			padding: 20px;
+			background-color: #e9ecef;
+			border-radius: 5px;
+			font-family: monospace;
+			white-space: pre-wrap;
+		}
+
+		.copy-btn {
+			background-color: var(--secondary-color);
+		}
+
+		.copy-btn:hover {
+			background-color: #5a6268;
+		}
+
+		.command-inputs {
+			border: 1px solid #ced4da;
+			padding: 15px;
+			margin-bottom: 15px;
+			border-radius: 5px;
+		}
+
+		.command-row {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			margin-bottom: 10px;
+		}
+
+		.command-row input {
+			flex: 1;
+			margin-right: 10px;
+		}
+
+		.remove-btn {
+			background-color: var(--danger-color);
+		}
+
+		.remove-btn:hover {
+			background-color: #c82333;
+		}
+
+		.tab-container {
+			display: flex;
+			margin-bottom: 20px;
+		}
+
+		.tab-button {
+			background-color: #e9ecef;
+			color: var(--dark-color);
+			border: 1px solid #ced4da;
+			padding: 10px 20px;
+			cursor: pointer;
+			border-radius: 5px 5px 0 0;
+			margin-right: 2px;
+			transition: background-color 0.3s ease-in-out;
+		}
+
+		.tab-button.active {
+			background-color: var(--primary-color);
+			color: white;
+			border-color: var(--primary-color);
+		}
+
+		.tab-content {
+			display: none;
+			padding: 25px;
+			border: 1px solid #ced4da;
+			border-radius: 0 0 5px 5px;
+			background-color: white;
+		}
+
+		.tab-content.active {
+			display: block;
+		}
+
+		.notification {
+			position: fixed;
+			top: 20px;
+			right: 20px;
+			padding: 15px 20px;
+			background-color: var(--success-color);
+			color: white;
+			border-radius: 5px;
+			box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+			opacity: 0;
+			transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+			z-index: 1000;
+			transform: translateY(-20px);
+		}
+
+		.notification.show {
+			opacity: 1;
+			transform: translateY(0);
+		}
+
+		.notification.error {
+			background-color: var(--danger-color);
+		}
+	</style>
+</head>
+
+<body>
+	<div class="container">
+		<h1>PanelBase API Helper</h1>
+
+		<div class="form-group">
+			<label for="ip">IP:</label>
+			<input type="text" id="ip" placeholder="例如: localhost 或 127.0.0.1">
+		</div>
+
+		<div class="form-group">
+			<label for="port">Port:</label>
+			<input type="text" id="port" placeholder="例如: 8080">
+		</div>
+
+		<div class="form-group">
+			<label for="entry">Entry Point:</label>
+			<input type="text" id="entry" placeholder="例如: your-entry-point">
+		</div>
+
+		<div class="form-group">
+			<label for="token">JWT Token:</label>
+			<input type="text" id="token" placeholder="貼上您的 JWT Token">
+		</div>
+
+		<button onclick="saveToStorage()">保存設置</button>
+		<button onclick="loadFromStorage()">載入設置</button>
+
+		<div class="tab-container">
+			<button class="tab-button active" onclick="showTab('create')">創建任務</button>
+			<button class="tab-button" onclick="showTab('start')">啟動任務</button>
+			<button class="tab-button" onclick="showTab('status')">查詢狀態</button>
+			<button class="tab-button" onclick="showTab('list')">任務列表</button>
+		</div>
+
+		<div id="create-tab" class="tab-content active">
+			<h3>創建任務</h3>
+			<div class="form-group">
+				<label for="taskName">任務名稱:</label>
+				<input type="text" id="taskName" placeholder="輸入任務名稱">
+			</div>
+
+			<div id="commands-container">
+				<!-- 命令輸入區域將在這裡動態生成 -->
+			</div>
+
+			<button onclick="addCommand()">添加命令</button>
+			<button onclick="generateCreateCurl()">生成創建任務 Curl</button>
+		</div>
+
+		<div id="start-tab" class="tab-content">
+			<h3>啟動任務</h3>
+			<div class="form-group">
+				<label for="taskId">任務 ID:</label>
+				<input type="text" id="taskId" placeholder="輸入任務 ID">
+			</div>
+			<button onclick="generateStartCurl()">生成啟動任務 Curl</button>
+		</div>
+
+		<div id="status-tab" class="tab-content">
+			<h3>查詢任務狀態</h3>
+			<div class="form-group">
+				<label for="statusTaskId">任務 ID:</label>
+				<input type="text" id="statusTaskId" placeholder="輸入任務 ID">
+			</div>
+			<button onclick="generateStatusCurl()">生成查詢狀態 Curl</button>
+		</div>
+
+		<div id="list-tab" class="tab-content">
+			<h3>任務列表</h3>
+			<button onclick="generateListCurl()">生成任務列表 Curl</button>
+		</div>
+
+		<div class="result" id="result"></div>
+		<button onclick="copyCurl()" class="copy-btn">複製 Curl 命令</button>
+	</div>
+
+	<!-- 添加通知容器 -->
+	<div id="notification" class="notification"></div>
+
+	<script>
+		let commandCount = 0;
+
+		function addCommand() {
+			const container = document.getElementById('commands-container');
+			const div = document.createElement('div');
+			div.className = 'command-inputs';
+			div.innerHTML = `
+				<div class="command-row">
+					<input type="text" placeholder="命令" id="cmd-${commandCount}">
+					<input type="text" placeholder="參數 (用空格分隔)" id="args-${commandCount}">
+					<button class="remove-btn" onclick="removeCommand(this)">刪除</button>
+				</div>
+			`;
+			container.appendChild(div);
+			commandCount++;
+		}
+
+		function removeCommand(button) {
+			button.closest('.command-inputs').remove();
+		}
+
+		function showTab(tabName) {
+			// 隱藏所有標籤內容
+			document.querySelectorAll('.tab-content').forEach(tab => {
+				tab.classList.remove('active');
+			});
+			document.querySelectorAll('.tab-button').forEach(btn => {
+				btn.classList.remove('active');
+			});
+
+			// 顯示選中的標籤
+			document.getElementById(`${tabName}-tab`).classList.add('active');
+			event.target.classList.add('active');
+		}
+
+		function getBaseUrl() {
+			const ip = document.getElementById('ip').value;
+			const port = document.getElementById('port').value;
+			const entry = document.getElementById('entry').value;
+			return `http://${ip}:${port}/${entry}/api`;
+		}
+
+		function generateCreateCurl() {
+			const commands = [];
+			document.querySelectorAll('.command-inputs').forEach(div => {
+				const cmdInput = div.querySelector('input[id^="cmd-"]');
+				const argsInput = div.querySelector('input[id^="args-"]');
+				if (cmdInput.value) {
+					commands.push({
+						command: cmdInput.value,
+						args: argsInput.value.split(' ').filter(arg => arg)
+					});
+				}
+			});
+
+			if (commands.length === 0) {
+				showNotification('請至少添加一個命令！', true);
+				return;
+			}
+
+			const taskName = document.getElementById('taskName').value || 'task';
+			const curlCmd = `curl -X POST ${getBaseUrl()}/tasks \\
+  -H "Authorization: Bearer ${document.getElementById('token').value}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+	"name": "${taskName}",
+	"commands": ${JSON.stringify(commands, null, 2)},
+	"work_dir": "/"
+}'`;
+
+			document.getElementById('result').textContent = curlCmd;
+		}
+
+		function generateStartCurl() {
+			const taskId = document.getElementById('taskId').value;
+			const curlCmd = `curl -X POST ${getBaseUrl()}/tasks/${taskId}/start \\
+  -H "Authorization: Bearer ${document.getElementById('token').value}"`;
+
+			document.getElementById('result').textContent = curlCmd;
+		}
+
+		function generateStatusCurl() {
+			const taskId = document.getElementById('statusTaskId').value;
+			const curlCmd = `curl ${getBaseUrl()}/tasks/${taskId} \\
+  -H "Authorization: Bearer ${document.getElementById('token').value}"`;
+
+			document.getElementById('result').textContent = curlCmd;
+		}
+
+		function generateListCurl() {
+			const curlCmd = `curl ${getBaseUrl()}/tasks \\
+  -H "Authorization: Bearer ${document.getElementById('token').value}"`;
+
+			document.getElementById('result').textContent = curlCmd;
+		}
+
+		function loadFromStorage() {
+			document.getElementById('ip').value = localStorage.getItem('pb_ip') || '';
+			document.getElementById('port').value = localStorage.getItem('pb_port') || '';
+			document.getElementById('entry').value = localStorage.getItem('pb_entry') || '';
+			document.getElementById('token').value = localStorage.getItem('pb_token') || '';
+		}
+
+		function showNotification(message, isError = false) {
+			const notification = document.getElementById('notification');
+			notification.textContent = message;
+			notification.classList.add('show');
+			if (isError) {
+				notification.classList.add('error');
+			} else {
+				notification.classList.remove('error');
+			}
+
+			// 3秒後自動隱藏
+			setTimeout(() => {
+				notification.classList.remove('show');
+			}, 3000);
+		}
+
+		function saveToStorage() {
+			localStorage.setItem('pb_ip', document.getElementById('ip').value);
+			localStorage.setItem('pb_port', document.getElementById('port').value);
+			localStorage.setItem('pb_entry', document.getElementById('entry').value);
+			localStorage.setItem('pb_token', document.getElementById('token').value);
+			showNotification('設置已保存！');
+		}
+
+		function copyCurl() {
+			const curlCmd = document.getElementById('result').textContent;
+			if (curlCmd) {
+				navigator.clipboard.writeText(curlCmd).then(() => {
+					showNotification('已複製到剪貼板！');
+				}).catch(err => {
+					console.error('複製失敗:', err);
+					showNotification('複製失敗！', true);
+				});
+			}
+		}
+
+		// 頁面載入時自動載入保存的設置並添加一個初始命令輸入
+		window.onload = function () {
+			loadFromStorage();
+			addCommand();
+		};
+	</script>
+</body>
+
+</html>

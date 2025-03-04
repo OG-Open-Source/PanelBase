@@ -18,10 +18,9 @@ type TaskHandler struct {
 
 // 請求結構體
 type CreateTaskRequest struct {
-	Name    string   `json:"name"`
-	Command string   `json:"command"`
-	Args    []string `json:"args"`
-	WorkDir string   `json:"work_dir"`
+	Name     string            `json:"name"`
+	Commands []executor.Command `json:"commands"`
+	WorkDir  string           `json:"work_dir"`
 }
 
 func NewTaskHandler(e *executor.Executor, cfg *config.Config) *TaskHandler {
@@ -50,7 +49,7 @@ func (h *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		req.WorkDir = h.config.WorkDir
 	}
 
-	task, err := h.executor.CreateTask(req.Name, req.Command, req.Args, req.WorkDir)
+	task, err := h.executor.CreateTask(req.Name, req.Commands, req.WorkDir)
 	if err != nil {
 		logger.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
