@@ -1,0 +1,18 @@
+version: "3"
+
+services:
+  panelbase:
+    build: .
+    container_name: panelbase
+    ports:
+      - "8080:8080"
+    environment:
+      - IP=0.0.0.0
+      - PORT=8080
+      - ENTRY=panel
+      - JWT_SECRET=change_this_to_a_secure_random_string
+      - PANEL_TRUSTED_IPS=
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped

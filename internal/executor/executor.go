@@ -6,8 +6,9 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"github.com/google/uuid"
+
 	"github.com/OG-Open-Source/PanelBase/internal/logger"
+	"github.com/google/uuid"
 )
 
 type Executor struct {
@@ -60,14 +61,26 @@ func (e *Executor) StartTask(taskID string) error {
 	// 依序執行每個命令
 	for i, cmd := range task.Commands {
 		logger.Info(fmt.Sprintf("Executing command %d/%d: %s %v", i+1, len(task.Commands), cmd.Command, cmd.Args))
-		
-		command := exec.Command(cmd.Command, cmd.Args...)
+
+		// 检测操作系统，在Windows下使用cmd /c执行命令
+		var command *exec.Cmd
+		if strings.Contains(strings.ToLower(fmt.Sprintf("%s", exec.Command("cmd", "/c", "echo").Path)), "windows") {
+			// Windows环境
+			fullCmd := []string{"/c", cmd.Command}
+			fullCmd = append(fullCmd, cmd.Args...)
+			command = exec.Command("cmd", fullCmd...)
+			logger.Info(fmt.Sprintf("Executing Windows command: cmd %v", fullCmd))
+		} else {
+			// Linux/Unix环境
+			command = exec.Command(cmd.Command, cmd.Args...)
+		}
+
 		command.Dir = task.WorkDir
 
 		output, err := command.CombinedOutput()
-		outputs = append(outputs, fmt.Sprintf("$ %s %s\n%s", 
-			cmd.Command, 
-			strings.Join(cmd.Args, " "), 
+		outputs = append(outputs, fmt.Sprintf("$ %s %s\n%s",
+			cmd.Command,
+			strings.Join(cmd.Args, " "),
 			string(output)))
 
 		if err != nil {
@@ -141,4 +154,4 @@ func (e *Executor) ListTasks() ([]*Task, error) {
 	return tasks, nil
 }
 
-// ... 其他方法實現 
+// ... 其他方法實現

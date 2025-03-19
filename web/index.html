@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>PanelBase - Secure Control Panel</title>
+	<style>
+		/* 确保Vue未加载完成前不显示内容 */
+		[v-cloak] {
+			display: none !important;
+		}
+	</style>
+	<link rel="stylesheet" href="static/css/main.css">
+	<link rel="icon" href="static/img/favicon.ico">
+	<!-- 预加载JavaScript库，避免CDN可能的加载问题 -->
+	<script src="static/js/vue.min.js"></script>
+	<script src="static/js/axios.min.js"></script>
+</head>
+
+<body>
+	<div id="app" v-cloak>
+		<div class="login-container" v-if="!isAuthenticated">
+			<div class="login-form">
+				<div class="logo">
+					<img src="static/img/logo.png" alt="PanelBase Logo"
+						onerror="this.src='static/img/logo-fallback.svg'">
+					<h1>PanelBase</h1>
+				</div>
+				<div class="error-message" v-if="loginError">{{ loginError }}</div>
+				<form @submit.prevent="login">
+					<div class="form-group">
+						<label for="username">Username</label>
+						<input type="text" id="username" v-model="credentials.username" required>
+					</div>
+					<div class="form-group">
+						<label for="password">Password</label>
+						<input type="password" id="password" v-model="credentials.password" required>
+					</div>
+					<button type="submit" :disabled="loggingIn">
+						<span v-if="loggingIn">Logging in...</span>
+						<span v-else>Login</span>
+					</button>
+				</form>
+			</div>
+		</div>
+
+		<div class="dashboard" v-else>
+			<header>
+				<div class="brand">
+					<img src="static/img/logo.png" alt="PanelBase Logo"
+						onerror="this.src='static/img/logo-fallback.svg'">
+					<h1>PanelBase</h1>
+				</div>
+				<nav>
+					<ul>
+						<li :class="{ active: activeTab === 'dashboard' }">
+							<a href="#" @click.prevent="activeTab = 'dashboard'">Dashboard</a>
+						</li>
+						<li :class="{ active: activeTab === 'tasks' }">
+							<a href="#" @click.prevent="activeTab = 'tasks'">Tasks</a>
+						</li>
+						<li :class="{ active: activeTab === 'users' }" v-if="hasPermission('VIEW_USER')">
+							<a href="#" @click.prevent="activeTab = 'users'">Users</a>
+						</li>
+						<li :class="{ active: activeTab === 'settings' }" v-if="hasPermission('SYSTEM_CONFIG')">
+							<a href="#" @click.prevent="activeTab = 'settings'">Settings</a>
+						</li>
+					</ul>
+				</nav>
+				<div class="user-menu">
+					<span>{{ user.username }}</span>
+					<button @click="logout">Logout</button>
+				</div>
+			</header>
+
+			<main>
+				<!-- Dashboard Tab -->
+				<div v-if="activeTab === 'dashboard'" class="tab-content">
+					<div class="panel-header">
+						<h2>Dashboard</h2>
+					</div>
+					<div class="dashboard-stats">
+						<div class="stat-card">
+							<h3>Tasks</h3>
+							<div class="stat-value">{{ stats.totalTasks }}</div>
+						</div>
+						<div class="stat-card">
+							<h3>Running</h3>
+							<div class="stat-value" :class="{'status-pulse': stats.runningTasks > 0}">{{
+								stats.runningTasks }}</div>
+						</div>
+						<div class="stat-card">
+							<h3>Completed</h3>
+							<div class="stat-value">{{ stats.completedTasks }}</div>
+						</div>
+						<div class="stat-card">
+							<h3>Failed</h3>
+							<div class="stat-value">{{ stats.failedTasks }}</div>
+						</div>
+					</div>
+					<div class="recent-tasks">
+						<h3>Recent Tasks</h3>
+						<table>
+							<thead>
+								<tr>
+									<th>ID</th>
+									<th>Name</th>
+									<th>Status</th>
+									<th>Created</th>
+									<th>Actions</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr v-for="task in recentTasks" :key="task.id">
+									<td>{{ task.id }}</td>
+									<td>{{ task.name }}</td>
+									<td :class="'status-' + task.status.toLowerCase()">{{ task.status }}</td>
+									<td>{{ formatTime(task.start_time) }}</td>
+									<td>
+										<button @click="viewTask(task)" class="btn-sm">View</button>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+
+				<!-- Tasks Tab -->
+				<div v-if="activeTab === 'tasks'" class="tab-content">
+					<div class="panel-header">
+						<h2>Task Management</h2>
+						<div class="header-actions">
+							<button v-if="hasPermission('CREATE_TASK')" @click="showCreateTaskModal = true">Create
+								Task</button>
+						</div>
+					</div>
+
+					<div class="task-list">
+						<table>
+							<thead>
+								<tr>
+									<th>ID</th>
+									<th>Name</th>
+									<th>Status</th>
+									<th>Start Time</th>
+									<th>End Time</th>
+									<th>Actions</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr v-for="task in tasks" :key="task.id">
+									<td>{{ task.id }}</td>
+									<td>{{ task.name }}</td>
+									<td :class="'status-' + task.status.toLowerCase()">{{ task.status }}</td>
+									<td>{{ formatTime(task.start_time) }}</td>
+									<td>{{ formatTime(task.end_time) }}</td>
+									<td>
+										<button @click="viewTask(task)" class="btn-sm">View</button>
+										<button v-if="task.status === 'PENDING' && hasPermission('RUN_TASK')"
+											@click="startTask(task)" class="btn-sm btn-success">Start</button>
+										<button v-if="task.status === 'RUNNING' && hasPermission('STOP_TASK')"
+											@click="stopTask(task)" class="btn-sm btn-danger">Stop</button>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+
+					<!-- Task Details Modal -->
+					<div class="modal" v-if="selectedTask">
+						<div class="modal-content">
+							<div class="modal-header">
+								<h3>Task Details: {{ selectedTask.name }}</h3>
+								<button @click="selectedTask = null" class="close-btn">&times;</button>
+							</div>
+							<div class="modal-body">
+								<div class="task-info">
+									<div class="info-row">
+										<strong>ID:</strong> {{ selectedTask.id }}
+									</div>
+									<div class="info-row">
+										<strong>Status:</strong>
+										<span :class="'status-' + selectedTask.status.toLowerCase()">
+											{{ selectedTask.status }}
+										</span>
+									</div>
+									<div class="info-row">
+										<strong>Working Directory:</strong> {{ selectedTask.work_dir }}
+									</div>
+									<div class="info-row">
+										<strong>Start Time:</strong> {{ formatTime(selectedTask.start_time) }}
+									</div>
+									<div class="info-row">
+										<strong>End Time:</strong> {{ formatTime(selectedTask.end_time) }}
+									</div>
+									<div class="info-row" v-if="selectedTask.exit_code !== undefined">
+										<strong>Exit Code:</strong> {{ selectedTask.exit_code }}
+									</div>
+								</div>
+
+								<div class="task-commands">
+									<h4>Commands</h4>
+									<div v-for="(cmd, index) in selectedTask.commands" :key="index" class="command">
+										<code>{{ cmd.command }} {{ cmd.args.join(' ') }}</code>
+									</div>
+								</div>
+
+								<div class="task-output" v-if="selectedTask.output">
+									<h4>Output</h4>
+									<pre>{{ selectedTask.output }}</pre>
+								</div>
+
+								<div class="task-error" v-if="selectedTask.error">
+									<h4>Error</h4>
+									<pre class="error">{{ selectedTask.error }}</pre>
+								</div>
+							</div>
+							<div class="modal-footer">
+								<button v-if="selectedTask.status === 'PENDING' && hasPermission('RUN_TASK')"
+									@click="startTask(selectedTask)" class="btn-success">Start Task</button>
+								<button v-if="selectedTask.status === 'RUNNING' && hasPermission('STOP_TASK')"
+									@click="stopTask(selectedTask)" class="btn-danger">Stop Task</button>
+								<button @click="selectedTask = null">Close</button>
+							</div>
+						</div>
+					</div>
+
+					<!-- Create Task Modal -->
+					<div class="modal" v-if="showCreateTaskModal">
+						<div class="modal-content">
+							<div class="modal-header">
+								<h3>Create New Task</h3>
+								<button @click="showCreateTaskModal = false" class="close-btn">&times;</button>
+							</div>
+							<div class="modal-body">
+								<form @submit.prevent="createTask">
+									<div class="form-group">
+										<label for="taskName">Task Name</label>
+										<input type="text" id="taskName" v-model="newTask.name" required>
+									</div>
+									<div class="form-group">
+										<label for="workDir">Working Directory</label>
+										<input type="text" id="workDir" v-model="newTask.work_dir"
+											placeholder="Default: /">
+									</div>
+									<div class="form-group">
+										<label>Commands</label>
+										<div v-for="(cmd, index) in newTask.commands" :key="index"
+											class="command-input">
+											<input type="text" v-model="cmd.command" placeholder="Command" required>
+											<input type="text" v-model="cmd.args"
+												placeholder="Arguments (space separated)">
+											<button type="button" @click="removeCommand(index)"
+												class="btn-sm btn-danger">Remove</button>
+										</div>
+										<button type="button" @click="addCommand" class="btn-sm">Add Command</button>
+									</div>
+								</form>
+							</div>
+							<div class="modal-footer">
+								<button @click="submitCreateTask" class="btn-success">Create Task</button>
+								<button @click="showCreateTaskModal = false">Cancel</button>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- Users Tab -->
+				<div v-if="activeTab === 'users' && hasPermission('VIEW_USER')" class="tab-content">
+					<div class="panel-header">
+						<h2>User Management</h2>
+						<button v-if="hasPermission('CREATE_USER')" @click.stop="showCreateUserModal()">Create
+							User</button>
+					</div>
+
+					<div class="user-list">
+						<table>
+							<thead>
+								<tr>
+									<th>ID</th>
+									<th>Username</th>
+									<th>Role</th>
+									<th>Status</th>
+									<th>Actions</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr v-for="u in users" :key="u.id">
+									<td>{{ u.id }}</td>
+									<td>{{ u.username }}</td>
+									<td>{{ u.role }}</td>
+									<td :class="u.active ? 'status-active' : 'status-inactive'">
+										{{ u.active ? 'Active' : 'Inactive' }}
+									</td>
+									<td>
+										<button v-if="hasPermission('UPDATE_USER')" @click.stop="editUser(u)"
+											class="btn-sm">Edit</button>
+										<button v-if="hasPermission('UPDATE_USER')" @click.stop="generateApiKey(u)"
+											class="btn-sm">API Key</button>
+										<button v-if="hasPermission('DELETE_USER') && u.id !== 1 && u.id !== user.id"
+											@click.stop="confirmDeleteUser(u)" class="btn-sm btn-danger">Delete</button>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+
+					<!-- Create/Edit User Modal -->
+					<div class="modal" v-if="showUserModal">
+						<div class="modal-content">
+							<div class="modal-header">
+								<h3>{{ userForm.id ? 'Edit User' : 'Create New User' }}</h3>
+								<button @click.stop="showUserModal = false" class="close-btn">&times;</button>
+							</div>
+							<div class="modal-body">
+								<form id="userForm" @submit.prevent>
+									<div class="form-group">
+										<label for="userUsername">Username</label>
+										<input type="text" id="userUsername" v-model="userForm.username" required>
+									</div>
+									<div class="form-group">
+										<label for="userPassword">Password {{ userForm.id ? '(leave empty to keep
+											current)' : '' }}</label>
+										<input type="password" id="userPassword" v-model="userForm.password"
+											:required="!userForm.id">
+									</div>
+									<div class="form-group">
+										<label for="userRole">Role</label>
+										<select id="userRole" v-model="userForm.role" required>
+											<option value="ROOT" v-if="user.role === 'ROOT'">ROOT</option>
+											<option value="ADMIN">ADMIN</option>
+											<option value="USER">USER</option>
+											<option value="GUEST">GUEST</option>
+										</select>
+									</div>
+									<div class="form-group" v-if="userForm.id">
+										<label for="userActive">Status</label>
+										<select id="userActive" v-model="userForm.active" :disabled="userForm.id === 1">
+											<option :value="true">Active</option>
+											<option :value="false">Inactive</option>
+										</select>
+									</div>
+								</form>
+							</div>
+							<div class="modal-footer">
+								<button @click.stop="submitUserForm()" class="btn-success">
+									{{ userForm.id ? 'Update User' : 'Create User' }}
+								</button>
+								<button @click.stop="showUserModal = false">Cancel</button>
+							</div>
+						</div>
+					</div>
+
+					<!-- API Key Modal -->
+					<div class="modal" v-if="apiKeyModal.show">
+						<div class="modal-content">
+							<div class="modal-header">
+								<h3>API Key for {{ apiKeyModal.username }}</h3>
+								<button @click="apiKeyModal.show = false" class="close-btn">&times;</button>
+							</div>
+							<div class="modal-body">
+								<div class="api-key-info">
+									<p class="warning">This API key will only be shown once. Make sure to copy it now.
+									</p>
+									<div class="api-key">
+										<code>{{ apiKeyModal.key }}</code>
+										<button @click="copyApiKey" class="btn-sm">Copy</button>
+									</div>
+								</div>
+							</div>
+							<div class="modal-footer">
+								<button @click="apiKeyModal.show = false">Close</button>
+							</div>
+						</div>
+					</div>
+
+					<!-- Delete User Confirmation Modal -->
+					<div class="modal" v-if="deleteUserModal.show">
+						<div class="modal-content">
+							<div class="modal-header">
+								<h3>Confirm Delete</h3>
+								<button @click="deleteUserModal.show = false" class="close-btn">&times;</button>
+							</div>
+							<div class="modal-body">
+								<p>Are you sure you want to delete user <strong>{{ deleteUserModal.username }}</strong>?
+								</p>
+								<p class="warning">This action cannot be undone.</p>
+							</div>
+							<div class="modal-footer">
+								<button @click="deleteUser" class="btn-danger">Delete</button>
+								<button @click="deleteUserModal.show = false">Cancel</button>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- Settings Tab -->
+				<div v-if="activeTab === 'settings' && hasPermission('SYSTEM_CONFIG')" class="tab-content">
+					<h2>System Settings</h2>
+					<p>Settings coming soon.</p>
+				</div>
+			</main>
+		</div>
+	</div>
+
+	<!-- 使用本地Vue和Axios文件，以防CDN无法访问 -->
+	<script src="static/js/vue.min.js"></script>
+	<script src="static/js/axios.min.js"></script>
+	<script src="static/js/main.js"></script>
+</body>
+
+</html>

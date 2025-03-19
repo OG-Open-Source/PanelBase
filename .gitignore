@@ -1,0 +1,34 @@
+# Binaries
+/panelbase
+/panelbase.exe
+
+# Data and logs
+/data/
+/logs/
+
+# Build artifacts
+*.o
+*.a
+*.so
+
+# IDE/Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Environment variables (except example)
+#.env
+
+# Go specific
+*.test
+*.out
+vendor/
+
+# Dependency directories
+node_modules/ 

@@ -1,0 +1,9 @@
+<!-- This is a placeholder since we can't directly create a binary ICO file.
+     In a real deployment, you would need to replace this with a proper ICO file. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="16" height="16" rx="3" fill="#3498DB"/>
+  <path d="M4 4H12V12H4V4Z" stroke="white" stroke-width="1"/>
+  <path d="M6 6H10V10H6V6Z" fill="white"/>
+  <path d="M4 8H12" stroke="white" stroke-width="1"/>
+  <path d="M8 4V12" stroke="white" stroke-width="1"/>
+</svg> 

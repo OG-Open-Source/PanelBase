@@ -37,4 +37,4 @@ type TaskManager interface {
 	StopTask(taskID string) error
 	GetTaskStatus(taskID string) (*Task, error)
 	ListTasks() ([]*Task, error)
-} 
+}

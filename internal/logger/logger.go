@@ -102,4 +102,4 @@ func Warn(message string) {
 
 func Fatal(message string) {
 	log(FATAL, message)
-} 
+}

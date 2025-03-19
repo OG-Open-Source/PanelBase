@@ -76,4 +76,4 @@ func getTrustedIPs() []string {
 		return []string{"127.0.0.1"}
 	}
 	return strings.Split(ips, ",")
-} 
+}
