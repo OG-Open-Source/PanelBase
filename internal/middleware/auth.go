@@ -1,157 +1,126 @@
 package middleware
 
 import (
-	"context"
 	"net/http"
 	"strings"
-	"time"
 
-	"github.com/OG-Open-Source/PanelBase/internal/config"
 	"github.com/OG-Open-Source/PanelBase/internal/logger"
 	"github.com/OG-Open-Source/PanelBase/internal/user"
-	"github.com/golang-jwt/jwt"
+	"github.com/labstack/echo/v4"
 )
 
-// Key type for context values
-type contextKey string
+// AuthMiddleware handles authentication for both JWT tokens and API keys
+func AuthMiddleware() echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			// Skip authentication for public endpoints
+			path := c.Request().URL.Path
+			if isPublicPath(path) {
+				return next(c)
+			}
 
-// Context keys
-const (
-	UserContextKey contextKey = "user"
-)
+			// Get Authorization header
+			authHeader := c.Request().Header.Get("Authorization")
+			if authHeader == "" {
+				return c.JSON(http.StatusUnauthorized, map[string]string{
+					"error": "Authorization header required",
+				})
+			}
 
-// Claims represents the JWT claims
-type Claims struct {
-	UserID int           `json:"user_id"`
-	Role   user.UserRole `json:"role"`
-	jwt.StandardClaims
-}
+			var userInfo *user.User
+			var err error
 
-// AuthMiddleware handles authentication and authorization
-type AuthMiddleware struct {
-	config      *config.Config
-	userManager user.UserManager
-}
-
-// NewAuthMiddleware creates a new auth middleware
-func NewAuthMiddleware(cfg *config.Config, userManager user.UserManager) *AuthMiddleware {
-	return &AuthMiddleware{
-		config:      cfg,
-		userManager: userManager,
-	}
-}
-
-// Authenticate verifies JWT tokens or API keys and adds the user to the request context
-func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check if IP is trusted
-		clientIP := getClientIP(r)
-		if !m.isIPTrusted(clientIP) {
-			logger.Warn("Unauthorized access attempt from IP: " + clientIP)
-			http.Error(w, "Unauthorized IP", http.StatusUnauthorized)
-			return
-		}
-
-		// First try to authenticate with Bearer token (JWT)
-		authHeader := r.Header.Get("Authorization")
-		if strings.HasPrefix(authHeader, "Bearer ") {
-			tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-
-			// Parse and validate the token
-			claims := &Claims{}
-			token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-				return []byte(m.config.JWTSecret), nil
-			})
-
-			if err == nil && token.Valid {
-				// Token is valid, get the user
-				authenticatedUser, err := m.userManager.GetUser(claims.UserID)
-				if err == nil && authenticatedUser.Active {
-					// Add user to context
-					ctx := context.WithValue(r.Context(), UserContextKey, authenticatedUser)
-					next.ServeHTTP(w, r.WithContext(ctx))
-					return
+			// Check if it's a Bearer token or API key
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				// It's a Bearer token, use JWT verification
+				tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+				claims, err := user.VerifyJWT(tokenString)
+				if err != nil {
+					logger.Log.Warnf("Invalid JWT token: %v", err)
+					return c.JSON(http.StatusUnauthorized, map[string]string{
+						"error": "Invalid token",
+					})
 				}
-			}
-		}
 
-		// If JWT authentication failed, try API key
-		apiKey := r.Header.Get("X-API-Key")
-		if apiKey != "" {
-			authenticatedUser, err := m.userManager.GetUserByAPIKey(apiKey)
-			if err == nil && authenticatedUser.Active {
-				// Add user to context
-				ctx := context.WithValue(r.Context(), UserContextKey, authenticatedUser)
-				next.ServeHTTP(w, r.WithContext(ctx))
-				return
-			}
-		}
+				// Get username from claims
+				username, ok := claims["username"].(string)
+				if !ok {
+					return c.JSON(http.StatusUnauthorized, map[string]string{
+						"error": "Invalid token content",
+					})
+				}
 
-		// Authentication failed
-		logger.Warn("Authentication failed for request from: " + clientIP)
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-	})
+				// Get user info
+				userInfo, err = user.GetUser(username)
+				if err != nil {
+					return c.JSON(http.StatusUnauthorized, map[string]string{
+						"error": "User not found",
+					})
+				}
+			} else if strings.HasPrefix(authHeader, "ApiKey ") {
+				// It's an API key
+				apiKeyString := strings.TrimPrefix(authHeader, "ApiKey ")
+				userInfo, err = user.VerifyAPIKey(apiKeyString)
+				if err != nil {
+					logger.Log.Warnf("Invalid API key: %v", err)
+					return c.JSON(http.StatusUnauthorized, map[string]string{
+						"error": "Invalid API key",
+					})
+				}
+			} else {
+				return c.JSON(http.StatusUnauthorized, map[string]string{
+					"error": "Invalid authorization format",
+				})
+			}
+
+			// Set user info in context
+			c.Set("user", userInfo)
+			return next(c)
+		}
+	}
 }
 
-// GenerateToken creates a new JWT token for a user
-func (m *AuthMiddleware) GenerateToken(u *user.User) (string, error) {
-	// Create expiration time (24 hours)
-	expirationTime := time.Now().Add(24 * time.Hour)
+// AdminMiddleware checks if the user is an admin
+func AdminMiddleware() echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			userInfo, ok := c.Get("user").(*user.User)
+			if !ok {
+				return c.JSON(http.StatusUnauthorized, map[string]string{
+					"error": "Not authenticated",
+				})
+			}
 
-	// Create claims
-	claims := &Claims{
-		UserID: u.ID,
-		Role:   u.Role,
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: expirationTime.Unix(),
-			IssuedAt:  time.Now().Unix(),
-			Subject:   u.Username,
-		},
+			if userInfo.Role != "admin" {
+				return c.JSON(http.StatusForbidden, map[string]string{
+					"error": "Admin permission required",
+				})
+			}
+
+			return next(c)
+		}
 	}
-
-	// Create the token
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	// Sign the token with the secret
-	tokenString, err := token.SignedString([]byte(m.config.JWTSecret))
-	if err != nil {
-		return "", err
-	}
-
-	return tokenString, nil
 }
 
-// isIPTrusted checks if an IP is in the trusted list
-func (m *AuthMiddleware) isIPTrusted(ip string) bool {
-	// If no trusted IPs are configured, trust all
-	if len(m.config.TrustedIPs) == 0 {
-		return true
+// isPublicPath checks if the path is a public path
+func isPublicPath(path string) bool {
+	publicPaths := []string{
+		"/login",
+		"/health",
+		"/favicon.ico",
+		"/index.html",
 	}
 
-	for _, trustedIP := range m.config.TrustedIPs {
-		if ip == trustedIP {
+	for _, publicPath := range publicPaths {
+		if strings.HasSuffix(path, publicPath) {
 			return true
 		}
 	}
+
+	// Static files
+	if strings.Contains(path, "/static/") {
+		return true
+	}
+
 	return false
-}
-
-// GetUserFromContext retrieves the user from the request context
-func GetUserFromContext(r *http.Request) *user.User {
-	user, ok := r.Context().Value(UserContextKey).(*user.User)
-	if !ok {
-		return nil
-	}
-	return user
-}
-
-// getClientIP extracts the client IP address from the request
-func getClientIP(r *http.Request) string {
-	// Check X-Forwarded-For header
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		ips := strings.Split(xff, ",")
-		return strings.TrimSpace(ips[0])
-	}
-	// If no X-Forwarded-For, use RemoteAddr
-	return strings.Split(r.RemoteAddr, ":")[0]
 }

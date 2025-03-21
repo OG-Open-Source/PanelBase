@@ -3,77 +3,68 @@ package config
 import (
 	"fmt"
 	"os"
-	"strconv"
-	"strings"
-	"github.com/joho/godotenv"
+	"path/filepath"
+
+	"github.com/BurntSushi/toml"
 )
 
 type Config struct {
-	IP             string   `json:"ip"`
-	Port           int      `json:"port"`
-	AllowedOrigins string   `json:"allowed_origins"`
-	ProxyTarget    string   `json:"proxy_target"`
-	EntryPoint     string   `json:"entry_point"`
-	JWTSecret      string   `json:"jwt_secret"`
-	TrustedIPs     []string `json:"trusted_ips"`
-	WorkDir        string   `json:"work_dir"`
+	Server   ServerConfig   `toml:"server"`
+	Security SecurityConfig `toml:"security"`
+	Users    UsersConfig    `toml:"users"`
+	Logging  LoggingConfig  `toml:"logging"`
+	UI       UIConfig       `toml:"ui"`
 }
 
-func Load() (*Config, error) {
-	// 加載 .env 文件
-	if err := godotenv.Load(); err != nil {
-		return nil, err
-	}
+type ServerConfig struct {
+	Host  string `toml:"host"`
+	Port  int    `toml:"port"`
+	Entry string `toml:"entry"`
+}
 
-	// 檢查必要的環境變量
-	requiredEnvs := map[string]string{
-		"IP":         getEnvOrDefault("IP", ""),
-		"PORT":       getEnvOrDefault("PORT", ""),
-		"ENTRY":      getEnvOrDefault("ENTRY", ""),
-		"JWT_SECRET": getEnvOrDefault("JWT_SECRET", ""),
-		"WORK_DIR":   getEnvOrDefault("WORK_DIR", ""),
-	}
+type SecurityConfig struct {
+	JWTSecret      string `toml:"jwt_secret"`
+	JWTExpireHours int    `toml:"jwt_expire_hours"`
+}
 
-	// 檢查是否有空值
-	var missingEnvs []string
-	for key, value := range requiredEnvs {
-		if value == "" {
-			missingEnvs = append(missingEnvs, key)
-		}
-	}
+type UsersConfig struct {
+	Credentials []UserCredential `toml:"credentials"`
+}
 
-	if len(missingEnvs) > 0 {
-		return nil, fmt.Errorf("missing required environment variables: %v", missingEnvs)
-	}
+type UserCredential struct {
+	Username string `toml:"username"`
+	Password string `toml:"password"`
+}
 
-	port, err := strconv.Atoi(requiredEnvs["PORT"])
+type LoggingConfig struct {
+	Level      string `toml:"level"`
+	File       string `toml:"file"`
+	MaxSize    int    `toml:"max_size"`
+	MaxBackups int    `toml:"max_backups"`
+	MaxAge     int    `toml:"max_age"`
+}
+
+type UIConfig struct {
+	ThemeFile string `toml:"theme_file"`
+}
+
+var GlobalConfig Config
+
+func LoadConfig() error {
+	configPath := filepath.Join("configs", "config.toml")
+
+	file, err := os.ReadFile(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("invalid PORT value: %v", err)
+		return fmt.Errorf("error reading config file: %v", err)
 	}
 
-	return &Config{
-		IP:             requiredEnvs["IP"],
-		Port:           port,
-		AllowedOrigins: "*",
-		ProxyTarget:    "",
-		EntryPoint:     requiredEnvs["ENTRY"],
-		JWTSecret:      requiredEnvs["JWT_SECRET"],
-		TrustedIPs:     getTrustedIPs(),
-		WorkDir:        requiredEnvs["WORK_DIR"],
-	}, nil
+	if _, err := toml.Decode(string(file), &GlobalConfig); err != nil {
+		return fmt.Errorf("error parsing config file: %v", err)
+	}
+
+	return nil
 }
 
-func getEnvOrDefault(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
-func getTrustedIPs() []string {
-	ips := os.Getenv("PANEL_TRUSTED_IPS")
-	if ips == "" {
-		return []string{"127.0.0.1"}
-	}
-	return strings.Split(ips, ",")
+func GetConfig() *Config {
+	return &GlobalConfig
 }

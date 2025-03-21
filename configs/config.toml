@@ -1,0 +1,21 @@
+[server]
+host = "0.0.0.0"
+port = 8080
+entry = "nucurtomentry"
+
+[security]
+jwt_secret = "this-is-a-secret-key-replace-in-production"
+jwt_expire_hours = 24
+
+[users]
+# Users defined in users.json file
+
+[logging]
+level = "info"
+file = "logs/panelbase.log"
+max_size = 10
+max_backups = 5
+max_age = 30
+
+[ui]
+theme_file = "configs/theme.json"

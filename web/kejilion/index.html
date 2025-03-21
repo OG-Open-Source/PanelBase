@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>科技lion面板</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="menu-header">功能菜單</div>
+            <ul class="menu">
+                <li class="active"><a href="index.html">儀表板</a></li>
+                <li><a href="docker.html">Docker管理</a></li>
+                <li><a href="website.html">網站管理</a></li>
+                <li><a href="filemanager.html">檔案管理</a></li>
+                <li><a href="market.html">應用商店</a></li>
+                <li><a href="settings.html">系統設定</a></li>
+            </ul>
+        </div>
+        <div class="content">
+            <div class="dashboard">
+                <h1>系統儀表板</h1>
+                <div class="stats-container">
+                    <div class="stat-card">
+                        <h3>系統狀態</h3>
+                        <p class="status-indicator online">在線</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>系統負載</h3>
+                        <p id="loadValue">加載中...</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>記憶體使用</h3>
+                        <p id="memoryValue">加載中...</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>CPU使用</h3>
+                        <p id="cpuValue">加載中...</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>硬碟使用</h3>
+                        <p id="diskValue">加載中...</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>運行時間</h3>
+                        <p id="uptimeValue">加載中...</p>
+                    </div>
+                </div>
+                <div class="system-info">
+                    <h2>系統資訊</h2>
+                    <table>
+                        <tr>
+                            <th>主機名</th>
+                            <td id="hostname">加載中...</td>
+                        </tr>
+                        <tr>
+                            <th>操作系統</th>
+                            <td id="os">加載中...</td>
+                        </tr>
+                        <tr>
+                            <th>內核版本</th>
+                            <td id="kernel">加載中...</td>
+                        </tr>
+                        <tr>
+                            <th>IP地址</th>
+                            <td id="ip">加載中...</td>
+                        </tr>
+                        <tr>
+                            <th>CPU型號</th>
+                            <td id="cpu">加載中...</td>
+                        </tr>
+                        <tr>
+                            <th>記憶體總量</th>
+                            <td id="memory">加載中...</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="js/script.js"></script>
+</body>
+</html> 
