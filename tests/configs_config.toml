@@ -1,0 +1,15 @@
+[server]
+host = "0.0.0.0"
+port = 37415
+entry = "R0wrGu2shcHU"
+
+[security]
+jwt_secret = "f9ae4ef88f061835577587f3db75ff7d4c2af37bc5c2a16ef9dac8aabed8a0f039aa19afd480f15587dd8bc4c9d43ea9ae376103de1f4611beb79115987c2a52"
+jwt_expire_hours = 24
+
+[logging]
+level = "info"
+file = "logs/panelbase.log"
+max_size = 10
+max_backups = 5
+max_age = 30

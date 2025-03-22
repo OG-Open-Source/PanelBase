@@ -1,0 +1,24 @@
+{
+  "kejilion": {
+    "name": "科技lion面板",
+    "authors": "科技lion",
+    "version": "1.0.0",
+    "description": "科技lion面板",
+    "directory": "kejilion",
+    "structure": {
+      "css": {
+        "style.css": "https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main/web/kejilion/css/style.css"
+      },
+      "js": {
+        "nav.js": "https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main/web/kejilion/js/nav.js",
+        "script.js": "https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main/web/kejilion/js/script.js"
+      },
+      "docker.html": "https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main/web/kejilion/docker.html",
+      "filemanager.html": "https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main/web/kejilion/filemanager.html",
+      "index.html": "https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main/web/kejilion/index.html",
+      "market.html": "https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main/web/kejilion/market.html",
+      "settings.html": "https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main/web/kejilion/settings.html",
+      "website.html": "https://raw.githubusercontent.com/OG-Open-Source/PanelBase/refs/heads/main/web/kejilion/website.html"
+    }
+  }
+}

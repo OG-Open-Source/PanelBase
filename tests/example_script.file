@@ -5,6 +5,9 @@
 # @authors: PanelBase Team
 # @version: 1.0.0
 # @description: Execute command
+# @source_link: https://example.com/script.sh
+# @execute_dir: /path/to/directory
+# @allow_users: admin, user
 
 *#ARG_1#*
 
@@ -16,5 +19,8 @@
 // @authors: PanelBase Team
 // @version: 1.0.0
 // @description: Execute command
+// @source_link: https://example.com/script.sh
+// @execute_dir: /path/to/directory
+// @allow_users: admin, user
 
 *#ARG_1#*

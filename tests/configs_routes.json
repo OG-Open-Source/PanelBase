@@ -1,0 +1,6 @@
+{
+  "routes": {
+    "code": "file",
+    "get_data": "data.py"
+  }
+}

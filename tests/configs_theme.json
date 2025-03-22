@@ -1,0 +1,18 @@
+{
+  "current_theme": "default_theme",
+  "themes": {
+    "default_theme": {
+      "name": "Default Theme",
+      "authors": "PanelBase Team",
+      "version": "1.0.0",
+      "description": "Default theme for PanelBase",
+      "source_link": "https://github.com/OG-Open-Source/PanelBase-DefaultTheme/theme.json",
+      "directory": "default",
+      "structure": {
+        "index.html": "https://raw.githubusercontent.com/OG-Open-Source/PanelBase-DefaultTheme/main/index.html",
+        "style.css": "https://raw.githubusercontent.com/OG-Open-Source/PanelBase-DefaultTheme/main/style.css",
+        "script.js": "https://raw.githubusercontent.com/OG-Open-Source/PanelBase-DefaultTheme/main/script.js"
+      }
+    }
+  }
+}
