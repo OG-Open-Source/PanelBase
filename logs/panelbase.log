@@ -1,0 +1,6 @@
+{"level":"info","time":"2025-03-22T21:23:19+08:00","caller":"E:/Github Desktop/PanelBase/pkg/logger/logger.go:64","message":"Logger initialized"}
+{"level":"info","entryURL":"0.0.0.0:11256/37a47574faed/","time":"2025-03-22T21:23:20+08:00","caller":"E:/Github Desktop/PanelBase/cmd/panelbase/main.go:43","message":"Server is accessible at this URL path"}
+{"level":"info","address":"0.0.0.0:11256","entryURL":"0.0.0.0:11256/37a47574faed/","time":"2025-03-22T21:23:20+08:00","caller":"E:/Github Desktop/PanelBase/internal/api/api.go:53","message":"Starting API server"}
+{"level":"info","time":"2025-03-22T21:23:21+08:00","caller":"E:/Github Desktop/PanelBase/cmd/panelbase/main.go:58","message":"Shutting down server..."}
+{"level":"info","time":"2025-03-22T21:23:21+08:00","caller":"E:/Github Desktop/PanelBase/internal/api/api.go:60","message":"Shutting down API server"}
+{"level":"info","time":"2025-03-22T21:23:21+08:00","caller":"E:/Github Desktop/PanelBase/cmd/panelbase/main.go:69","message":"Server exiting"}

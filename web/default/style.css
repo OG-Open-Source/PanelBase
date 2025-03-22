@@ -58,28 +58,6 @@ main {
 	border-left: 4px solid #3498db;
 }
 
-.theme-info-content h3 {
-	color: #3498db;
-	margin-top: 20px;
-	margin-bottom: 10px;
-	border-bottom: 1px solid #eee;
-	padding-bottom: 5px;
-}
-
-.theme-info-content ul {
-	list-style-type: none;
-	padding-left: 10px;
-}
-
-.theme-info-content li {
-	padding: 5px 0;
-	border-bottom: 1px dashed #eee;
-}
-
-.theme-info-content p {
-	margin-bottom: 8px;
-}
-
 /* Footer styles */
 footer {
 	text-align: center;

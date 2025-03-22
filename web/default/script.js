@@ -21,33 +21,17 @@ async function fetchThemeInfo() {
 
 		const data = await response.json();
 
-		// 创建包含所有主题信息的 HTML
-		let themeInfoHTML = '<div class="theme-info-content">';
+		// Create HTML with theme information
+		const themeInfoHTML =
+			'<div class="theme-info-content">' +
+				'<p><strong>Name:</strong> ' + data.name + '</p>' +
+				'<p><strong>Version:</strong> ' + data.version + '</p>' +
+				'<p><strong>Authors:</strong> ' + data.authors + '</p>' +
+				'<p><strong>Description:</strong> ' + data.description + '</p>' +
+				'<p><strong>Source:</strong> <a href="' + data.source_link + '" target="_blank">GitHub Repository</a></p>' +
+			'</div>';
 
-		// 基本信息
-		themeInfoHTML +=
-			'<h3>基本信息</h3>' +
-			'<p><strong>名称:</strong> ' + data.name + '</p>' +
-			'<p><strong>版本:</strong> ' + data.version + '</p>' +
-			'<p><strong>作者:</strong> ' + data.authors + '</p>' +
-			'<p><strong>描述:</strong> ' + data.description + '</p>' +
-			'<p><strong>源代码:</strong> <a href="' + data.source_link + '" target="_blank">GitHub 仓库</a></p>';
-
-		// 目录信息
-		themeInfoHTML +=
-			'<h3>主题目录</h3>' +
-			'<p><strong>目录:</strong> ' + data.directory + '</p>';
-
-		// 结构信息
-		themeInfoHTML += '<h3>主题结构</h3><ul>';
-
-		for (const [key, value] of Object.entries(data.structure)) {
-			themeInfoHTML += '<li><strong>' + key + ':</strong> ' + value + '</li>';
-		}
-
-		themeInfoHTML += '</ul></div>';
-
-		// 更新主题信息元素
+		// Update the theme info element
 		themeInfoElement.innerHTML = themeInfoHTML;
 
 	} catch (error) {
