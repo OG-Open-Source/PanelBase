@@ -83,7 +83,52 @@ Invoke-WebRequest -Uri "http://localhost:12088/2d3f5527a780/theme/info"
 }
 ```
 
-### 3. 访问 Web 界面
+### 3. 主题下载端点
+
+**请求：**
+
+```powershell
+Invoke-WebRequest -Uri "http://localhost:12088/2d3f5527a780/theme/download?url=https://example.com/mytheme.json"
+```
+
+**预期响应：**
+
+```json
+{
+  "status": "success",
+  "message": "Theme downloaded successfully",
+  "file_path": "themes/temp/mytheme.json",
+  "theme_name": "My Custom Theme"
+}
+```
+
+### 4. 主题元数据检查端点
+
+**请求：**
+
+```powershell
+Invoke-WebRequest -Uri "http://localhost:12088/2d3f5527a780/theme/metadata?url=https://example.com/mytheme.json"
+```
+
+**预期响应：**
+
+```json
+{
+  "name": "My Custom Theme",
+  "authors": "Theme Author",
+  "version": "1.0.0",
+  "description": "A custom theme for PanelBase",
+  "source_link": "https://github.com/author/mytheme",
+  "directory": "custom",
+  "structure": {
+    "index.html": "web/custom/index.html",
+    "style.css": "web/custom/style.css",
+    "script.js": "web/custom/script.js"
+  }
+}
+```
+
+### 5. 访问 Web 界面
 
 在浏览器中打开以下 URL：
 
