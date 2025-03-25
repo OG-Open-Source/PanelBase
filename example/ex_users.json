@@ -1,0 +1,15 @@
+{
+  "users": {
+    "f1bc3a9c63097bd90d5799649c9d4349": {
+      "username": "admin",
+      "password": "$2a$10$VwPWUIUaqO6O7Ti1DZpHPeJKdrK4sUuutuBcLUpkeeZHiGuswRQey",
+      "role": "admin",
+      "name": "Administrator",
+      "email": "admin@example.com",
+      "created_at": "2025-03-25T22:02:34.6267009+08:00",
+      "last_login": "2025-03-25T22:23:28.1416913+08:00"
+    }
+  },
+  "default_role": "viewer",
+  "jwt_secret": "b01503d5288b6e5d7b833e73c52d35784db9a074259a98530d752b6824259ee4"
+}

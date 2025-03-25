@@ -1,0 +1,26 @@
+#!/bin/bash
+# @script: shell
+# @pkg_managers: apk, apt, opkg, pacman, yum, zypper, dnf
+# @dependencies: null
+# @authors: PanelBase Team
+# @version: 1.0.0
+# @description: Execute command
+# @source_link: https://example.com/script.sh
+# @execute_dir: /path/to/directory
+# @allow_users: admin, editor
+
+*#ARG_1#*
+
+---
+
+// @script: golang
+// @pkg_managers: apk, apt, opkg, pacman, yum, zypper, dnf
+// @dependencies: null
+// @authors: PanelBase Team
+// @version: 1.0.0
+// @description: Execute command
+// @source_link: https://example.com/script.sh
+// @execute_dir: /path/to/directory
+// @allow_users: admin, editor
+
+*#ARG_1#*

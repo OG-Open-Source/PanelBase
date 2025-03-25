@@ -1,0 +1,8 @@
+{
+  "routes": {
+    "system": "system.sh",
+    "users": "users.sh",
+    "backup": "backup.sh",
+    "update": "update.sh"
+  }
+} 

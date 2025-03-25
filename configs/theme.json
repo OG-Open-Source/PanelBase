@@ -1,0 +1,27 @@
+{
+  "current_theme": "default",
+  "themes": {
+    "default": {
+      "name": "Default Theme",
+      "authors": "PanelBase Team",
+      "version": "1.0.0",
+      "description": "Default theme for PanelBase",
+      "source_link": "https://github.com/OG-Open-Source/PanelBase",
+      "directory": "default",
+      "structure": {
+        "index.html": "web/themes/default/templates/index.html",
+        "login.html": "web/themes/default/templates/login.html",
+        "admin.html": "web/themes/default/templates/admin.html",
+        "assets": {
+          "css": {
+            "styles.css": "web/themes/default/assets/css/styles.css"
+          },
+          "js": {
+            "main.js": "web/themes/default/assets/js/main.js",
+            "admin.js": "web/themes/default/assets/js/admin.js"
+          }
+        }
+      }
+    }
+  }
+} 

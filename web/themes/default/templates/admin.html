@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .title }}</title>
+    <link rel="stylesheet" href="/assets/css/styles.css">
+</head>
+<body class="admin-page">
+    <header>
+        <div class="container">
+            <h1>PanelBase Admin</h1>
+            <nav>
+                <ul>
+                    <li><a href="/">Dashboard</a></li>
+                    <li><a href="/system">System</a></li>
+                    <li><a href="/users">Users</a></li>
+                    <li><a href="/settings">Settings</a></li>
+                    <li><a href="/logout">Logout</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <h2>Admin Control Center</h2>
+            <p>Welcome to the administrative control center for PanelBase.</p>
+            
+            <div class="admin-grid">
+                <div class="admin-card">
+                    <h3>User Management</h3>
+                    <ul class="admin-actions">
+                        <li><a href="/users/add">Add New User</a></li>
+                        <li><a href="/users/roles">Manage Roles</a></li>
+                        <li><a href="/users/permissions">Edit Permissions</a></li>
+                    </ul>
+                </div>
+                
+                <div class="admin-card">
+                    <h3>System Configuration</h3>
+                    <ul class="admin-actions">
+                        <li><a href="/system/settings">System Settings</a></li>
+                        <li><a href="/system/network">Network Configuration</a></li>
+                        <li><a href="/system/security">Security Settings</a></li>
+                    </ul>
+                </div>
+                
+                <div class="admin-card">
+                    <h3>Maintenance</h3>
+                    <ul class="admin-actions">
+                        <li><a href="/maintenance/backup">Backup System</a></li>
+                        <li><a href="/maintenance/update">Check for Updates</a></li>
+                        <li><a href="/maintenance/logs">View System Logs</a></li>
+                    </ul>
+                </div>
+                
+                <div class="admin-card">
+                    <h3>Theme Management</h3>
+                    <ul class="admin-actions">
+                        <li><a href="/themes">Change Theme</a></li>
+                        <li><a href="/themes/install">Install New Theme</a></li>
+                        <li><a href="/themes/edit">Edit Current Theme</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="admin-advanced">
+                <h3>Advanced Options</h3>
+                <div class="button-grid">
+                    <button class="danger-button">Reset System</button>
+                    <button class="danger-button">Factory Reset</button>
+                    <button class="danger-button">Reboot Server</button>
+                    <button class="danger-button">Shutdown Server</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2023 PanelBase. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="/assets/js/admin.js"></script>
+</body>
+</html> 
