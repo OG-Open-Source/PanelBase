@@ -43,7 +43,7 @@ cd panelbase
 初始登入資訊：
 
 - 用戶名：admin
-- 密碼：查看 `/root/panelbase_password.txt`
+- 密碼：admin
 
 ## 配置指南
 
@@ -58,69 +58,69 @@ PanelBase 提供了完整的 API 接口，支持以下操作：
 
 ### 主題相關 API
 
-- **GET /api/v1/theme**: 獲取所有主題或特定主題信息
+- **GET /api/v1/themes**: 獲取所有主題或特定主題信息
 
   ```bash
-  curl -H "Authorization: Bearer YOUR_TOKEN" http://your-server-ip:8080/api/v1/theme
-  curl -H "Authorization: Bearer YOUR_TOKEN" -X GET -d '{"id":"theme_id"}' http://your-server-ip:8080/api/v1/theme
+  curl -H "Authorization: Bearer YOUR_TOKEN" http://your-server-ip:8080/api/v1/themes
+  curl -H "Authorization: Bearer YOUR_TOKEN" -X GET -d '{"id":"theme_id"}' http://your-server-ip:8080/api/v1/themes
   ```
 
-- **POST /api/v1/theme**: 安裝新主題或切換當前主題
+- **POST /api/v1/themes**: 安裝新主題或切換當前主題
 
   ```bash
-  curl -H "Authorization: Bearer YOUR_TOKEN" -X POST -d '{"url":"theme_source_url"}' http://your-server-ip:8080/api/v1/theme
-  curl -H "Authorization: Bearer YOUR_TOKEN" -X POST -d '{"id":"theme_id","status":"switch"}' http://your-server-ip:8080/api/v1/theme
+  curl -H "Authorization: Bearer YOUR_TOKEN" -X POST -d '{"url":"theme_source_url"}' http://your-server-ip:8080/api/v1/themes
+  curl -H "Authorization: Bearer YOUR_TOKEN" -X POST -d '{"id":"theme_id","status":"switch"}' http://your-server-ip:8080/api/v1/themes
   ```
 
-- **PUT /api/v1/theme**: 更新所有已安裝主題
+- **PUT /api/v1/themes**: 更新所有已安裝主題
 
   ```bash
-  curl -H "Authorization: Bearer YOUR_TOKEN" -X PUT http://your-server-ip:8080/api/v1/theme
+  curl -H "Authorization: Bearer YOUR_TOKEN" -X PUT http://your-server-ip:8080/api/v1/themes
   ```
 
-- **PATCH /api/v1/theme**: 更新特定主題
+- **PATCH /api/v1/themes**: 更新特定主題
 
   ```bash
-  curl -H "Authorization: Bearer YOUR_TOKEN" -X PATCH -d '{"id":"theme_id"}' http://your-server-ip:8080/api/v1/theme
+  curl -H "Authorization: Bearer YOUR_TOKEN" -X PATCH -d '{"id":"theme_id"}' http://your-server-ip:8080/api/v1/themes
   ```
 
-- **DELETE /api/v1/theme**: 删除所有非當前主題或特定主題
+- **DELETE /api/v1/themes**: 删除所有非當前主題或特定主題
   ```bash
-  curl -H "Authorization: Bearer YOUR_TOKEN" -X DELETE http://your-server-ip:8080/api/v1/theme
-  curl -H "Authorization: Bearer YOUR_TOKEN" -X DELETE -d '{"id":"theme_id"}' http://your-server-ip:8080/api/v1/theme
+  curl -H "Authorization: Bearer YOUR_TOKEN" -X DELETE http://your-server-ip:8080/api/v1/themes
+  curl -H "Authorization: Bearer YOUR_TOKEN" -X DELETE -d '{"id":"theme_id"}' http://your-server-ip:8080/api/v1/themes
   ```
 
 ### 插件相關 API
 
-- **GET /api/v1/plugin**: 獲取所有插件或特定插件信息
+- **GET /api/v1/plugins**: 獲取所有插件或特定插件信息
 
   ```bash
-  curl -H "Authorization: Bearer YOUR_TOKEN" http://your-server-ip:8080/api/v1/plugin
-  curl -H "Authorization: Bearer YOUR_TOKEN" -X GET -d '{"id":"plugin_id"}' http://your-server-ip:8080/api/v1/plugin
+  curl -H "Authorization: Bearer YOUR_TOKEN" http://your-server-ip:8080/api/v1/plugins
+  curl -H "Authorization: Bearer YOUR_TOKEN" -X GET -d '{"id":"plugin_id"}' http://your-server-ip:8080/api/v1/plugins
   ```
 
-- **POST /api/v1/plugin**: 安裝新插件
+- **POST /api/v1/plugins**: 安裝新插件
 
   ```bash
-  curl -H "Authorization: Bearer YOUR_TOKEN" -X POST -d '{"url":"plugin_source_url"}' http://your-server-ip:8080/api/v1/plugin
+  curl -H "Authorization: Bearer YOUR_TOKEN" -X POST -d '{"url":"plugin_source_url"}' http://your-server-ip:8080/api/v1/plugins
   ```
 
-- **PUT /api/v1/plugin**: 更新所有已安裝插件
+- **PUT /api/v1/plugins**: 更新所有已安裝插件
 
   ```bash
-  curl -H "Authorization: Bearer YOUR_TOKEN" -X PUT http://your-server-ip:8080/api/v1/plugin
+  curl -H "Authorization: Bearer YOUR_TOKEN" -X PUT http://your-server-ip:8080/api/v1/plugins
   ```
 
-- **PATCH /api/v1/plugin**: 更新特定插件
+- **PATCH /api/v1/plugins**: 更新特定插件
 
   ```bash
-  curl -H "Authorization: Bearer YOUR_TOKEN" -X PATCH -d '{"id":"plugin_id"}' http://your-server-ip:8080/api/v1/plugin
+  curl -H "Authorization: Bearer YOUR_TOKEN" -X PATCH -d '{"id":"plugin_id"}' http://your-server-ip:8080/api/v1/plugins
   ```
 
-- **DELETE /api/v1/plugin**: 删除所有插件或特定插件
+- **DELETE /api/v1/plugins**: 删除所有插件或特定插件
   ```bash
-  curl -H "Authorization: Bearer YOUR_TOKEN" -X DELETE http://your-server-ip:8080/api/v1/plugin
-  curl -H "Authorization: Bearer YOUR_TOKEN" -X DELETE -d '{"id":"plugin_id"}' http://your-server-ip:8080/api/v1/plugin
+  curl -H "Authorization: Bearer YOUR_TOKEN" -X DELETE http://your-server-ip:8080/api/v1/plugins
+  curl -H "Authorization: Bearer YOUR_TOKEN" -X DELETE -d '{"id":"plugin_id"}' http://your-server-ip:8080/api/v1/plugins
   ```
 
 ### 命令相關 API
@@ -157,6 +157,152 @@ PanelBase 提供了完整的 API 接口，支持以下操作：
   ```
 
 ## 更新日誌
+
+### 2024 年 7 月 14 日
+
+- 改進代碼性能和體驗
+  - 移除所有與持續時間解析和API令牌創建相關的調試日誌信息
+  - 優化核心功能代碼，減少屏幕輸出，提升執行效率
+  - 保留重要邏輯功能，僅移除開發階段的調試信息
+  - 改善系統輸出的清潔度，以提供更專業的使用體驗
+
+### 2024 年 7 月 13 日
+
+- 优化API令牌持续时间处理
+  - 移除API令牌最小和最大持续时间限制，允许用户完全自定义过期时间
+  - 简化持续时间解析，仅支持ISO 8601标准格式（如`P3Y6M4DT12H30M5S`、`PT1H`）
+  - 移除多级持续时间格式解析，确保系统一致性和标准化
+  - 完善日志输出，提供更清晰的持续时间解析过程信息
+  - 统一所有与令牌相关函数的持续时间处理方式，使用相同的逻辑
+
+- 增强ISO 8601持续时间格式支持
+  - 改进对复杂ISO 8601持续时间格式的解析，如`P3Y6M4DT12H30M5S`
+  - 添加多级持续时间格式解析逻辑，支持ISO 8601、Go标准格式和数字小时数
+  - 扩展调试日志，显示持续时间的解析过程和结果
+  - 统一所有持续时间的最小和最大限制（1小时至720小时）
+  - 优化令牌创建过程的持续时间显示，更直观地展示小时和分钟
+  - 确保所有API令牌创建方法使用相同的持续时间解析逻辑
+
+- 修复API token生成和验证问题
+  - 修正API token的签名密钥传递问题，确保使用正确的JWT密钥
+  - 移除`generateAPITokenJWT`函数中的硬编码密钥，改为使用配置中的密钥
+  - 确保所有API token的生成都使用相同的密钥进行签名
+  - 优化调试日志，便于追踪令牌创建和验证过程
+
+- 修复API token过期时间计算问题
+  - 修正API token创建时过期时间计算错误，确保正确应用持续时间
+  - 添加调试日志，以便于排查时间计算问题
+  - 统一使用单一时间变量，避免多次调用time.Now()导致的微小差异
+  - 确保令牌过期时间(exp)正确设置为当前时间加上持续时间
+
+- 修正时间字段序列化问题
+  - 添加自定义 `JsonTime` 类型处理时间字段的零值
+  - 确保 `last_login`、`last_used` 和 `last_reset_time` 等时间字段在未设置时序列化为 `null`
+  - 统一系统中所有时间字段的处理方式
+  - 解决 users.json 中时间字段显示为 "0001-01-01" 的问题
+  - 修复配置初始化和用户配置加载中的时间字段类型转换问题
+  - 确保所有地方使用 `JsonTime` 类型处理时间值
+  - 修复 API token 创建时的 `last_used` 和 `last_reset_time` 初始化为零值，正确显示为 `null`
+  - 统一时间字段处理逻辑，确保首次使用前所有时间都显示为 `null`
+  - 添加 API token 使用统计追踪功能，自动更新 `last_used` 和 `usage_count` 字段
+  - 优化认证中间件，通过匹配 token 字符串查找和更新对应的 API token 记录
+
+### 2024 年 7 月 12 日
+
+- 添加令牌解析工具
+  - 创建 PowerShell 版本 TokenParser.ps1 脚本，用于解析 JWT 和 API 令牌
+  - 创建 Bash 版本 token_parser.sh 脚本，提供相同的功能
+  - 支持令牌结构分析，显示标头、载荷和签名部分
+  - 自动检测令牌过期状态并显示剩余有效时间
+  - 支持从文件读取或直接输入令牌
+  - 可将解析结果保存为 JSON 文件
+  - 添加彩色输出，提升使用体验
+  - 自动识别令牌中的关键字段，包括 type、username、user_id 等
+  - 对令牌解析工具进行兼容性优化，支持不同环境
+  - 修正令牌中 username 和 user_id 字段的解析逻辑
+  - 更新令牌类型的识别机制，区分 JWT 和 API 令牌
+
+### 2024 年 7 月 9 日
+
+- 添加配置文件自動檢查和生成功能
+  - 啟動時自動檢測 `/configs/` 目錄及必要的配置文件是否存在
+  - 當缺少配置目錄或文件時，自動創建相應的默認配置
+  - 添加 `commands.json` 和 `plugins.json` 空文件自動生成功能
+  - 添加 `config.yaml` 自動配置功能，從註冊端口(1024-49151)隨機選擇可用端口
+  - 添加 `themes.json` 自動配置功能，使用默認主題設置
+  - 添加 `users.json` 自動生成功能，創建默認 admin 用戶並加密密碼
+  - 新增隨機值生成工具包，支持生成用戶ID、JWT密鑰、API令牌等
+  - 新增密碼加密工具包，支持使用 bcrypt 對密碼進行加密和驗證
+  - 優化端口選擇範圍，使用標準的註冊端口範圍(1024-49151)
+  - 增加端口有效性檢查，確保選擇的端口在有效範圍內
+  - 解決了首次安裝時需要手動創建配置文件的問題
+  - 簡化了部署流程，降低了安裝門檻
+  - 自動創建基本目錄結構，包括 `/commands/`、`/plugins/` 和 `/web/` 目錄
+- 重構用戶配置數據結構
+  - 移除 User 結構中的冗餘 ID 欄位
+  - 使用 map 的 key 作為用戶唯一識別符
+  - 生成隨機的用戶 ID 而不是使用固定的 "admin"
+  - 更新相關處理邏輯以適應新的數據結構
+  - 添加工具函數簡化用戶 ID 查找
+  - 修復處理器中使用 User.ID 欄位的代碼
+  - 更新 JWT 令牌生成機制，使用 map key 作為用戶 ID
+  - 保持向後兼容性，確保舊配置仍然可用
+- 系統日誌英文化
+  - 將所有日誌輸出更新為英文，提高國際化能力
+  - 包含啟動訊息、配置文件檢測、警告和錯誤訊息
+  - 保持錯誤訊息清晰明確，方便故障排除
+  - 保證配置文件結構和格式不變，只更新日誌語言
+- API 響應格式標準化
+  - 統一所有 API 響應格式，採用 `status`、`message` 和 `data` 三層結構
+  - 為錯誤響應添加詳細說明和相關數據
+  - 實現用戶友好的錯誤訊息，方便客戶端處理
+  - 保持 API 響應一致性，提高開發體驗
+- 修復用戶登入功能
+  - 修正 GetUser 方法，支持通過用戶名而非 ID 查找用戶
+  - 確保用戶登入 API 能夠正確識別存在的用戶
+  - 更新認證中間件錯誤處理邏輯，確保安全性和友好性
+  - 解決了用戶無法登入的問題
+- 優化 API 路徑和功能
+  - 更新登入路徑為 `/api/v1/auth/login`，符合 RESTful 規範
+  - 添加 API 令牌創建端點 `/api/v1/auth/token`
+  - 實現 UsersConfig.Save 方法，確保用戶數據保存功能正常工作
+  - 修復最後登入時間 (last_login) 無法正確記錄問題
+  - 標準化所有中間件的錯誤響應格式
+  - 完善 API 令牌創建功能，支持權限控制和有效期設置
+- 改進用戶登入時間處理
+  - 新用戶首次登入前，`last_login` 值顯示為 `null`
+  - 登入後正確更新並顯示 `last_login` 時間
+  - 使用 ISO 8601 格式（RFC3339）標準化時間顯示
+  - 添加時間格式化工具函數，統一處理零值時間
+- 優化 Token 驗證機制
+  - 重構 JWT 令牌驗證邏輯，增強其健壯性
+  - 簡化令牌類型檢測，支持自動識別 JWT 和 API 令牌
+  - 修復認證中間件對 JWT 令牌的處理邏輯
+  - 解決「未知 token 類型」的錯誤問題
+  - 明確在令牌 claims 中添加類型標識
+  - 改進 API 令牌創建和驗證流程
+  - 優化令牌驗證失敗時的錯誤提示
+- 改進 API 令牌創建功能
+  - 修復已過期 JWT 令牌無法創建 API 令牌的問題
+  - 針對 API 令牌創建請求特殊處理，允許已過期但簽名有效的 JWT 令牌
+  - 添加 `CreateAPITokenWithSecret` 方法，使用指定的 JWT 密鑰創建 API 令牌
+  - 確保 API 令牌使用與系統相同的 JWT 密鑰進行簽名
+  - 優化錯誤處理和響應格式
+- 增強 JWT 令牌安全機制
+  - 為 JWT 令牌添加過期時間限制，最長 7 天
+  - 為 API 令牌添加過期時間限制，最長 30 天
+  - 優化過期時間解析邏輯，支持多種時間格式
+  - 為 JWT 令牌和 API 令牌添加默認過期時間
+  - 實現過期時間上限控制，防止永久有效令牌帶來的安全風險
+  - 確保 API 令牌至少有 1 小時的有效期
+- 優化 API 令牌數據結構
+  - 將 User.API 從數組類型重構為映射（map）類型
+  - 使用令牌ID作為映射的鍵（key），提高查詢效率
+  - 從 APIToken 結構中移除冗餘的 ID 欄位
+  - 優化令牌管理相關方法，包括創建、更新、刪除和重置
+  - 改進令牌數據的序列化和反序列化處理
+  - 確保向後兼容性，支持舊版本配置自動遷移
+  - 減少數據存儲冗餘，提高系統性能
 
 ### 2024 年 7 月 8 日
 

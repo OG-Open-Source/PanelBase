@@ -17,13 +17,16 @@ func SetupRoutes(router *gin.Engine, configService *services.ConfigService) {
 	commandHandler := NewCommandHandler(configService)
 	systemHandler := NewSystemHandler(configService)
 
-	// 登录路由
-	router.POST("/api/v1/login", authHandler.LoginHandler)
+	// Auth相關路由
+	router.POST("/api/v1/auth/login", authHandler.LoginHandler)
 
 	// API 路由组 (需要认证)
 	apiGroup := router.Group("/api/v1")
 	apiGroup.Use(middleware.AuthMiddleware(configService))
 	{
+		// API Token管理
+		apiGroup.POST("/auth/token", authHandler.CreateAPITokenHandler)
+
 		// 系统相关API
 		apiGroup.GET("/system/info", systemHandler.GetSystemInfo)
 		apiGroup.GET("/system/status", systemHandler.GetSystemStatus)

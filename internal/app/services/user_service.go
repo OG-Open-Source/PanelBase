@@ -40,9 +40,9 @@ func (s *UserService) Authenticate(username, password string) (*models.User, err
 }
 
 // GenerateJWT generates a JWT token for a user
-func (s *UserService) GenerateJWT(user *models.User) (string, error) {
+func (s *UserService) GenerateJWT(user *models.User, userID string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"id":   user.ID,
+		"id":   userID,
 		"user": user.Username,
 		"role": user.Role,
 		"exp":  time.Now().Add(time.Hour * 24).Unix(),

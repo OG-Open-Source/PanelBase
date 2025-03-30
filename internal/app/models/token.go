@@ -132,67 +132,40 @@ func ValidateAPIToken(tokenString, secret string) (*APIClaims, error) {
 
 // ValidateToken 通用token验证方法
 func ValidateToken(tokenString, secret string) (*TokenClaims, error) {
-	// 先尝试解析为通用claims以获取token类型
-	claims := &TokenClaims{}
-	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
-	_, _, err := parser.ParseUnverified(tokenString, claims)
-
-	// 如果解析失败或者Token类型为空，默认尝试JWT类型
-	if err != nil || claims.Type == "" {
-		// 尝试作为JWT token解析
-		jwtClaims, jwtErr := ValidateJWTToken(tokenString, secret)
-		if jwtErr != nil {
-			// JWT解析也失败，再尝试API token
-			apiClaims, apiErr := ValidateAPIToken(tokenString, secret)
-			if apiErr != nil {
-				// 两种都失败，返回原始错误
-				if err != nil {
-					return nil, fmt.Errorf("token解析失败: %v", err)
-				}
-				return nil, fmt.Errorf("未知token类型: %v", claims.Type)
-			}
-
-			// API token解析成功
-			return &TokenClaims{
-				UserID:           apiClaims.UserID,
-				Type:             TokenTypeAPI,
-				RegisteredClaims: apiClaims.RegisteredClaims,
-			}, nil
+	// 直接尝试作为JWT token解析，但忽略过期错误
+	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
+		return []byte(secret), nil
+	}, jwt.WithoutClaimsValidation())
 
-		// JWT token解析成功
-		return &TokenClaims{
-			UserID:           jwtClaims.UserID,
-			Type:             TokenTypeJWT,
-			RegisteredClaims: jwtClaims.RegisteredClaims,
-		}, nil
+	if err == nil {
+		if claims, ok := token.Claims.(*JWTClaims); ok {
+			// 只检查签名有效性，忽略过期
+			if token.Valid {
+				return &TokenClaims{
+					UserID:           claims.UserID,
+					Type:             TokenTypeJWT,
+					RegisteredClaims: claims.RegisteredClaims,
+				}, nil
+			}
+		}
 	}
 
-	// 根据token类型选择验证方法
-	switch claims.Type {
-	case TokenTypeJWT:
-		jwtClaims, err := ValidateJWTToken(tokenString, secret)
-		if err != nil {
-			return nil, err
-		}
-		return &TokenClaims{
-			UserID:           jwtClaims.UserID,
-			Type:             TokenTypeJWT,
-			RegisteredClaims: jwtClaims.RegisteredClaims,
-		}, nil
-	case TokenTypeAPI:
-		apiClaims, err := ValidateAPIToken(tokenString, secret)
-		if err != nil {
-			return nil, err
-		}
+	// JWT解析失败，尝试API token
+	apiClaims, apiErr := ValidateAPIToken(tokenString, secret)
+	if apiErr == nil {
+		// API token解析成功
 		return &TokenClaims{
 			UserID:           apiClaims.UserID,
 			Type:             TokenTypeAPI,
 			RegisteredClaims: apiClaims.RegisteredClaims,
 		}, nil
-	default:
-		return nil, fmt.Errorf("unknown token type: %s", claims.Type)
 	}
+
+	// 如果两种都失败，返回JWT错误
+	return nil, fmt.Errorf("invalid token: %v", err)
 }
 
 // IsAPITokenValid 检查API token是否有效

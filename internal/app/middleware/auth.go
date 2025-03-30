@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/OG-Open-Source/PanelBase/internal/app/services"
 	sharedmodels "github.com/OG-Open-Source/PanelBase/internal/shared/models"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // AuthMiddleware 认证中间件
@@ -22,7 +24,11 @@ func AuthMiddleware(configService *services.ConfigService) gin.HandlerFunc {
 		// 获取Authorization header
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "未提供认证信息"})
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"status":  "failure",
+				"message": "Authentication information not provided",
+				"data":    nil,
+			})
 			c.Abort()
 			return
 		}
@@ -30,17 +36,60 @@ func AuthMiddleware(configService *services.ConfigService) gin.HandlerFunc {
 		// 解析Bearer token
 		parts := strings.Split(authHeader, " ")
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "无效的认证格式"})
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"status":  "failure",
+				"message": "Invalid authentication format",
+				"data":    nil,
+			})
 			c.Abort()
 			return
 		}
 
 		tokenString := parts[1]
 
-		// 验证token
-		claims, err := appmodels.ValidateToken(tokenString, secret)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "无效的token", "details": err.Error()})
+		// 特殊处理：如果请求的是API token创建接口，允许过期但签名有效的JWT
+		isAPITokenCreation := c.Request.URL.Path == "/api/v1/auth/token" && c.Request.Method == "POST"
+
+		var claims *appmodels.TokenClaims
+		var err error
+
+		if isAPITokenCreation {
+			// 对API token创建请求使用忽略过期的验证
+			token, parseErr := jwt.ParseWithClaims(tokenString, &appmodels.JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+				}
+				return []byte(secret), nil
+			}, jwt.WithoutClaimsValidation())
+
+			if parseErr == nil && token.Valid {
+				if jwtClaims, ok := token.Claims.(*appmodels.JWTClaims); ok {
+					claims = &appmodels.TokenClaims{
+						UserID:           jwtClaims.UserID,
+						Type:             appmodels.TokenTypeJWT,
+						RegisteredClaims: jwtClaims.RegisteredClaims,
+					}
+				}
+			} else {
+				err = parseErr
+			}
+		} else {
+			// 普通API请求使用标准验证
+			claims, err = appmodels.ValidateToken(tokenString, secret)
+		}
+
+		if err != nil || claims == nil {
+			errMsg := "Invalid token"
+			if err != nil {
+				errMsg = err.Error()
+			}
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"status":  "failure",
+				"message": "Invalid token",
+				"data": gin.H{
+					"details": errMsg,
+				},
+			})
 			c.Abort()
 			return
 		}
@@ -48,78 +97,101 @@ func AuthMiddleware(configService *services.ConfigService) gin.HandlerFunc {
 		// 根据token类型处理
 		switch claims.Type {
 		case appmodels.TokenTypeJWT:
-			// 验证用户信息是否发生变化
-			user, err := configService.UsersConfig.GetUser(claims.UserID)
-			if err != nil || user == nil {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "用户不存在"})
-				c.Abort()
-				return
+			// 查找用户信息
+			var foundUser *sharedmodels.User
+			var userID string
+
+			// 先尝试使用 UserID 查找用户
+			for id, user := range configService.UsersConfig.Users {
+				if id == claims.UserID {
+					foundUser = user
+					userID = id
+					break
+				}
 			}
 
-			// 验证用户信息是否与token中的一致
-			jwtClaims, err := appmodels.ValidateJWTToken(tokenString, secret)
-			if err != nil {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "无效的JWT token"})
-				c.Abort()
-				return
-			}
-
-			if jwtClaims.Role != user.Role ||
-				jwtClaims.Name != user.Name ||
-				jwtClaims.Email != user.Email ||
-				jwtClaims.Password != user.Password {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "用户信息已更改，请重新登录"})
+			// 如果找不到用户，返回错误
+			if foundUser == nil {
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"status":  "failure",
+					"message": "User does not exist",
+					"data": gin.H{
+						"user_id": claims.UserID,
+					},
+				})
 				c.Abort()
 				return
 			}
 
 			// 设置用户信息到上下文
-			c.Set("user_id", claims.UserID)
-			c.Set("role", jwtClaims.Role)
+			c.Set("user_id", userID)
+			c.Set("role", foundUser.Role)
 			c.Set("token_type", "jwt")
-			c.Set("user", user)
+			c.Set("user", foundUser)
 
 		case appmodels.TokenTypeAPI:
-			// 验证API token
-			user, err := configService.UsersConfig.GetUser(claims.UserID)
-			if err != nil || user == nil {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "用户不存在"})
-				c.Abort()
-				return
-			}
+			// 处理API token验证
+			// 从claims中获取用户ID
+			username := claims.UserID
 
-			// 获取API token信息
-			apiClaims, err := appmodels.ValidateAPIToken(tokenString, secret)
-			if err != nil {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "无效的API token"})
-				c.Abort()
-				return
-			}
+			// 查找用户
+			var foundUser *sharedmodels.User
+			var userID string
 
-			// 验证API token是否存在且有效
-			var apiToken *sharedmodels.APIToken
-			for i := range user.API {
-				if user.API[i].ID == apiClaims.APIID {
-					apiToken = &user.API[i]
+			// 遍历所有用户，查找匹配的用户名和API token
+			for id, user := range configService.UsersConfig.Users {
+				if user.Username == username {
+					foundUser = user
+					userID = id
+
+					// 检查是否有匹配的token
+					// 使用token字符串尝试匹配user中的API tokens
+					for tokenID, apiToken := range user.API {
+						if apiToken.Token == tokenString {
+							// 更新API token使用统计
+							if err := foundUser.UpdateAPITokenUsage(tokenID); err != nil {
+								// 记录错误但不中断请求处理
+								fmt.Printf("Failed to update API token usage: %v\n", err)
+							}
+
+							// 保存用户配置
+							err := configService.UsersConfig.Save(configService.BaseDir)
+							if err != nil {
+								// 记录错误但不中断请求处理
+								fmt.Printf("Failed to save user configuration after token usage update: %v\n", err)
+							}
+							break
+						}
+					}
 					break
 				}
 			}
 
-			if apiToken == nil {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "API token已失效"})
+			// 如果找不到用户，返回错误
+			if foundUser == nil {
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"status":  "failure",
+					"message": "User does not exist",
+					"data": gin.H{
+						"username": username,
+					},
+				})
 				c.Abort()
 				return
 			}
 
-			// 设置用户信息和API token信息到上下文
-			c.Set("user_id", claims.UserID)
-			c.Set("api_id", apiClaims.APIID)
-			c.Set("api_permissions", apiToken.Permissions)
+			// 设置用户信息到上下文
+			c.Set("user_id", userID)
+			c.Set("role", foundUser.Role)
 			c.Set("token_type", "api")
-			c.Set("user", user)
+			c.Set("user", foundUser)
 
 		default:
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "未知的token类型"})
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"status":  "failure",
+				"message": "Unknown token type",
+				"data":    nil,
+			})
 			c.Abort()
 			return
 		}
@@ -134,7 +206,11 @@ func RoleMiddleware(role string) gin.HandlerFunc {
 		// 获取token类型
 		tokenType, exists := c.Get("token_type")
 		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "未认证"})
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"status":  "failure",
+				"message": "Not authenticated",
+				"data":    nil,
+			})
 			c.Abort()
 			return
 		}
@@ -144,13 +220,21 @@ func RoleMiddleware(role string) gin.HandlerFunc {
 		case "jwt":
 			userRole, exists := c.Get("role")
 			if !exists {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "未认证"})
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"status":  "failure",
+					"message": "Not authenticated",
+					"data":    nil,
+				})
 				c.Abort()
 				return
 			}
 
 			if userRole != role {
-				c.JSON(http.StatusForbidden, gin.H{"error": "权限不足"})
+				c.JSON(http.StatusForbidden, gin.H{
+					"status":  "failure",
+					"message": "Insufficient permissions",
+					"data":    nil,
+				})
 				c.Abort()
 				return
 			}
@@ -158,7 +242,11 @@ func RoleMiddleware(role string) gin.HandlerFunc {
 		case "api":
 			permissions, exists := c.Get("api_permissions")
 			if !exists {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "未认证"})
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"status":  "failure",
+					"message": "Not authenticated",
+					"data":    nil,
+				})
 				c.Abort()
 				return
 			}
@@ -173,13 +261,21 @@ func RoleMiddleware(role string) gin.HandlerFunc {
 			}
 
 			if !hasPermission {
-				c.JSON(http.StatusForbidden, gin.H{"error": "权限不足"})
+				c.JSON(http.StatusForbidden, gin.H{
+					"status":  "failure",
+					"message": "Insufficient permissions",
+					"data":    nil,
+				})
 				c.Abort()
 				return
 			}
 
 		default:
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "未知的token类型"})
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"status":  "failure",
+				"message": "Unknown token type",
+				"data":    nil,
+			})
 			c.Abort()
 			return
 		}

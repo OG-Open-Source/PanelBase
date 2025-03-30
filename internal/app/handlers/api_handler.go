@@ -8,6 +8,7 @@ import (
 
 	"github.com/OG-Open-Source/PanelBase/internal/app/services"
 	sharedmodels "github.com/OG-Open-Source/PanelBase/internal/shared/models"
+	"github.com/OG-Open-Source/PanelBase/pkg/utils"
 	"github.com/gin-gonic/gin"
 )
 
@@ -48,7 +49,10 @@ func (h *APIHandler) HandleLogin(c *gin.Context) {
 		return
 	}
 
-	log.Printf("找到用户: %s (ID: %s, 角色: %s)\n", user.Username, user.ID, user.Role)
+	// 查找用戶ID
+	userID := utils.FindUserIDByUsername(h.configService.UsersConfig.Users, user.Username)
+
+	log.Printf("找到用户: %s (ID: %s, 角色: %s)\n", user.Username, userID, user.Role)
 
 	if !user.VerifyPassword(loginData.Password) {
 		log.Printf("密码验证失败，用户: %s\n", loginData.Username)
@@ -57,11 +61,11 @@ func (h *APIHandler) HandleLogin(c *gin.Context) {
 	}
 
 	// 更新最后登录时间
-	user.LastLogin = time.Now()
+	user.LastLogin = sharedmodels.JsonTime(time.Now())
 
 	// 使用字符串格式的过期时间（ISO 8601）
 	expirationStr := formatDuration(24 * time.Hour)
-	token, err := user.GenerateToken(h.configService.UsersConfig.JWTSecret, expirationStr)
+	token, err := user.GenerateToken(h.configService.UsersConfig.JWTSecret, expirationStr, userID)
 	if err != nil {
 		log.Printf("生成令牌失败: %v\n", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成令牌失败"})
@@ -129,7 +133,12 @@ func (h *APIHandler) CreateAPIToken(c *gin.Context) {
 	user := c.MustGet("user").(*sharedmodels.User)
 	// 将过期时间转换为字符串
 	expirationStr := formatDuration(time.Duration(tokenData.ExpiresIn) * time.Hour)
-	token, err := user.CreateAPIToken(tokenData.Name, tokenData.Permissions, expirationStr, tokenData.RateLimit)
+
+	// 获取JWT密钥
+	jwtSecret := h.configService.UsersConfig.JWTSecret
+
+	// 创建API token时传入JWT密钥
+	token, err := user.CreateAPIToken(tokenData.Name, tokenData.Permissions, expirationStr, tokenData.RateLimit, jwtSecret)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

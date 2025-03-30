@@ -3,7 +3,10 @@ package models
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -12,6 +15,37 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// JsonTime 自定义时间类型，用于处理JSON序列化时的零值时间
+type JsonTime time.Time
+
+// MarshalJSON 自定义时间序列化方法，处理零值时间
+func (t JsonTime) MarshalJSON() ([]byte, error) {
+	tt := time.Time(t)
+	if tt.IsZero() || tt.Year() == 1 {
+		return []byte("null"), nil
+	}
+	return json.Marshal(tt)
+}
+
+// UnmarshalJSON 自定义时间反序列化方法
+func (t *JsonTime) UnmarshalJSON(data []byte) error {
+	// 处理null值
+	if string(data) == "null" {
+		*t = JsonTime(time.Time{})
+		return nil
+	}
+
+	tt := time.Time{}
+	err := json.Unmarshal(data, &tt)
+	*t = JsonTime(tt)
+	return err
+}
+
+// Time 将JsonTime转换为time.Time
+func (t JsonTime) Time() time.Time {
+	return time.Time(t)
+}
 
 // 持续时间部分的正则表达式
 var (
@@ -82,45 +116,37 @@ func ParseISO8601Duration(durationStr string) (time.Duration, error) {
 	return duration, nil
 }
 
-// GetDurationOrDefault 从字符串解析持续时间，如果解析失败则返回默认值（秒）
+// GetDurationOrDefault 从字符串解析持续时间，如果解析失败则返回默认值
+// 仅支持ISO 8601格式，如: PT1H, P1D, P1W, P1Y2M3DT4H5M6S等
 func GetDurationOrDefault(durationStr string, defaultSeconds int) time.Duration {
+	defaultDuration := time.Duration(defaultSeconds) * time.Second
+
 	if durationStr == "" {
-		return time.Duration(defaultSeconds) * time.Second
+		return defaultDuration
 	}
 
-	// 尝试解析ISO 8601格式
+	// 只尝试解析ISO 8601格式
 	duration, err := ParseISO8601Duration(durationStr)
 	if err == nil {
 		return duration
 	}
 
-	// 尝试解析Go的持续时间格式 (如: "1h30m")
-	duration, err = time.ParseDuration(durationStr)
-	if err == nil {
-		return duration
-	}
-
-	// 最后尝试解析为秒
-	if seconds, err := strconv.Atoi(durationStr); err == nil {
-		return time.Duration(seconds) * time.Second
-	}
-
-	// 返回默认值
-	return time.Duration(defaultSeconds) * time.Second
+	// 解析失败，返回默认值
+	return defaultDuration
 }
 
 // User represents a user in the system
 type User struct {
-	ID        string     `json:"id"`
-	IsActive  bool       `json:"is_active"`
-	Username  string     `json:"username"`
-	Password  string     `json:"password"`
-	Role      string     `json:"role"`
-	Name      string     `json:"name"`
-	Email     string     `json:"email"`
-	CreatedAt time.Time  `json:"created_at"`
-	LastLogin time.Time  `json:"last_login"`
-	API       []APIToken `json:"api"`
+	// ID 欄位被移除，因為使用 map 中的 key 作為用戶ID
+	IsActive  bool                `json:"is_active"`
+	Username  string              `json:"username"`
+	Password  string              `json:"password"`
+	Role      string              `json:"role"`
+	Name      string              `json:"name"`
+	Email     string              `json:"email"`
+	CreatedAt JsonTime            `json:"created_at"`
+	LastLogin JsonTime            `json:"last_login"`
+	API       map[string]APIToken `json:"api"`
 }
 
 // UsersConfig holds the users configuration
@@ -132,17 +158,42 @@ type UsersConfig struct {
 
 // GetUser 获取用户信息
 func (c *UsersConfig) GetUser(username string) (*User, error) {
-	if user, exists := c.Users[username]; exists {
-		return user, nil
+	// 遍历所有用户，查找匹配的用户名
+	for _, user := range c.Users {
+		if user.Username == username {
+			return user, nil
+		}
 	}
-	return nil, fmt.Errorf("用户不存在: %s", username)
+	return nil, fmt.Errorf("user not found: %s", username)
 }
 
 // Save 保存用户配置到文件
 func (c *UsersConfig) Save(baseDir string) error {
-	// 在这里实现保存逻辑，例如将用户配置写入文件
-	// 这里只是占位，实际实现会涉及到文件IO
-	return nil
+	// Import internally to avoid import cycles
+	saveFn := func(config *UsersConfig, dir string) error {
+		configPath := filepath.Join(dir, "configs", "users.json")
+
+		// Serialize the configuration
+		data, err := json.MarshalIndent(config, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to serialize users configuration: %w", err)
+		}
+
+		// Ensure the directory exists
+		dirPath := filepath.Dir(configPath)
+		if err := os.MkdirAll(dirPath, 0755); err != nil {
+			return fmt.Errorf("failed to create config directory: %w", err)
+		}
+
+		// Write to file
+		if err := os.WriteFile(configPath, data, 0644); err != nil {
+			return fmt.Errorf("failed to save users configuration: %w", err)
+		}
+
+		return nil
+	}
+
+	return saveFn(c, baseDir)
 }
 
 // VerifyPassword 验证用户密码
@@ -160,26 +211,56 @@ func (u *User) VerifyPassword(password string) bool {
 	return hashedPassword == u.Password
 }
 
-// GenerateToken 生成用户JWT token
-func (u *User) GenerateToken(secret string, expiration string) (string, error) {
-	// 解析过期时间
-	expirationDuration := GetDurationOrDefault(expiration, 86400) // 默认24小时
+// GenerateToken 生成用戶JWT token
+func (u *User) GenerateToken(secret string, expiration string, userID string) (string, error) {
+	// 默认持续时间（如果未提供或解析失败）
+	defaultExpirationDuration := 24 * time.Hour // 默认24小时
 
-	claims := &JWTTokenClaims{
-		UserID:   u.ID,
-		Username: u.Username,
-		Role:     u.Role,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expirationDuration)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Subject:   u.ID,
-			// 明确添加token类型
-			ID: "jwt",
-		},
+	// 解析過期時間
+	var expirationDuration time.Duration
+	if expiration == "" {
+		// 使用默認過期時間
+		expirationDuration = defaultExpirationDuration
+	} else {
+		// 嘗試解析為ISO 8601格式
+		parsedDuration, err := ParseISO8601Duration(expiration)
+		if err == nil {
+			// 使用解析结果（无最小/最大限制）
+			expirationDuration = parsedDuration
+		} else {
+			// 解析失败，使用默认值
+			expirationDuration = defaultExpirationDuration
+		}
+	}
+
+	// 获取当前时间
+	now := time.Now()
+
+	// 计算过期时间
+	expiresAt := now.Add(expirationDuration)
+
+	// 使用MapClaims以便添加自定义字段
+	claims := jwt.MapClaims{
+		"user_id":  userID,
+		"username": u.Username,
+		"role":     u.Role,
+		"type":     "jwt", // 明确添加token类型
+		"exp":      expiresAt.Unix(),
+		"iat":      now.Unix(),
+		"sub":      userID,
+		"jti":      generateUUID(),   // 使用UUID作为JWT ID
+		"iss":      "panelbase-auth", // 发行者标识
+		"aud":      "panelbase-api",  // 接收者标识
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(secret))
+	tokenString, err := token.SignedString([]byte(secret))
+	if err != nil {
+		return "", err
+	}
+
+	// 返回令牌
+	return tokenString, nil
 }
 
 // FormatDuration 将time.Duration格式化为ISO 8601持续时间格式
@@ -230,93 +311,207 @@ func FormatDuration(d time.Duration) string {
 }
 
 // CreateAPIToken 创建新的API token
-func (u *User) CreateAPIToken(name string, permissions []string, expiration string, rateLimit int) (string, error) {
+func (u *User) CreateAPIToken(name string, permissions []string, expiration string, rateLimit int, secret string) (string, error) {
 	// 创建新的API token
 	tokenID := generateUUID()
 
-	// 解析过期时间
-	expirationDuration := GetDurationOrDefault(expiration, 3600) // 默认1小时
-	expirationMinutes := int(expirationDuration.Minutes())
-	if expirationMinutes <= 0 {
-		expirationMinutes = 60 // 至少1小时
-	}
+	// 默认持续时间（如果未提供或解析失败）
+	defaultExpirationDuration := time.Hour // 默认1小时
 
-	// 存储格式化后的ISO 8601格式
-	formattedExpiration := expiration
+	// 解析过期时间
+	var expirationDuration time.Duration
 	if expiration == "" || expiration == "0" {
-		formattedExpiration = FormatDuration(expirationDuration)
+		// 使用默认过期时间
+		expirationDuration = defaultExpirationDuration
 	} else {
-		// 尝试解析并重新格式化以确保标准格式
+		// 尝试解析为ISO 8601格式
 		parsedDuration, err := ParseISO8601Duration(expiration)
 		if err == nil {
-			formattedExpiration = FormatDuration(parsedDuration)
+			// 使用解析结果（无最小/最大限制）
+			expirationDuration = parsedDuration
+		} else {
+			// 解析失败，使用默认值
+			expirationDuration = defaultExpirationDuration
 		}
 	}
 
+	// 存储格式化后的ISO 8601格式
+	formattedExpiration := FormatDuration(expirationDuration)
+
 	apiToken := APIToken{
-		ID:            tokenID,
 		Name:          name,
 		Permissions:   permissions,
 		RateLimit:     rateLimit,
 		Expiration:    formattedExpiration,
-		CreatedAt:     time.Now(),
-		LastUsed:      time.Now(),
+		CreatedAt:     JsonTime(time.Now()),
+		LastUsed:      JsonTime(time.Time{}), // 使用零值表示从未使用
 		UsageCount:    0,
 		IsActive:      true,
-		LastResetTime: time.Now(),
+		LastResetTime: JsonTime(time.Time{}), // 使用零值表示从未重置
 	}
 
+	// 获取当前时间
+	now := time.Now()
+
+	// 计算过期时间（以分钟为单位）
+	expirationMinutes := int(expirationDuration.Minutes())
+
+	// 计算过期时间
+	_ = now.Add(expirationDuration)
+
 	// 生成JWT token
-	tokenString, err := generateAPITokenJWT(u.ID, tokenID, expirationMinutes)
+	tokenString, err := generateAPITokenJWT(u.Username, tokenID, expirationMinutes, secret)
 	if err != nil {
 		return "", err
 	}
 
 	apiToken.Token = tokenString
-	u.API = append(u.API, apiToken)
+
+	// 初始化API map（如果为nil）
+	if u.API == nil {
+		u.API = make(map[string]APIToken)
+	}
+
+	u.API[tokenID] = apiToken
+	return tokenString, nil
+}
+
+// CreateAPITokenWithSecret 创建新的API token，使用指定的JWT密钥
+func (u *User) CreateAPITokenWithSecret(name string, permissions []string, expiration string, rateLimit int, secret string) (string, error) {
+	// 创建新的API token
+	tokenID := generateUUID()
+
+	// 默认持续时间（如果未提供或解析失败）
+	defaultExpirationDuration := time.Hour // 默认1小时
+
+	// 解析过期时间
+	var expirationDuration time.Duration
+	if expiration == "" || expiration == "0" {
+		// 使用默认过期时间
+		expirationDuration = defaultExpirationDuration
+	} else {
+		// 尝试解析为ISO 8601格式
+		parsedDuration, err := ParseISO8601Duration(expiration)
+		if err == nil {
+			// 使用解析结果（无最小/最大限制）
+			expirationDuration = parsedDuration
+		} else {
+			// 解析失败，使用默认值
+			expirationDuration = defaultExpirationDuration
+		}
+	}
+
+	// 存储格式化后的ISO 8601格式
+	formattedExpiration := FormatDuration(expirationDuration)
+
+	apiToken := APIToken{
+		Name:          name,
+		Permissions:   permissions,
+		RateLimit:     rateLimit,
+		Expiration:    formattedExpiration,
+		CreatedAt:     JsonTime(time.Now()),
+		LastUsed:      JsonTime(time.Time{}), // 使用零值表示从未使用
+		UsageCount:    0,
+		IsActive:      true,
+		LastResetTime: JsonTime(time.Time{}), // 使用零值表示从未重置
+	}
+
+	// 使用传入的secret生成JWT token
+	// 获取当前时间
+	now := time.Now()
+
+	// 计算过期时间
+	expiresAt := now.Add(expirationDuration)
+
+	claims := jwt.MapClaims{
+		"user_id":  u.Username,
+		"token_id": tokenID,
+		"exp":      expiresAt.Unix(),
+		"iat":      now.Unix(),
+		"type":     "api",            // 明确添加token类型
+		"jti":      tokenID,          // 使用tokenID作为JWT ID
+		"iss":      "panelbase-auth", // 发行者标识
+		"aud":      "panelbase-api",  // 接收者标识
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString([]byte(secret))
+	if err != nil {
+		return "", err
+	}
+
+	apiToken.Token = tokenString
+
+	// 初始化API map（如果为nil）
+	if u.API == nil {
+		u.API = make(map[string]APIToken)
+	}
+
+	u.API[tokenID] = apiToken
 	return tokenString, nil
 }
 
 // GetAPITokens 获取用户所有API token
 func (u *User) GetAPITokens() []APIToken {
-	return u.API
+	var tokens []APIToken
+	for _, token := range u.API {
+		tokens = append(tokens, token)
+	}
+	return tokens
 }
 
 // UpdateAPIToken 更新API token
 func (u *User) UpdateAPIToken(tokenID string, name string, permissions []string, expiration string, rateLimit int) error {
-	for i := range u.API {
-		if u.API[i].ID == tokenID {
-			u.API[i].Name = name
-			u.API[i].Permissions = permissions
-			u.API[i].Expiration = expiration
-			u.API[i].RateLimit = rateLimit
-			return nil
-		}
+	token, exists := u.API[tokenID]
+	if !exists {
+		return fmt.Errorf("API token不存在: %s", tokenID)
 	}
-	return fmt.Errorf("API token不存在: %s", tokenID)
+	token.Name = name
+	token.Permissions = permissions
+	token.Expiration = expiration
+	token.RateLimit = rateLimit
+	u.API[tokenID] = token
+	return nil
 }
 
 // DeleteAPIToken 删除API token
 func (u *User) DeleteAPIToken(tokenID string) error {
-	for i := range u.API {
-		if u.API[i].ID == tokenID {
-			u.API = append(u.API[:i], u.API[i+1:]...)
-			return nil
-		}
+	_, exists := u.API[tokenID]
+	if !exists {
+		return fmt.Errorf("API token不存在: %s", tokenID)
 	}
-	return fmt.Errorf("API token不存在: %s", tokenID)
+	delete(u.API, tokenID)
+	return nil
 }
 
 // ResetAPITokenUsage 重置API token使用统计
 func (u *User) ResetAPITokenUsage(tokenID string) error {
-	for i := range u.API {
-		if u.API[i].ID == tokenID {
-			u.API[i].UsageCount = 0
-			u.API[i].LastResetTime = time.Now()
-			return nil
-		}
+	token, exists := u.API[tokenID]
+	if !exists {
+		return fmt.Errorf("API token不存在: %s", tokenID)
 	}
-	return fmt.Errorf("API token不存在: %s", tokenID)
+	token.UsageCount = 0
+	token.LastResetTime = JsonTime(time.Now())
+	u.API[tokenID] = token
+	return nil
+}
+
+// UpdateAPITokenUsage 更新API token使用情况
+func (u *User) UpdateAPITokenUsage(tokenID string) error {
+	token, exists := u.API[tokenID]
+	if !exists {
+		return fmt.Errorf("API token不存在: %s", tokenID)
+	}
+
+	// 增加使用次数
+	token.UsageCount++
+
+	// 更新最后使用时间
+	token.LastUsed = JsonTime(time.Now())
+
+	// 更新token
+	u.API[tokenID] = token
+	return nil
 }
 
 // 生成UUID
@@ -326,34 +521,47 @@ func generateUUID() string {
 }
 
 // 生成API Token的JWT
-func generateAPITokenJWT(userID, tokenID string, expiresInMinutes int) (string, error) {
+func generateAPITokenJWT(userID, tokenID string, expiresInMinutes int, secret string) (string, error) {
+	// 获取当前时间
+	now := time.Now()
+
+	// 计算过期时间
+	expiresAt := now.Add(time.Duration(expiresInMinutes) * time.Minute)
+
 	claims := jwt.MapClaims{
 		"user_id":  userID,
 		"token_id": tokenID,
-		"exp":      time.Now().Add(time.Duration(expiresInMinutes) * time.Minute).Unix(),
-		"iat":      time.Now().Unix(),
-		"type":     "api", // 明确添加token类型
+		"exp":      expiresAt.Unix(),
+		"iat":      now.Unix(),
+		"type":     "api",            // 明确添加token类型
+		"jti":      tokenID,          // 使用tokenID作为JWT ID
+		"iss":      "panelbase-auth", // 发行者标识
+		"aud":      "panelbase-api",  // 接收者标识
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte("api_secret_key")) // 实际应使用配置的密钥
+	tokenString, err := token.SignedString([]byte(secret))
+	if err != nil {
+		return "", fmt.Errorf("生成JWT令牌失败: %w", err)
+	}
+
+	return tokenString, nil
 }
 
-// APIToken 定义API token配置
+// APIToken 定義API token配置
 type APIToken struct {
-	ID            string    `json:"id"`              // API token的唯一标识
-	Name          string    `json:"name"`            // API token的名称
-	Description   string    `json:"description"`     // API token的描述
-	Token         string    `json:"token"`           // API token的JWT字符串
-	Permissions   []string  `json:"permissions"`     // API token的权限列表
-	RateLimit     int       `json:"rate_limit"`      // 速率限制（每分钟请求数）
-	Expiration    string    `json:"expiration"`      // 过期时间（ISO 8601持续时间格式）
-	CreatedAt     time.Time `json:"created_at"`      // 创建时间
-	LastUsed      time.Time `json:"last_used"`       // 最后使用时间
-	UsageCount    int       `json:"usage_count"`     // 使用次数
-	IsActive      bool      `json:"is_active"`       // 是否激活
-	AllowedIPs    []string  `json:"allowed_ips"`     // 允许的IP地址列表
-	AllowedHosts  []string  `json:"allowed_hosts"`   // 允许的主机名列表
-	MaxRequests   int       `json:"max_requests"`    // 最大请求次数（0表示无限制）
-	LastResetTime time.Time `json:"last_reset_time"` // 上次重置时间
+	Name          string   `json:"name"`            // API token的名称
+	Description   string   `json:"description"`     // API token的描述
+	Token         string   `json:"token"`           // API token的JWT字符串
+	Permissions   []string `json:"permissions"`     // API token的权限列表
+	RateLimit     int      `json:"rate_limit"`      // 速率限制（每分钟请求数）
+	Expiration    string   `json:"expiration"`      // 过期时间（ISO 8601持续时间格式）
+	CreatedAt     JsonTime `json:"created_at"`      // 创建时间
+	LastUsed      JsonTime `json:"last_used"`       // 最后使用时间
+	UsageCount    int      `json:"usage_count"`     // 使用次数
+	IsActive      bool     `json:"is_active"`       // 是否激活
+	AllowedIPs    []string `json:"allowed_ips"`     // 允许的IP地址列表
+	AllowedHosts  []string `json:"allowed_hosts"`   // 允许的主机名列表
+	MaxRequests   int      `json:"max_requests"`    // 最大请求次数（0表示无限制）
+	LastResetTime JsonTime `json:"last_reset_time"` // 上次重置时间
 }

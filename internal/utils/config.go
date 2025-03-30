@@ -42,22 +42,25 @@ func LoadUsersConfig(filePath string) (*models.UsersConfig, error) {
 
 	// 如果文件不存在，创建默认配置
 	if os.IsNotExist(err) {
-		log.Printf("用户配置文件 %s 不存在，创建默认配置\n", filePath)
+		log.Printf("User config file %s not found, creating default configuration\n", filePath)
+
+		// 生成隨機用戶ID
+		userID := generateRandomSecret(16)
 
 		// 创建默认配置
 		config := &models.UsersConfig{
 			Users: map[string]*models.User{
-				"admin": {
-					ID:        "admin",
+				userID: {
+					// ID 欄位已被移除
 					IsActive:  true,
 					Username:  "admin",
 					Password:  "$2a$10$VwPWUIUaqO6O7Ti1DZpHPeJKdrK4sUuutuBcLUpkeeZHiGuswRQey", // bcrypt hashed "admin"
 					Role:      "admin",
 					Name:      "Administrator",
 					Email:     "admin@example.com",
-					CreatedAt: time.Now(),
-					LastLogin: time.Now(),
-					API:       []models.APIToken{},
+					CreatedAt: models.JsonTime(time.Now()),
+					LastLogin: models.JsonTime(time.Time{}), // 使用零值表示從未登入
+					API:       make(map[string]models.APIToken),
 				},
 			},
 			DefaultRole: "user",
@@ -67,33 +70,33 @@ func LoadUsersConfig(filePath string) (*models.UsersConfig, error) {
 		// 确保目录存在
 		dir := filepath.Dir(filePath)
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			return nil, fmt.Errorf("创建配置目录失败: %w", err)
+			return nil, fmt.Errorf("failed to create config directory: %w", err)
 		}
 
 		// 保存配置
 		configData, err := json.MarshalIndent(config, "", "  ")
 		if err != nil {
-			return nil, fmt.Errorf("序列化默认用户配置失败: %w", err)
+			return nil, fmt.Errorf("failed to serialize default user config: %w", err)
 		}
 
 		if err := os.WriteFile(filePath, configData, 0644); err != nil {
-			return nil, fmt.Errorf("保存默认用户配置失败: %w", err)
+			return nil, fmt.Errorf("failed to save default user config: %w", err)
 		}
 
 		return config, nil
 	} else if err != nil {
-		return nil, fmt.Errorf("打开用户配置文件失败: %w", err)
+		return nil, fmt.Errorf("failed to open user config file: %w", err)
 	}
 	defer usersFile.Close()
 
 	usersData, err := io.ReadAll(usersFile)
 	if err != nil {
-		return nil, fmt.Errorf("读取用户配置文件失败: %w", err)
+		return nil, fmt.Errorf("failed to read user config file: %w", err)
 	}
 
 	var usersConfig models.UsersConfig
 	if err := json.Unmarshal(usersData, &usersConfig); err != nil {
-		return nil, fmt.Errorf("解析用户配置文件失败: %w", err)
+		return nil, fmt.Errorf("failed to parse user config file: %w", err)
 	}
 
 	// 确保Users不为nil
@@ -187,7 +190,7 @@ func LoadCommandsConfig(filePath string) (*models.SystemCommandsConfig, error) {
 	}
 
 	// 记录加载的配置数量
-	log.Printf("已加载 %d 个命令配置\n", len(commandsConfig.Routes))
+	log.Printf("Loaded %d command configurations\n", len(commandsConfig.Routes))
 
 	return &commandsConfig, nil
 }
@@ -332,6 +335,30 @@ func SaveThemesConfig(themesFilePath string, config *models.ThemesConfig) error 
 
 	if err := os.WriteFile(themesFilePath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write themes configuration: %w", err)
+	}
+
+	return nil
+}
+
+// SaveUsersConfig saves the users configuration to a file
+func SaveUsersConfig(usersConfig *models.UsersConfig, baseDir string) error {
+	configPath := filepath.Join(baseDir, "configs", "users.json")
+
+	// Serialize the configuration
+	data, err := json.MarshalIndent(usersConfig, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to serialize users configuration: %w", err)
+	}
+
+	// Ensure the directory exists
+	dir := filepath.Dir(configPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	// Write to file
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to save users configuration: %w", err)
 	}
 
 	return nil

@@ -1,7 +1,0 @@
-{
-  "code": "file",
-  "get_data": "data.py",
-  "get_user_by_id": "commands/user/get_user.py",
-  "update_product": "commands/product/update_product.py",
-  "delete_comment": "commands/comment/delete_comment.py"
-}
