@@ -1,0 +1,65 @@
+{
+  "name": "WhatsDifferent",
+  "authors": ["PanelBase Team"],
+  "version": "1.0.0",
+  "description": "A multifunctional plugin for comparing text differences",
+  "source_link": "https://raw.githubusercontent.com/OG-Open-Source/PanelBase/main/example/ex_whatsdifferent.json",
+  "api_version": "v1",
+  "directory": "whatsdifferent",
+  "structure": {
+    "diff_handler.go": "https://raw.githubusercontent.com/OG-Open-Source/PanelBase/main/example/assets/whatsdifferent/diff_handler.go"
+  },
+  "dependencies": {
+    "golang.org/x/text": "0.13.0",
+    "github.com/sergi/go-diff": "1.2.0"
+  },
+  "endpoints": {
+    "/diff": {
+      "methods": ["GET", "POST"],
+      "description": "Compare two text inputs and show differences",
+      "input": {
+        "original": "String - original text to compare",
+        "new": "String - new text to compare against original"
+      },
+      "output": {
+        "diff": "HTML formatted diff result",
+        "changes_count": "Number of changes detected",
+        "timestamp": "Time when diff was performed"
+      }
+    },
+    "/status": {
+      "methods": ["GET"],
+      "description": "Get plugin status information",
+      "output": {
+        "status": "Current status of the plugin",
+        "version": "Plugin version",
+        "uptime": "How long the plugin has been running"
+      }
+    },
+    "/history": {
+      "methods": ["GET", "POST", "DELETE"],
+      "description": "Manage diff history",
+      "input": {
+        "id": "Optional - ID of specific history item",
+        "limit": "Optional - limit number of returned items"
+      },
+      "output": {
+        "items": "Array of history items",
+        "count": "Total number of items in history"
+      }
+    },
+    "/settings": {
+      "methods": ["GET", "PUT", "PATCH"],
+      "description": "Manage plugin settings",
+      "input": {
+        "ignore_whitespace": "Optional boolean - whether to ignore whitespace differences",
+        "context_lines": "Optional number - number of context lines to show around differences",
+        "max_history_items": "Optional number - maximum number of history items to store"
+      },
+      "output": {
+        "settings": "Object containing current settings",
+        "update_status": "Status of update operation if applicable"
+      }
+    }
+  }
+} 
