@@ -3,58 +3,45 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 
-	"github.com/OG-Open-Source/PanelBase/internal/app/handlers"
-	"github.com/OG-Open-Source/PanelBase/internal/app/services"
-	"github.com/OG-Open-Source/PanelBase/internal/config"
+	//"net/http" // No longer needed here directly for routes
+
+	// Import the config package
+	"github.com/OG-Open-Source/PanelBase/internal/bootstrap"
+	"github.com/OG-Open-Source/PanelBase/internal/config" // Use the correct module path
+	"github.com/OG-Open-Source/PanelBase/internal/routes" // Import the routes package
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	// Try to find current working directory
-	workDir, err := os.Getwd()
+	// 初始化配置文件
+	if err := bootstrap.Bootstrap(); err != nil {
+		log.Printf("Warning: Failed to bootstrap configs: %v", err)
+	}
+
+	// 加载配置
+	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatalf("Failed to get working directory: %v", err)
+		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	// Initialize configuration
-	configInitializer := config.NewConfigInitializer()
-	configInitializer.SetBaseDir(workDir)
-
-	// Check and initialize configuration files
-	if err := configInitializer.Initialize(); err != nil {
-		log.Fatalf("Failed to initialize configuration: %v", err)
+	// 设置 Gin 模式
+	if cfg.Server.Mode == "production" {
+		gin.SetMode(gin.ReleaseMode)
 	}
 
-	// Build configuration file path
-	configPath := filepath.Join(workDir, "configs", "config.yaml")
-	log.Printf("Using configuration file: %s", configPath)
-
-	// Load configuration
-	configService, err := services.NewConfigService(configPath)
-	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
-	}
-
-	// Set Gin mode
-	gin.SetMode(configService.Config.Server.Mode)
-
-	// Create router
+	// 创建 Gin 引擎
 	router := gin.Default()
 
-	// Setup routes
-	handlers.SetupRoutes(router, configService)
+	// 设置路由
+	routes.SetupRoutes(router, cfg)
 
-	// Start server
-	serverAddr := fmt.Sprintf("%s:%d",
-		configService.Config.Server.Host,
-		configService.Config.Server.Port,
-	)
-	log.Printf("Starting PanelBase server at %s", serverAddr)
-	log.Printf("Mode: %s", configService.Config.Server.Mode)
-	if err := router.Run(serverAddr); err != nil {
+	// 构建服务器地址
+	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
+
+	// 启动服务器
+	log.Printf("Server starting on %s", addr)
+	if err := router.Run(addr); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }

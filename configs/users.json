@@ -1,0 +1,19 @@
+{
+  "jwt_secret": "yjzyXCihIyU0SsHkgw-fuUtnKAZ337I3",
+  "users": {
+    "usr_dkLltngb": {
+      "api": {
+        "tokens": []
+      },
+      "created_at": "2025-04-02T01:04:14+08:00",
+      "email": "admin@example.com",
+      "is_active": true,
+      "name": "Administrator",
+      "password": "$2a$10$GwC9oMpXW63aPw7inCDXEe4xO6cp1H54AGW0ElM5VDMFOBV.U2NpO",
+      "scopes": [
+        "*:*:*"
+      ],
+      "username": "admin"
+    }
+  }
+}
