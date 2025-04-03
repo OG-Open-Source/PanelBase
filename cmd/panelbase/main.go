@@ -1,8 +1,16 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"syscall"
+	"time"
 
 	//"net/http" // No longer needed here directly for routes
 
@@ -13,35 +21,88 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const logFileName = "panelbase.log"
+const logsDir = "logs" // Consistent with bootstrap
+
 func main() {
-	// 初始化配置文件
+	// Bootstrap: Ensure config/logs directories exist first
+	// Bootstrap itself logs if it creates files/dirs.
 	if err := bootstrap.Bootstrap(); err != nil {
-		log.Printf("Warning: Failed to bootstrap configs: %v", err)
+		log.Fatalf("Failed to bootstrap application: %v", err)
 	}
 
-	// 加载配置
+	// --- Setup Logging (Reduced Output) ---
+	logFilePath := filepath.Join(logsDir, logFileName)
+	logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatalf("Failed to open log file %s: %v", logFilePath, err)
+	}
+	defer logFile.Close()
+
+	multiWriter := io.MultiWriter(os.Stdout, logFile)
+	log.SetOutput(multiWriter)
+	log.SetFlags(log.LstdFlags) // Keep date and time
+	gin.DefaultWriter = multiWriter
+
+	// Remove verbose logging setup message
+	// log.Println("Logging configured to output to console and", logFilePath)
+	// --- End Logging Setup ---
+
+	// Load configuration
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	// 设置 Gin 模式
-	if cfg.Server.Mode == "production" {
-		gin.SetMode(gin.ReleaseMode)
-	}
+	// Remove logging of loaded mode
+	// log.Printf("[Config] Loaded server mode from config.toml: '%s'", cfg.Server.Mode)
 
-	// 创建 Gin 引擎
-	router := gin.Default()
+	// Set Gin mode directly, without extra logging.
+	gin.SetMode(cfg.Server.Mode)
+	// Remove logging of mode setting
+	// log.Printf("[Main] Set Gin mode based on config: '%s'", cfg.Server.Mode)
 
-	// 设置路由
+	// Initialize Gin engine
+	router := gin.New()
+	router.Use(gin.Logger()) // Keep Gin's request logger
+	router.Use(gin.Recovery())
+
+	// Setup routes
 	routes.SetupRoutes(router, cfg)
 
-	// 构建服务器地址
-	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
-
-	// 启动服务器
-	log.Printf("Server starting on %s", addr)
-	if err := router.Run(addr); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	// Create the HTTP server instance
+	serverAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
+	srv := &http.Server{
+		Addr:    serverAddr,
+		Handler: router,
 	}
+
+	// Start server in a goroutine
+	go func() {
+		// Keep the essential starting server message
+		log.Printf("Starting server on %s in %s mode...", serverAddr, gin.Mode())
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Listen and serve error: %s\n", err)
+		}
+		// Keep the server stopped message
+		log.Println("HTTP server shut down gracefully.")
+	}()
+
+	// Wait for interrupt signal
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	receivedSignal := <-quit
+	// Keep shutdown messages
+	log.Printf("Received signal: %v. Shutting down server...", receivedSignal)
+
+	// Graceful shutdown context
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatal("Server forced to shutdown uncleanly: ", err)
+	}
+
+	// Keep the final exiting message
+	log.Println("Server exiting.")
 }

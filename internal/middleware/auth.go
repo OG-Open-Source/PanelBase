@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/OG-Open-Source/PanelBase/internal/config"
+	"github.com/OG-Open-Source/PanelBase/internal/models"
 	"github.com/OG-Open-Source/PanelBase/internal/server" // For ErrorResponse
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -16,7 +17,7 @@ import (
 
 // JWTCustomClaims contains custom JWT claims.
 type JWTCustomClaims struct {
-	Scopes []string `json:"scopes"`
+	Scopes models.UserPermissions `json:"scopes"`
 }
 
 // JWTClaims represents the structure of the JWT payload.
@@ -104,10 +105,17 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 				return
 			}
 
+			// Ensure claims.Scopes is not nil before storing
+			userPermissions := claims.Scopes
+			if userPermissions == nil {
+				userPermissions = make(models.UserPermissions) // Use empty map if nil
+			}
+
 			// 6. Validation successful, store user info in context
 			c.Set("userID", claims.UserID)
-			c.Set("username", claims.Username)        // Store username if present
-			c.Set("scopes", claims.Scopes)            // Store scopes (full or subset)
+			c.Set("username", claims.Username) // Store username if present
+			// Store the permissions map (scopes) using a clear key
+			c.Set("userPermissions", userPermissions)
 			c.Set("token_audience", expectedAudience) // Store audience for potential use
 
 			// Continue to the next handler
@@ -121,14 +129,17 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 }
 
 // Helper function to get claims from context (can be placed here or in a utils package)
+// Update this helper if needed, or create a specific one for permissions
+/* // Commenting out old GetClaims as it's not directly used now
 func GetClaims(c *gin.Context) (*JWTClaims, bool) {
-	claims, exists := c.Get("userClaims")
+	claims, exists := c.Get("userClaims") // Consider using specific keys like "userID", "userPermissions"
 	if !exists {
 		return nil, false
 	}
 	typedClaims, ok := claims.(JWTClaims)
 	return &typedClaims, ok
 }
+*/
 
 // GenerateToken - Placeholder for token generation logic (should be in an auth service/handler)
 func GenerateToken(cfg *config.Config, userID, username string) (string, error) {
@@ -139,7 +150,7 @@ func GenerateToken(cfg *config.Config, userID, username string) (string, error) 
 		UserID:   userID,
 		Username: username,
 		JWTCustomClaims: JWTCustomClaims{
-			Scopes: []string{}, // Populate scopes as needed
+			Scopes: models.UserPermissions{}, // Populate scopes as needed
 		},
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),

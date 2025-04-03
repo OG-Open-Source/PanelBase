@@ -1,11 +1,12 @@
 package bootstrap
 
 import (
+	"bytes"
 	crand "crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	mrand "math/rand"
+	"log"
+	"math/big" // Use crypto/rand for secure random numbers
 	"net"
 	"os"
 	"path/filepath"
@@ -13,10 +14,14 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/OG-Open-Source/PanelBase/internal/models"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Configs 定义所有配置文件的默认内容
+const configsDir = "configs"
+const logsDir = "logs"
+
+// Configs defines the default content for all configuration files.
 type Configs struct {
 	Themes   map[string]interface{}
 	Commands map[string]interface{}
@@ -25,34 +30,25 @@ type Configs struct {
 	Config   map[string]interface{}
 }
 
-// NewConfigs 创建默认配置
+// NewConfigs creates the default configuration structure.
 func NewConfigs() *Configs {
+	// Default configurations remain empty as per previous request
 	return &Configs{
-		Themes: map[string]interface{}{
-			"themes":        map[string]interface{}{},
-			"current_theme": "",
-		},
-		Commands: map[string]interface{}{
-			"commands": map[string]interface{}{},
-		},
-		Plugins: map[string]interface{}{
-			"plugins": map[string]interface{}{},
-		},
-		Users: map[string]interface{}{
-			"jwt_secret": "", // 将在 Bootstrap 时设置
-			"users":      map[string]interface{}{},
-		},
-		Config: map[string]interface{}{
-			"server": map[string]interface{}{
+		Themes:   map[string]interface{}{"themes": map[string]interface{}{}, "current_theme": ""},
+		Commands: map[string]interface{}{"commands": map[string]interface{}{}},
+		Plugins:  map[string]interface{}{"plugins": map[string]interface{}{}},
+		Users:    map[string]interface{}{"jwt_secret": "", "users": map[string]interface{}{}}, // JWT secret and users filled dynamically
+		Config: map[string]interface{}{ // For config.toml
+			"server": map[string]interface{}{ // Will be set dynamically during Bootstrap
 				"host": "0.0.0.0",
-				"port": 0, // 将在 Bootstrap 时设置
-				"mode": "debug",
+				"port": 0,
+				"mode": "release",
 			},
-			"features": map[string]interface{}{
+			"features": map[string]interface{}{ // Will be set dynamically during Bootstrap
 				"commands": false,
 				"plugins":  true,
 			},
-			"auth": map[string]interface{}{
+			"auth": map[string]interface{}{ // Will be set dynamically during Bootstrap
 				"jwt_expiration": 24,
 				"cookie_name":    "panelbase_jwt",
 			},
@@ -60,170 +56,230 @@ func NewConfigs() *Configs {
 	}
 }
 
-// Bootstrap 检查并创建必要的配置文件
+// Bootstrap checks and creates necessary configuration files and directories.
 func Bootstrap() error {
-	// 确保 configs 目录存在
-	if err := ensureConfigsDir(); err != nil {
+	// Ensure the configs directory exists
+	if err := ensureDirExists(configsDir); err != nil {
 		return fmt.Errorf("failed to ensure configs directory: %w", err)
 	}
 
-	// 创建默认配置
+	// Ensure the logs directory exists
+	if err := ensureDirExists(logsDir); err != nil {
+		return fmt.Errorf("failed to ensure logs directory: %w", err)
+	}
+
+	// Create default config structure (used if files need creation)
 	configs := NewConfigs()
 
-	// 生成随机 JWT 密钥
-	jwtSecret, err := generateRandomString(32)
-	if err != nil {
-		return fmt.Errorf("failed to generate JWT secret: %w", err)
-	}
-	configs.Users["jwt_secret"] = jwtSecret
+	// --- Check/Create individual config files if they don't exist ---
 
-	// 生成随机端口 (1024-49151) 并检查是否被占用
-	port, err := findAvailablePort(1024, 49151)
-	if err != nil {
-		return fmt.Errorf("failed to find available port: %w", err)
-	}
-	configs.Config["server"].(map[string]interface{})["port"] = port
-
-	// 生成随机用户ID
-	userID, err := generateRandomString(8)
-	if err != nil {
-		return fmt.Errorf("failed to generate user ID: %w", err)
-	}
-	userID = "usr_" + userID
-
-	// 设置管理员密码
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
-	if err != nil {
-		return fmt.Errorf("failed to hash admin password: %w", err)
-	}
-
-	// 添加管理员用户
-	configs.Users["users"].(map[string]interface{})[userID] = map[string]interface{}{
-		"is_active":  true,
-		"username":   "admin",
-		"password":   string(hashedPassword),
-		"name":       "Administrator",
-		"email":      "admin@example.com",
-		"created_at": time.Now().Format(time.RFC3339),
-		"scopes":     []string{"*:*:*"},
-		"api": map[string]interface{}{
-			"tokens": []map[string]interface{}{},
-		},
-	}
-
-	// 创建配置文件
-	if err := createConfigFile("themes.json", configs.Themes); err != nil {
-		return err
-	}
-	if err := createConfigFile("commands.json", configs.Commands); err != nil {
-		return err
-	}
-	if err := createConfigFile("plugins.json", configs.Plugins); err != nil {
-		return err
-	}
-	if err := createConfigFile("users.json", configs.Users); err != nil {
-		return err
-	}
-	if err := createConfigFile("config.toml", configs.Config); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// ensureConfigsDir 确保 configs 目录存在
-func ensureConfigsDir() error {
-	configsDir := "configs"
-	if _, err := os.Stat(configsDir); os.IsNotExist(err) {
-		return os.MkdirAll(configsDir, 0755)
-	}
-	return nil
-}
-
-// createConfigFile 创建配置文件
-func createConfigFile(filename string, data interface{}) error {
-	filepath := filepath.Join("configs", filename)
-
-	// 检查文件是否已存在
-	if _, err := os.Stat(filepath); err == nil {
-		return nil // 文件已存在，跳过
-	}
-
-	// 创建文件
-	file, err := os.Create(filepath)
-	if err != nil {
-		return fmt.Errorf("failed to create %s: %w", filename, err)
-	}
-	defer file.Close()
-
-	// 根据文件类型选择编码方式
-	switch filename {
-	case "config.toml":
-		encoder := toml.NewEncoder(file)
-		if err := encoder.Encode(data); err != nil {
-			return fmt.Errorf("failed to write %s: %w", filename, err)
+	// Check/Create users.json (handles dynamic values)
+	usersPath := filepath.Join(configsDir, "users.json")
+	if _, err := os.Stat(usersPath); os.IsNotExist(err) {
+		log.Printf("File '%s' not found, creating with defaults...", usersPath)
+		// Generate dynamic values ONLY if creating the file
+		jwtSecret, err := generateRandomString(32)
+		if err != nil {
+			return fmt.Errorf("failed to generate JWT secret for new users file: %w", err)
 		}
-	default:
-		encoder := json.NewEncoder(file)
-		encoder.SetIndent("", "  ") // 使用两个空格缩进
-		if err := encoder.Encode(data); err != nil {
-			return fmt.Errorf("failed to write %s: %w", filename, err)
+		userID, err := generateRandomString(8)
+		if err != nil {
+			return fmt.Errorf("failed to generate user ID for new users file: %w", err)
+		}
+		userID = "usr_" + userID
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
+		if err != nil {
+			return fmt.Errorf("failed to hash admin password for new users file: %w", err)
+		}
+
+		// Define full permissions for the admin user (using the new map structure)
+		adminPermissions := models.UserPermissions{
+			"commands": {"read:list", "read:item", "install", "execute", "update", "delete"},
+			"plugins":  {"read:list", "read:item", "install", "update", "delete"},
+			"themes":   {"read:list", "read:item", "install", "update", "delete"},
+			"users":    {"read:list", "read:item", "create", "update", "delete"},
+			"api":      {"read:list", "read:item", "create", "update", "delete"},
+		}
+
+		// Prepare default user data map
+		defaultUsersData := map[string]interface{}{
+			"jwt_secret": jwtSecret,
+			"users": map[string]interface{}{ // Add admin user (using the new permission structure)
+				userID: map[string]interface{}{ // Use the dynamically generated userID
+					"is_active":  true,
+					"username":   "admin",
+					"password":   string(hashedPassword),
+					"name":       "Administrator",
+					"email":      "admin@example.com",
+					"created_at": time.Now().Format(time.RFC3339),
+					"scopes":     adminPermissions, // Assign the map directly
+					"api": map[string]interface{}{ // Initialize api settings
+						"tokens": []map[string]interface{}{}, // Empty tokens list
+					},
+				},
+			},
+		}
+		if err := writeJsonFile(usersPath, defaultUsersData); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return fmt.Errorf("failed to check users file '%s': %w", usersPath, err)
+	}
+
+	// Check/Create config.toml (handles dynamic port)
+	configTomlPath := filepath.Join(configsDir, "config.toml")
+	if _, err := os.Stat(configTomlPath); os.IsNotExist(err) {
+		log.Printf("File '%s' not found, creating with defaults...", configTomlPath)
+		// Generate dynamic port ONLY if creating the file
+		port, err := findAvailablePort(1024, 49151)
+		if err != nil {
+			return fmt.Errorf("failed to find available port for new config file: %w", err)
+		}
+
+		// Start with the default static config structure
+		defaultConfigData := configs.Config // Get map[string]interface{} from NewConfigs()
+
+		// Inject the dynamic port
+		if serverConf, ok := defaultConfigData["server"].(map[string]interface{}); ok {
+			serverConf["port"] = port
+		} else {
+			// This should not happen if NewConfigs is correct
+			return fmt.Errorf("internal error: invalid structure for default server config")
+		}
+
+		if err := writeTomlFile(configTomlPath, defaultConfigData); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return fmt.Errorf("failed to check config file '%s': %w", configTomlPath, err)
+	}
+
+	// Check/Create other simple JSON files (themes, commands, plugins)
+	simpleJsonConfigs := map[string]interface{}{
+		filepath.Join(configsDir, "themes.json"):   configs.Themes,
+		filepath.Join(configsDir, "commands.json"): configs.Commands,
+		filepath.Join(configsDir, "plugins.json"):  configs.Plugins,
+	}
+	for path, data := range simpleJsonConfigs {
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			log.Printf("File '%s' not found, creating with defaults...", path)
+			if err := writeJsonFile(path, data); err != nil {
+				return err // Return error if writing fails
+			}
+		} else if err != nil {
+			return fmt.Errorf("failed to check config file '%s': %w", path, err)
 		}
 	}
 
 	return nil
 }
 
-// generateRandomString 生成随机字符串
+// ensureDirExists checks if a directory exists, and creates it if not.
+func ensureDirExists(dirPath string) error {
+	absPath, err := filepath.Abs(dirPath)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path for %s: %w", dirPath, err)
+	}
+	if _, err := os.Stat(absPath); os.IsNotExist(err) {
+		log.Printf("Directory '%s' not found, creating...", absPath)
+		// Create the directory with permissions 0755
+		// 0755 means owner can read/write/execute, group and others can read/execute
+		if err := os.MkdirAll(absPath, 0755); err != nil {
+			return fmt.Errorf("failed to create directory '%s': %w", absPath, err)
+		}
+		log.Printf("Directory '%s' created successfully.", absPath)
+	} else if err != nil {
+		// Handle other potential errors from os.Stat (e.g., permission denied)
+		return fmt.Errorf("failed to check directory '%s': %w", absPath, err)
+	}
+	return nil
+}
+
+// writeJsonFile encodes data to JSON and writes it to the specified file path.
+func writeJsonFile(filePath string, data interface{}) error {
+	jsonData, err := json.MarshalIndent(data, "", "  ") // Use two spaces for indentation
+	if err != nil {
+		return fmt.Errorf("failed to marshal data for %s: %w", filePath, err)
+	}
+	if err := os.WriteFile(filePath, jsonData, 0644); err != nil {
+		return fmt.Errorf("failed to write file %s: %w", filePath, err)
+	}
+	log.Printf("Successfully created default file: %s", filePath)
+	return nil
+}
+
+// writeTomlFile encodes data to TOML and writes it to the specified file path.
+func writeTomlFile(filePath string, data interface{}) error {
+	buf := new(bytes.Buffer)
+	if err := toml.NewEncoder(buf).Encode(data); err != nil {
+		return fmt.Errorf("failed to encode TOML for %s: %w", filePath, err)
+	}
+	if err := os.WriteFile(filePath, buf.Bytes(), 0644); err != nil {
+		return fmt.Errorf("failed to write file %s: %w", filePath, err)
+	}
+	log.Printf("Successfully created default file: %s", filePath)
+	return nil
+}
+
+// generateRandomString generates a cryptographically secure random string of specified length.
 func generateRandomString(length int) (string, error) {
-	bytes := make([]byte, length)
-	n, err := crand.Read(bytes)
-	if err != nil {
-		return "", err
+	const letters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
+	ret := make([]byte, length)
+	for i := 0; i < length; i++ {
+		num, err := crand.Int(crand.Reader, big.NewInt(int64(len(letters))))
+		if err != nil {
+			return "", fmt.Errorf("failed to generate random number: %w", err)
+		}
+		ret[i] = letters[num.Int64()]
 	}
-	if n != length {
-		return "", fmt.Errorf("failed to generate random string: expected %d bytes, got %d", length, n)
-	}
-	return base64.URLEncoding.EncodeToString(bytes)[:length], nil
+	return string(ret), nil
 }
 
-// findAvailablePort 在指定范围内查找可用端口
+// findAvailablePort searches for an available TCP port within the specified range.
 func findAvailablePort(start, end int) (int, error) {
-	// 设置随机种子
-	mrand.Seed(time.Now().UnixNano())
-
-	// 最多尝试 100 次
+	if start > end {
+		return 0, fmt.Errorf("invalid port range: start (%d) > end (%d)", start, end)
+	}
+	// Try up to 100 times to find a random port
 	maxAttempts := 100
 	for i := 0; i < maxAttempts; i++ {
-		// 生成随机端口
-		port := start + mrand.Intn(end-start+1)
+		// Generate a random port within the range (inclusive)
+		port, err := crand.Int(crand.Reader, big.NewInt(int64(end-start+1)))
+		if err != nil {
+			return 0, fmt.Errorf("failed to generate random port number: %w", err)
+		}
+		testPort := start + int(port.Int64())
 
-		// 检查端口是否被占用
-		addr := fmt.Sprintf(":%d", port)
-		listener, err := net.Listen("tcp", addr)
+		// Check if the port is available
+		address := fmt.Sprintf(":%d", testPort)
+		listener, err := net.Listen("tcp", address)
 		if err == nil {
-			// 端口可用,关闭监听器并返回端口号
+			// Port is available, close the listener and return the port
 			listener.Close()
-			return port, nil
+			return testPort, nil
 		}
 
-		// 如果错误不是端口被占用,则返回错误
+		// Check if the error indicates the port is already in use
 		if !isPortInUseError(err) {
-			return 0, fmt.Errorf("failed to check port %d: %w", port, err)
+			// If it's another error (e.g., permission denied), log it but continue searching
+			// as another random port might work.
+			log.Printf("Warning: Unexpected error checking port %d: %v", testPort, err)
 		}
-
-		// 端口被占用,继续尝试下一个
-		continue
+		// Port is in use or had an unexpected (but possibly transient) error, try another random port
 	}
 
-	return 0, fmt.Errorf("failed to find available port after %d attempts", maxAttempts)
+	return 0, fmt.Errorf("failed to find available port in range %d-%d after %d attempts", start, end, maxAttempts)
 }
 
-// isPortInUseError 检查错误是否为端口被占用
+// isPortInUseError checks if the error indicates a port is already in use.
 func isPortInUseError(err error) bool {
 	if err == nil {
 		return false
 	}
-	return strings.Contains(err.Error(), "address already in use") ||
-		strings.Contains(err.Error(), "bind: address already in use")
+	// Check for common error strings across different OS
+	errStr := err.Error()
+	return strings.Contains(errStr, "address already in use") ||
+		strings.Contains(errStr, "bind: address already in use") ||
+		// Add other potential OS-specific messages if needed
+		strings.Contains(errStr, "Only one usage of each socket address") // Windows
 }

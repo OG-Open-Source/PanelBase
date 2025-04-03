@@ -101,11 +101,18 @@ func LoginHandler(cfg *config.Config) gin.HandlerFunc {
 		// Session tokens expire in 7 days
 		expirationTime := time.Now().Add(7 * 24 * time.Hour)
 
+		// Ensure user.Scopes is not nil before assigning (though it should be initialized by bootstrap)
+		userScopes := user.Scopes
+		if userScopes == nil {
+			userScopes = make(models.UserPermissions) // Assign empty map if nil
+		}
+
 		claims := &middleware.JWTClaims{
 			UserID:   userID, // Use the actual UserID from the map key
 			Username: user.Username,
 			JWTCustomClaims: middleware.JWTCustomClaims{
-				Scopes: user.Scopes, // Include all user scopes for session token
+				// Include the user's full permissions (now a map)
+				Scopes: userScopes,
 			},
 			RegisteredClaims: jwt.RegisteredClaims{
 				ExpiresAt: jwt.NewNumericDate(expirationTime),
@@ -139,5 +146,88 @@ func LoginHandler(cfg *config.Config) gin.HandlerFunc {
 			"token": tokenString,
 		}
 		server.SuccessResponse(c, "Login successful", responseData)
+	}
+}
+
+// RefreshTokenHandler handles the token refresh request for web sessions.
+func RefreshTokenHandler(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Middleware should have already validated the token and put info in context
+		userID, userIDExists := c.Get("userID")
+		username, usernameExists := c.Get("username")
+		scopesInterface, scopesExists := c.Get("scopes")
+		audience, audienceExists := c.Get("token_audience")
+
+		if !userIDExists || !usernameExists || !scopesExists || !audienceExists {
+			server.ErrorResponse(c, http.StatusInternalServerError, "User information missing from context")
+			fmt.Println("Error: User info missing in RefreshTokenHandler context") // Log internal error
+			return
+		}
+
+		// Ensure this request comes from a web session token
+		if audience.(string) != middleware.AudienceWebSession {
+			server.ErrorResponse(c, http.StatusForbidden, "Token refresh is only allowed for web sessions")
+			return
+		}
+
+		// Type assert scopes to the correct map type
+		userScopes, ok := scopesInterface.(models.UserPermissions)
+		if !ok {
+			server.ErrorResponse(c, http.StatusInternalServerError, "Invalid scopes format in context")
+			fmt.Printf("Error: Invalid scopes type in RefreshTokenHandler context: %T\n", scopesInterface)
+			return
+		}
+
+		// Load JWT secret (need this again for signing the new token)
+		// TODO: Consider injecting the secret instead of reloading users.json
+		usersData, err := loadUsersData() // Inefficient, refactor later
+		if err != nil {
+			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to load user data for refresh")
+			fmt.Printf("Error loading user data in refresh: %v\n", err)
+			return
+		}
+		jwtSecret := []byte(usersData.JWTSecret)
+
+		// --- Generate a new JWT for web session ---
+		newExpirationTime := time.Now().Add(7 * 24 * time.Hour)
+		newClaims := &middleware.JWTClaims{
+			UserID:   userID.(string),
+			Username: username.(string),
+			JWTCustomClaims: middleware.JWTCustomClaims{
+				// Use the scopes extracted from the original token's context
+				Scopes: userScopes, // Assign the map directly
+			},
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(newExpirationTime),
+				IssuedAt:  jwt.NewNumericDate(time.Now()),
+				Issuer:    "PanelBase",
+				Audience:  jwt.ClaimStrings{middleware.AudienceWebSession},
+			},
+		}
+
+		newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, newClaims)
+		newTokenString, err := newToken.SignedString(jwtSecret)
+		if err != nil {
+			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate refresh token")
+			fmt.Printf("Error generating refresh token: %v\n", err)
+			return
+		}
+
+		// Set the new token in HTTP-only cookie
+		c.SetCookie(
+			cfg.Auth.CookieName,
+			newTokenString,
+			int(7*24*time.Hour.Seconds()),    // maxAge
+			"/",                              // path
+			"",                               // domain
+			cfg.Server.Mode != gin.DebugMode, // secure
+			true,                             // httpOnly
+		)
+
+		// Include the new token in the success response data
+		responseData := gin.H{
+			"token": newTokenString,
+		}
+		server.SuccessResponse(c, "Token refreshed successfully", responseData)
 	}
 }
