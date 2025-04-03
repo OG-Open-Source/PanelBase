@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/OG-Open-Source/PanelBase/internal/apitoken"
 	"github.com/OG-Open-Source/PanelBase/internal/auth"
 	"github.com/OG-Open-Source/PanelBase/internal/config"
 	"github.com/OG-Open-Source/PanelBase/internal/middleware"
@@ -30,42 +31,6 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 		{
 			// Token Refresh Route
 			protectedGroup.POST("/auth/token", auth.RefreshTokenHandler(cfg))
-
-			// Account Management Routes (for the currently authenticated user)
-			accountGroup := protectedGroup.Group("/account")
-			{
-				// API Token Management for the current user
-				tokenGroup := accountGroup.Group("/tokens")
-				{
-					tokenGroup.GET("", func(c *gin.Context) {
-						if !middleware.CheckPermission(c, "api", "read:self") {
-							return
-						}
-						server.SuccessResponse(c, "GET /account/tokens (List self) endpoint needs implementation", nil)
-					})
-					tokenGroup.POST("", func(c *gin.Context) {
-						if !middleware.CheckPermission(c, "api", "create:self") {
-							return
-						}
-						server.SuccessResponse(c, "POST /account/tokens (Create self) endpoint needs implementation", nil)
-					})
-					tokenGroup.PUT("", func(c *gin.Context) {
-						if !middleware.CheckPermission(c, "api", "update:self") {
-							return
-						}
-						// TODO: Parse body for token ID to update
-						server.SuccessResponse(c, "PUT /account/tokens (Update self - requires {'id':...} in body) endpoint needs implementation", nil)
-					})
-					tokenGroup.DELETE("", func(c *gin.Context) {
-						if !middleware.CheckPermission(c, "api", "delete:self") {
-							return
-						}
-						// TODO: Parse body for token ID to delete
-						server.SuccessResponse(c, "DELETE /account/tokens (Delete self - requires {'id':...} in body) endpoint needs implementation", nil)
-					})
-				}
-				// TODO: Add other account management endpoints here (e.g., GET /account/profile, PUT /account/profile)
-			}
 
 			// Commands (only if enabled)
 			if cfg.Features.Commands {
@@ -126,7 +91,7 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 				})
 			}
 
-			// Users
+			// General User Management (/api/v1/users)
 			userGroup := protectedGroup.Group("/users")
 			{
 				// GET /users - List users OR Get specific user by ID in body
@@ -180,6 +145,37 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 					// TODO: Implement actual logic to delete user
 					server.SuccessResponse(c, "DELETE Users (Delete) endpoint needs implementation", nil)
 				})
+
+				// --- User's Own API Token Management ---
+				// Mounted under /api/v1/users/token
+				selfTokenGroup := userGroup.Group("/token")
+				{
+					// GET route remains removed/commented out
+					// selfTokenGroup.GET("", apitoken.GetTokensHandler)
+
+					// POST /api/v1/users/token - Create a new API token for the user
+					// Apply AuthMiddleware first (already on protectedGroup/userGroup),
+					// then apply permission check middleware.
+					selfTokenGroup.POST("", middleware.RequirePermission("api", "create"), apitoken.CreateTokenHandler)
+
+					// PUT /api/v1/users/token - Placeholder for updating own token
+					// TODO: Apply middleware.RequirePermission("api", "update") when implemented
+					selfTokenGroup.PUT("", func(c *gin.Context) {
+						if !middleware.CheckPermission(c, "api", "update:token") { // Example permission check
+							return
+						}
+						server.SuccessResponse(c, "PUT /api/v1/users/token (Update own) endpoint not implemented", nil)
+					})
+
+					// DELETE /api/v1/users/token - Placeholder for deleting own token
+					// TODO: Apply middleware.RequirePermission("api", "delete") when implemented
+					selfTokenGroup.DELETE("", func(c *gin.Context) {
+						if !middleware.CheckPermission(c, "api", "delete:token") { // Example permission check
+							return
+						}
+						server.SuccessResponse(c, "DELETE /api/v1/users/token (Delete own) endpoint not implemented", nil)
+					})
+				}
 			}
 		}
 	}

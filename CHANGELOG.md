@@ -11,43 +11,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - (Future changes will go here)
 
+## [0.4.0] - 2025-04-04
+
+### Changed
+
+- **API Token Implementation**: 
+    - Changed API token generation from opaque random strings to JWTs signed with a user-specific secret (`api.jwt_secret` in `users.json`).
+    - Implemented a limit of 10 active API tokens per user.
+    - `POST /api/v1/users/token` endpoint now requires `name`, `scopes`, and `duration` in the request body.
+    - The response for token creation now includes the token `id`, metadata (`name`, `description`, `scopes`, `created_at`, `expires_at`), and the signed `token` (JWT string).
+- **User Data Management**:
+    - Refactored `users.json` file reading and writing logic into a new dedicated service: `internal/user/userservice.go`, including mutex locking for safe concurrent access.
+    - Updated `bootstrap` process to use `userservice` for initializing the `users.json` file.
+    - Updated `users.json` structure: added `api.jwt_secret` field per user and changed `api.tokens` to store token metadata as a map keyed by token ID.
+- **API Structure**:
+    - Consolidated API token management routes under `/api/v1/users/token` (POST, PUT, DELETE). Removed the standalone `/api/v1/token` group.
+    - Removed the `GET /api/v1/users/token` route.
+
+### Fixed
+
+- Fixed linter error caused by redeclaration of `UsersConfig` struct in the `models` package by removing `internal/models/users_config.go`.
+- Corrected various issues during refactoring, including function signatures, data structure mismatches, and import errors.
+
 ## [0.3.0] - 2025-04-03
 
 ### Added
 
-- Basic `/api/v1/auth/login` handler (`internal/auth/auth_service.go`): validates credentials against `users.json`, generates 7-day `web_session` JWT with full user scopes, sets HttpOnly cookie, and returns token in response data.
-- Basic `/api/v1/auth/token` handler (`internal/auth/auth_service.go`) for refreshing `web_session` tokens.
+- Basic `/api/v1/auth/login` handler (`internal/auth/auth_service.go`): validates credentials, generates JWT, sets cookie, returns token.
+- Basic `/api/v1/auth/token` handler (`internal/auth/auth_service.go`) for refreshing `web_session` tokens (requires valid session token).
 - `/logs` directory creation during bootstrap (`internal/bootstrap/bootstrap.go`).
-- Logging configuration (`cmd/panelbase/main.go`) to output logs to both console and `/logs/panelbase.log`.
-- Graceful server shutdown implementation (`cmd/panelbase/main.go`) on receiving SIGINT or SIGTERM signals.
-- `/api/v1/account/tokens` routes (GET, POST, PUT, DELETE) placeholders for managing user's own API tokens.
+- Logging configuration (`cmd/panelbase/main.go`) to output logs to console and `/logs/panelbase.log`.
+- Graceful server shutdown implementation (`cmd/panelbase/main.go`).
+- `/api/v1/users/token` routes (GET, POST, PUT, DELETE) placeholders for managing user's own API tokens.
 - Basic permission checking framework (`internal/middleware/permissions.go`) with `CheckPermission` and `CheckReadPermission` helpers.
 
 ### Changed
 
 - **Authentication:**
-  - Enhanced `AuthMiddleware` (`internal/middleware/auth.go`) to check for JWT in both Cookies (`web_session` audience) and `Authorization: Bearer` header (`api_access` audience), validating audience based on source.
-  - Updated JWT Claims structure (`internal/middleware/auth.go`) to use `username` tag instead of `preferred_username`.
-  - Moved `POST /api/v1/auth/token` route to be under authentication middleware protection.
-  - Changed user/token permission/scope structure from `[]string` to `map[string][]string` (`models.UserPermissions`) in models, JWT claims, and bootstrap.
-  - Updated `LoginHandler`, `RefreshTokenHandler`, and `AuthMiddleware` to use the new `map` based permission structure.
+    - Enhanced `AuthMiddleware` (`internal/middleware/auth.go`) to check JWT from Cookie/Header and store actual audience.
+    - Updated JWT Claims (`internal/middleware/auth.go`) to use `username` tag.
+    - Moved `POST /api/v1/auth/token` route under authentication protection.
+    - Changed user/token permission structure to `map[string][]string` (`models.UserPermissions`).
+    - Updated auth handlers and middleware to use new permission structure.
+- **API Structure:**
+    - Consolidated API token management for the current user under `/api/v1/users/token` (replacing the previously planned `/api/v1/account/tokens`).
 - **Models:**
-  - Updated `User` model (`internal/models/user.go`) to correctly represent the `api: {tokens: [...]}` structure from `users.json`, fixing a JSON unmarshal error during login.
+    - Updated `User` model (`internal/models/user.go`) for correct JSON unmarshalling of `api: {tokens: [...]}`.
 - **Server:**
-  - Standardized API response format (`internal/server/response.go`) to `{"status": "success|error", "message": "...", "data": ...}`.
+    - Standardized API response format (`internal/server/response.go`).
 - **Configuration:**
-  - Set default `server.mode` to `"release"` when creating `config.toml` in bootstrap.
-  - Changed `main.go` to directly use `server.mode` value from config to set Gin mode, removing default/fallback logic (Gin defaults to debug if value is empty/invalid).
-  - Removed explicit support for `gin.TestMode` in `main.go`.
+    - Set default `server.mode` to `"release"` in bootstrap.
+    - Changed `main.go` to use `server.mode` directly for Gin mode setting.
+    - Removed explicit `gin.TestMode` support in `main.go`.
 - **Code:**
-  - Translated comments in `bootstrap.go` and `main.go` to English.
+    - Translated comments in `bootstrap.go` and `main.go` to English.
+    - Removed verbose logging from `main.go` startup.
 
 ### Fixed
 
-- Fixed repeated syntax errors in `internal/auth/auth_service.go` caused by incorrect newline handling during file creation/editing.
-- Resolved `undefined: auth.LoginHandler` error by fixing auth service syntax and running `go mod tidy`.
-- Fixed `json: cannot unmarshal array into Go struct field ...` error by correcting the `User` model structure in `models/user.go`.
-- Corrected Gin mode setting logic in `main.go` to avoid potential conflicts and ensure mode is set before engine creation.
+- Fixed `auth_service.go` syntax errors.
+- Resolved `undefined: auth.LoginHandler` error.
+- Fixed JSON unmarshal error for User model.
+- Corrected Gin mode setting logic.
+- Fixed `Invalid audience format` error in `RefreshTokenHandler`.
 
 ## [0.2.0] - 2025-04-02
 

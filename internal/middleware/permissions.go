@@ -132,3 +132,4 @@ func CheckReadPermission(c *gin.Context, resource string) bool {
 
 // TODO: Refine extractIDFromRequestBody - reading body here might be problematic.
 // Consider requiring handlers to parse the body and pass the ID to permission checks.
+ 

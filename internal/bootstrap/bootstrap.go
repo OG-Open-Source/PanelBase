@@ -15,6 +15,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/OG-Open-Source/PanelBase/internal/models"
+	"github.com/OG-Open-Source/PanelBase/internal/user" // Import the user service
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -77,50 +78,8 @@ func Bootstrap() error {
 	usersPath := filepath.Join(configsDir, "users.json")
 	if _, err := os.Stat(usersPath); os.IsNotExist(err) {
 		log.Printf("File '%s' not found, creating with defaults...", usersPath)
-		// Generate dynamic values ONLY if creating the file
-		jwtSecret, err := generateRandomString(32)
-		if err != nil {
-			return fmt.Errorf("failed to generate JWT secret for new users file: %w", err)
-		}
-		userID, err := generateRandomString(8)
-		if err != nil {
-			return fmt.Errorf("failed to generate user ID for new users file: %w", err)
-		}
-		userID = "usr_" + userID
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
-		if err != nil {
-			return fmt.Errorf("failed to hash admin password for new users file: %w", err)
-		}
-
-		// Define full permissions for the admin user (using the new map structure)
-		adminPermissions := models.UserPermissions{
-			"commands": {"read:list", "read:item", "install", "execute", "update", "delete"},
-			"plugins":  {"read:list", "read:item", "install", "update", "delete"},
-			"themes":   {"read:list", "read:item", "install", "update", "delete"},
-			"users":    {"read:list", "read:item", "create", "update", "delete"},
-			"api":      {"read:list", "read:item", "create", "update", "delete"},
-		}
-
-		// Prepare default user data map
-		defaultUsersData := map[string]interface{}{
-			"jwt_secret": jwtSecret,
-			"users": map[string]interface{}{ // Add admin user (using the new permission structure)
-				userID: map[string]interface{}{ // Use the dynamically generated userID
-					"is_active":  true,
-					"username":   "admin",
-					"password":   string(hashedPassword),
-					"name":       "Administrator",
-					"email":      "admin@example.com",
-					"created_at": time.Now().Format(time.RFC3339),
-					"scopes":     adminPermissions, // Assign the map directly
-					"api": map[string]interface{}{ // Initialize api settings
-						"tokens": []map[string]interface{}{}, // Empty tokens list
-					},
-				},
-			},
-		}
-		if err := writeJsonFile(usersPath, defaultUsersData); err != nil {
-			return err
+		if err := initializeUsersFile(); err != nil {
+			return fmt.Errorf("failed to initialize users file: %w", err)
 		}
 	} else if err != nil {
 		return fmt.Errorf("failed to check users file '%s': %w", usersPath, err)
@@ -174,6 +133,109 @@ func Bootstrap() error {
 	return nil
 }
 
+// initializeUsersFile creates the initial users.json file with a default admin user.
+// This now uses the user service to save the config.
+func initializeUsersFile() error {
+	// Generate global JWT secret (can be used as fallback or default)
+	globalJwtSecret, err := generateRandomString(32)
+	if err != nil {
+		return fmt.Errorf("failed to generate global JWT secret: %w", err)
+	}
+
+	// Prepare user details (can be extended to multiple default users)
+	defaultUserDetails := []struct {
+		Username string
+		Password string
+		Name     string
+		Email    string
+		Scopes   models.UserPermissions
+	}{
+		{
+			Username: "admin",
+			Password: "admin",
+			Name:     "Administrator",
+			Email:    "admin@example.com",
+			Scopes: models.UserPermissions{ // Define admin scopes directly
+				"commands": {"read:list", "read:item", "install", "execute", "update", "delete"},
+				"plugins":  {"read:list", "read:item", "install", "update", "delete"},
+				"themes":   {"read:list", "read:item", "install", "update", "delete"},
+				"users":    {"read:list", "read:item", "create", "update", "delete"},
+				"api":      {"read:list", "read:item", "create", "update", "delete"},
+			},
+		},
+	}
+
+	// Initialize the UsersConfig structure
+	usersConfig := &models.UsersConfig{
+		JwtSecret: globalJwtSecret,
+		Users:     make(map[string]models.User),
+	}
+
+	// Create user entries using the models.User struct
+	for _, u := range defaultUserDetails {
+		userID, err := generateRandomString(8) // Generate ID for each user
+		if err != nil {
+			log.Printf("Warning: Failed to generate unique user ID for %s: %v. Skipping user.", u.Username, err)
+			continue
+		}
+		userID = "usr_" + userID
+
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
+		if err != nil {
+			log.Printf("Warning: Failed to hash password for %s: %v. Skipping user.", u.Username, err)
+			continue
+		}
+
+		userJwtSecret, err := generateRandomString(32) // Generate user-specific secret
+		if err != nil {
+			log.Printf("Warning: Failed to generate JWT secret for %s: %v. Using fallback.", u.Username, err)
+			userJwtSecret = "fallback_secret_" + userID // Less secure fallback
+		}
+
+		userData := models.User{
+			ID:        userID,
+			Username:  u.Username,
+			Password:  string(hashedPassword),
+			Name:      u.Name,
+			Email:     u.Email,
+			CreatedAt: time.Now().UTC(),
+			Active:    true,
+			Scopes:    u.Scopes,
+			API: models.UserAPISettings{
+				JwtSecret: userJwtSecret,
+				Tokens:    make(map[string]models.APIToken), // Initialize correctly
+			},
+		}
+		usersConfig.Users[u.Username] = userData // Add user to the map using username as key
+	}
+
+	// Save the initialized users config using the user service save function
+	// Need to access the save function from the user service.
+	// For now, assume user package has a SaveConfig function (needs adding to userservice.go)
+	if err := user.SaveUsersConfigForBootstrap(usersConfig); err != nil { // Placeholder name
+		log.Printf("Error initializing users.json via service: %v", err)
+		return err
+	}
+
+	log.Println("users.json initialized successfully via service.")
+	return nil
+}
+
+// generateRandomString remains here for bootstrap purposes
+// TODO: Consider moving to a shared utility package if used elsewhere.
+func generateRandomString(length int) (string, error) {
+	const letters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
+	ret := make([]byte, length)
+	for i := 0; i < length; i++ {
+		num, err := crand.Int(crand.Reader, big.NewInt(int64(len(letters))))
+		if err != nil {
+			return "", fmt.Errorf("failed to generate random number: %w", err)
+		}
+		ret[i] = letters[num.Int64()]
+	}
+	return string(ret), nil
+}
+
 // ensureDirExists checks if a directory exists, and creates it if not.
 func ensureDirExists(dirPath string) error {
 	absPath, err := filepath.Abs(dirPath)
@@ -219,20 +281,6 @@ func writeTomlFile(filePath string, data interface{}) error {
 	}
 	log.Printf("Successfully created default file: %s", filePath)
 	return nil
-}
-
-// generateRandomString generates a cryptographically secure random string of specified length.
-func generateRandomString(length int) (string, error) {
-	const letters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
-	ret := make([]byte, length)
-	for i := 0; i < length; i++ {
-		num, err := crand.Int(crand.Reader, big.NewInt(int64(len(letters))))
-		if err != nil {
-			return "", fmt.Errorf("failed to generate random number: %w", err)
-		}
-		ret[i] = letters[num.Int64()]
-	}
-	return string(ret), nil
 }
 
 // findAvailablePort searches for an available TCP port within the specified range.

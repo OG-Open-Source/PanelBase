@@ -1,16 +1,20 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
-	"github.com/OG-Open-Source/PanelBase/internal/config"
-	"github.com/OG-Open-Source/PanelBase/internal/middleware" // For JWTClaims, Audience constants
-	"github.com/OG-Open-Source/PanelBase/internal/models"     // For User structure
-	"github.com/OG-Open-Source/PanelBase/internal/server"     // For Response functions
+	"github.com/OG-Open-Source/PanelBase/internal/config" // For JWTClaims, Audience constants
+	"github.com/OG-Open-Source/PanelBase/internal/models" // For User structure
+	"github.com/OG-Open-Source/PanelBase/internal/server" // For Response functions
+	"github.com/OG-Open-Source/PanelBase/internal/user"   // Import the user service
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -57,177 +61,218 @@ func findUserByUsername(username string, usersData *UsersData) (*models.User, st
 	return nil, "", fmt.Errorf("user not found")
 }
 
-// LoginHandler handles the user login request.
+// generateSessionID creates a unique session identifier.
+func generateSessionID() (string, error) {
+	bytesLength := 16 // 16 bytes = 32 hex chars
+	b := make([]byte, bytesLength)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", fmt.Errorf("failed to read random bytes for session ID: %w", err)
+	}
+	return "ses_" + hex.EncodeToString(b), nil
+}
+
+// LoginHandler handles user login requests.
 func LoginHandler(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var payload LoginPayload
 		if err := c.ShouldBindJSON(&payload); err != nil {
-			server.ErrorResponse(c, http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
+			server.ErrorResponse(c, http.StatusBadRequest, "Invalid request payload")
 			return
 		}
 
-		// Load user data (Consider caching or using a service)
-		usersData, err := loadUsersData()
+		// 1. Load user data using the user service
+		userInstance, userExists, err := user.GetUserByUsername(payload.Username)
 		if err != nil {
-			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to load user data")
-			fmt.Printf("Error loading user data: %v\n", err) // Log internal error
+			// Log the internal error, but return a generic unauthorized message
+			log.Printf("Error loading user data during login for %s: %v", payload.Username, err)
+			server.ErrorResponse(c, http.StatusUnauthorized, "Invalid username or password")
 			return
 		}
-
-		// Find the user
-		user, userID, err := findUserByUsername(payload.Username, usersData)
-		if err != nil || (user != nil && !user.IsActive) {
-			status := http.StatusUnauthorized
-			message := "Invalid username or password"
-			if err == nil && user != nil && !user.IsActive {
-				message = "User account is inactive"
-				status = http.StatusForbidden
-			}
-			server.ErrorResponse(c, status, message)
-			return
-		}
-
-		// Compare the provided password with the stored hash
-		err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(payload.Password))
-		if err != nil {
-			// Password doesn't match
+		if !userExists {
 			server.ErrorResponse(c, http.StatusUnauthorized, "Invalid username or password")
 			return
 		}
 
-		// --- Password matches --- Generate JWT for web session
-
-		jwtSecret := []byte(usersData.JWTSecret) // Use secret from users.json
-		// Session tokens expire in 7 days
-		expirationTime := time.Now().Add(7 * 24 * time.Hour)
-
-		// Ensure user.Scopes is not nil before assigning (though it should be initialized by bootstrap)
-		userScopes := user.Scopes
-		if userScopes == nil {
-			userScopes = make(models.UserPermissions) // Assign empty map if nil
+		// 3. Check if user is active
+		if !userInstance.Active {
+			server.ErrorResponse(c, http.StatusUnauthorized, "User account is inactive")
+			return
 		}
 
-		claims := &middleware.JWTClaims{
-			UserID:   userID, // Use the actual UserID from the map key
-			Username: user.Username,
-			JWTCustomClaims: middleware.JWTCustomClaims{
-				// Include the user's full permissions (now a map)
-				Scopes: userScopes,
-			},
-			RegisteredClaims: jwt.RegisteredClaims{
-				ExpiresAt: jwt.NewNumericDate(expirationTime),
-				IssuedAt:  jwt.NewNumericDate(time.Now()),
-				Issuer:    "PanelBase",
-				Audience:  jwt.ClaimStrings{middleware.AudienceWebSession},
-			},
+		// 4. Verify password
+		err = bcrypt.CompareHashAndPassword([]byte(userInstance.Password), []byte(payload.Password))
+		if err != nil {
+			server.ErrorResponse(c, http.StatusUnauthorized, "Invalid username or password")
+			return
+		}
+
+		// --- Login Successful ---
+
+		// 5. Update LastLogin timestamp
+		now := time.Now().UTC()
+		userInstance.LastLogin = &now
+
+		// Save the updated user data (including LastLogin) using the UserService
+		if err := user.UpdateUser(userInstance); err != nil {
+			log.Printf("Warning: Failed to update last_login for user %s: %v", userInstance.Username, err)
+		}
+
+		// 6. Generate JWT token with specified structure and order
+		jwtSecret := cfg.Auth.JWTSecret
+		if jwtSecret == "" {
+			log.Printf("Error: JWT secret not configured for session token generation.")
+			server.ErrorResponse(c, http.StatusInternalServerError, "Session token configuration error")
+			return
+		}
+
+		expirationTime := time.Now().Add(cfg.Auth.TokenDuration)
+		issuedAt := time.Now()
+
+		// Generate session ID
+		sessionID, err := generateSessionID()
+		if err != nil {
+			log.Printf("Error generating session ID for user %s: %v", userInstance.Username, err)
+			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate session identifier")
+			return
+		}
+
+		// Use jwt.MapClaims for specific order
+		claims := jwt.MapClaims{
+			"aud":    "web",                 // Audience: Web Session
+			"sub":    userInstance.ID,       // Subject: User ID
+			"name":   userInstance.Name,     // Name: User's display name
+			"jti":    sessionID,             // JWT ID: Unique Session ID (ses_...)
+			"scopes": userInstance.Scopes,   // Scopes: User's base permissions
+			"iss":    "PanelBase",           // Issuer
+			"iat":    issuedAt.Unix(),       // Issued At
+			"exp":    expirationTime.Unix(), // Expiration Time
 		}
 
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-		tokenString, err := token.SignedString(jwtSecret)
+		tokenString, err := token.SignedString([]byte(jwtSecret))
 		if err != nil {
 			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate token")
-			fmt.Printf("Error generating token: %v\n", err) // Log internal error
 			return
 		}
 
-		// Set token in HTTP-only cookie
-		c.SetCookie(
-			cfg.Auth.CookieName,
-			tokenString,
-			int(7*24*time.Hour.Seconds()),    // maxAge in seconds
-			"/",                              // path
-			"",                               // domain (leave empty for current domain)
-			cfg.Server.Mode != gin.DebugMode, // secure (true in release mode)
-			true,                             // httpOnly
-		)
-
-		// Include the token in the success response data
-		responseData := gin.H{
+		// 7. Set cookie and return response
+		c.SetCookie(cfg.Auth.CookieName, tokenString, int(cfg.Auth.TokenDuration.Seconds()), "/", "", false, true)
+		server.SuccessResponse(c, "Login successful", gin.H{
 			"token": tokenString,
-		}
-		server.SuccessResponse(c, "Login successful", responseData)
+		})
 	}
 }
 
-// RefreshTokenHandler handles the token refresh request for web sessions.
+// RefreshTokenHandler handles refreshing the JWT token.
 func RefreshTokenHandler(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Middleware should have already validated the token and put info in context
-		userID, userIDExists := c.Get("userID")
-		username, usernameExists := c.Get("username")
-		scopesInterface, scopesExists := c.Get("scopes")
-		audience, audienceExists := c.Get("token_audience")
-
-		if !userIDExists || !usernameExists || !scopesExists || !audienceExists {
-			server.ErrorResponse(c, http.StatusInternalServerError, "User information missing from context")
-			fmt.Println("Error: User info missing in RefreshTokenHandler context") // Log internal error
+		// 1. Extract user information and token audience from context (set by AuthMiddleware)
+		userIDVal, exists := c.Get("userID")
+		if !exists {
+			server.ErrorResponse(c, http.StatusUnauthorized, "User ID missing from context")
 			return
 		}
+		userID := userIDVal.(string)
 
-		// Ensure this request comes from a web session token
-		if audience.(string) != middleware.AudienceWebSession {
-			server.ErrorResponse(c, http.StatusForbidden, "Token refresh is only allowed for web sessions")
+		permissionsVal, exists := c.Get("userPermissions")
+		if !exists {
+			server.ErrorResponse(c, http.StatusUnauthorized, "Permissions missing from context")
 			return
 		}
+		userScopes := permissionsVal.(models.UserPermissions)
 
-		// Type assert scopes to the correct map type
-		userScopes, ok := scopesInterface.(models.UserPermissions)
+		tokenAudienceVal, exists := c.Get("tokenAudience")
+		if !exists {
+			server.ErrorResponse(c, http.StatusUnauthorized, "Token audience missing from context")
+			return
+		}
+		// Ensure audience is correctly asserted (AuthMiddleware sets it as jwt.ClaimStrings)
+		tokenAudience, ok := tokenAudienceVal.(jwt.ClaimStrings)
 		if !ok {
-			server.ErrorResponse(c, http.StatusInternalServerError, "Invalid scopes format in context")
-			fmt.Printf("Error: Invalid scopes type in RefreshTokenHandler context: %T\n", scopesInterface)
+			// Fallback check if it was somehow set as []string
+			if audSlice, okSlice := tokenAudienceVal.([]string); okSlice {
+				tokenAudience = jwt.ClaimStrings(audSlice)
+				ok = true
+			} else if audStr, okStr := tokenAudienceVal.(string); okStr {
+				// Handle if it was set as single string
+				tokenAudience = jwt.ClaimStrings{audStr}
+				ok = true
+			} else {
+				server.ErrorResponse(c, http.StatusInternalServerError, "Invalid audience format in context")
+				return
+			}
+		}
+
+		// 2. Check if the token audience is correct for refresh ('web')
+		audienceValid := false
+		for _, aud := range tokenAudience {
+			if aud == "web" { // Check for the new audience value "web"
+				audienceValid = true
+				break
+			}
+		}
+		if !audienceValid {
+			server.ErrorResponse(c, http.StatusForbidden, "Token refresh requires a token with 'web' audience") // Updated error message
 			return
 		}
 
-		// Load JWT secret (need this again for signing the new token)
-		// TODO: Consider injecting the secret instead of reloading users.json
-		usersData, err := loadUsersData() // Inefficient, refactor later
+		// 3. Load user data to get Name (needed for new claim structure)
+		// TODO: Optimize this - ideally AuthMiddleware could verify user existence
+		// and maybe even attach the Name to context if needed frequently.
+		userInstance, userExists, err := user.GetUserByID(userID)
 		if err != nil {
-			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to load user data for refresh")
-			fmt.Printf("Error loading user data in refresh: %v\n", err)
+			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to load user data for refresh: "+err.Error())
 			return
 		}
-		jwtSecret := []byte(usersData.JWTSecret)
-
-		// --- Generate a new JWT for web session ---
-		newExpirationTime := time.Now().Add(7 * 24 * time.Hour)
-		newClaims := &middleware.JWTClaims{
-			UserID:   userID.(string),
-			Username: username.(string),
-			JWTCustomClaims: middleware.JWTCustomClaims{
-				// Use the scopes extracted from the original token's context
-				Scopes: userScopes, // Assign the map directly
-			},
-			RegisteredClaims: jwt.RegisteredClaims{
-				ExpiresAt: jwt.NewNumericDate(newExpirationTime),
-				IssuedAt:  jwt.NewNumericDate(time.Now()),
-				Issuer:    "PanelBase",
-				Audience:  jwt.ClaimStrings{middleware.AudienceWebSession},
-			},
+		if !userExists {
+			server.ErrorResponse(c, http.StatusNotFound, "User associated with token not found")
+			return
 		}
 
-		newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, newClaims)
-		newTokenString, err := newToken.SignedString(jwtSecret)
+		// 4. Generate a new JWT with updated expiration and potentially a new session ID (jti)
+		jwtSecret := cfg.Auth.JWTSecret
+		if jwtSecret == "" {
+			log.Printf("Error: JWT secret not configured for session token generation.")
+			server.ErrorResponse(c, http.StatusInternalServerError, "Session token configuration error")
+			return
+		}
+
+		expirationTime := time.Now().Add(cfg.Auth.TokenDuration)
+		issuedAt := time.Now()
+		newSessionID, err := generateSessionID() // Generate a new session ID for the refreshed token
 		if err != nil {
-			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate refresh token")
-			fmt.Printf("Error generating refresh token: %v\n", err)
+			log.Printf("Error generating session ID for user %s: %v", userInstance.Username, err)
+			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate session identifier")
 			return
 		}
 
-		// Set the new token in HTTP-only cookie
-		c.SetCookie(
-			cfg.Auth.CookieName,
-			newTokenString,
-			int(7*24*time.Hour.Seconds()),    // maxAge
-			"/",                              // path
-			"",                               // domain
-			cfg.Server.Mode != gin.DebugMode, // secure
-			true,                             // httpOnly
-		)
+		claims := jwt.MapClaims{
+			"aud":    "web",
+			"sub":    userID,
+			"name":   userInstance.Name,
+			"jti":    newSessionID,
+			"scopes": userScopes,
+			"iss":    "PanelBase",
+			"iat":    issuedAt.Unix(),
+			"exp":    expirationTime.Unix(),
+		}
 
-		// Include the new token in the success response data
-		responseData := gin.H{
+		newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+		newTokenString, err := newToken.SignedString([]byte(jwtSecret))
+		if err != nil {
+			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate refreshed token")
+			return
+		}
+
+		// 5. Set the new token in the cookie and return success
+		c.SetCookie(cfg.Auth.CookieName, newTokenString, int(cfg.Auth.TokenDuration.Seconds()), "/", "", false, true)
+		server.SuccessResponse(c, "Token refreshed successfully", gin.H{
 			"token": newTokenString,
-		}
-		server.SuccessResponse(c, "Token refreshed successfully", responseData)
+		})
 	}
 }
+
+// TODO: Remove findUserByUsername and loadUsersData once fully transitioned to userservice.
+// These functions are likely redundant now.
+var fileMutex sync.RWMutex // Keep mutex if these functions stay temporarily
