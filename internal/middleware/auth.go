@@ -12,91 +12,122 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// Claims defines the structure of the JWT claims used in this application.
-// Add fields relevant to your user model (e.g., Role).
-type Claims struct {
-	UserID   string `json:"user_id"`
-	Username string `json:"username"`
-	// Role     string `json:"role"` // Example: Add user role if needed
-	jwt.RegisteredClaims // Includes standard claims like Issuer, ExpiresAt, etc.
+// --- JWT Claims Structure and Audience Constants ---
+
+// JWTCustomClaims contains custom JWT claims.
+type JWTCustomClaims struct {
+	Scopes []string `json:"scopes"`
 }
 
+// JWTClaims represents the structure of the JWT payload.
+type JWTClaims struct {
+	UserID   string `json:"sub"` // Standard claim for Subject (User ID)
+	Username string `json:"username,omitempty"`
+	JWTCustomClaims
+	jwt.RegisteredClaims // Embeds standard claims like exp, iat, aud, iss
+}
+
+// Audience constants for differentiating token types.
 const (
-	AuthHeaderKey  = "Authorization"
-	BearerSchema   = "Bearer "
-	ContextUserKey = "userClaims" // Key to store claims in Gin context
+	AudienceWebSession = "web_session"
+	AudienceAPIAccess  = "api_access"
 )
 
-// AuthMiddleware creates a Gin middleware for JWT authentication.
-func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
-	// Convert JWT secret string to []byte for the library
-	jwtSecret := []byte(cfg.Auth.JWTSecret)
+// --- AuthMiddleware ---
 
+// AuthMiddleware validates JWT tokens from either Cookie or Authorization header.
+func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tokenString := extractToken(c, cfg.Auth.CookieName)
-		if tokenString == "" {
-			server.ErrorResponse(c, http.StatusUnauthorized, "Authorization token required.")
-			return // Abort middleware chain
+		var tokenString string
+		var tokenSource string // "cookie" or "header"
+
+		// 1. Try to get token from Cookie first
+		cookie, err := c.Cookie(cfg.Auth.CookieName)
+		if err == nil && cookie != "" {
+			tokenString = cookie
+			tokenSource = "cookie"
+		} else {
+			// 2. If not in cookie, try Authorization header (Bearer token)
+			authHeader := c.GetHeader("Authorization")
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				tokenString = strings.TrimPrefix(authHeader, "Bearer ")
+				tokenSource = "header"
+			}
 		}
 
-		// Parse and validate the token
-		token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-			// Validate the signing algorithm
+		// If token is not found in either location
+		if tokenString == "" {
+			server.ErrorResponse(c, http.StatusUnauthorized, "Authorization token required")
+			c.Abort()
+			return
+		}
+
+		// 3. Parse and validate the token
+		token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
+			// Ensure the signing method is HMAC
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
-			return jwtSecret, nil
+			// Return the secret key for validation
+			return []byte(cfg.Auth.JWTSecret), nil
 		})
 
 		if err != nil {
-			errMsg := "Invalid or expired token."
-			// Log the actual error for debugging, but don't expose details to the client
-			fmt.Printf("Token parsing error: %v\n", err) // Replace with proper logging
-			// Distinguish between expired and other invalid tokens if needed
-			if strings.Contains(err.Error(), "token is expired") {
-				errMsg = "Token has expired."
+			// Handle parsing errors (expired, malformed, signature mismatch etc.)
+			server.ErrorResponse(c, http.StatusUnauthorized, fmt.Sprintf("Invalid or expired token: %v", err))
+			c.Abort()
+			return
+		}
+
+		// 4. Check if the token and claims are valid
+		if claims, ok := token.Claims.(*JWTClaims); ok && token.Valid {
+			// 5. Validate Audience based on token source
+			var expectedAudience string
+			if tokenSource == "cookie" {
+				expectedAudience = AudienceWebSession
+			} else { // tokenSource == "header"
+				expectedAudience = AudienceAPIAccess
 			}
-			server.ErrorResponse(c, http.StatusUnauthorized, errMsg)
-			return
-		}
 
-		if claims, ok := token.Claims.(*Claims); ok && token.Valid {
-			// Token is valid, store claims in context for later handlers
-			c.Set(ContextUserKey, claims)
-			c.Next() // Proceed to the next handler
+			// Check if the expected audience is present in the token's audience list
+			audienceMatch := false
+			for _, aud := range claims.Audience {
+				if aud == expectedAudience {
+					audienceMatch = true
+					break
+				}
+			}
+
+			if !audienceMatch {
+				server.ErrorResponse(c, http.StatusForbidden, fmt.Sprintf("Invalid token audience for %s access", tokenSource))
+				c.Abort()
+				return
+			}
+
+			// 6. Validation successful, store user info in context
+			c.Set("userID", claims.UserID)
+			c.Set("username", claims.Username)        // Store username if present
+			c.Set("scopes", claims.Scopes)            // Store scopes (full or subset)
+			c.Set("token_audience", expectedAudience) // Store audience for potential use
+
+			// Continue to the next handler
+			c.Next()
 		} else {
-			fmt.Println("Token claims invalid or token is not valid.") // Replace with proper logging
-			server.ErrorResponse(c, http.StatusUnauthorized, "Invalid token.")
-			return
+			// General invalid token case (should ideally be caught by ParseWithClaims err)
+			server.ErrorResponse(c, http.StatusUnauthorized, "Invalid token")
+			c.Abort()
 		}
 	}
-}
-
-// extractToken tries to extract the JWT from the Authorization header or a cookie.
-func extractToken(c *gin.Context, cookieName string) string {
-	// 1. Check Authorization header
-	authHeader := c.GetHeader(AuthHeaderKey)
-	if authHeader != "" && strings.HasPrefix(authHeader, BearerSchema) {
-		return strings.TrimPrefix(authHeader, BearerSchema)
-	}
-
-	// 2. Check cookie
-	cookie, err := c.Cookie(cookieName)
-	if err == nil && cookie != "" {
-		return cookie
-	}
-
-	return "" // No token found
 }
 
 // Helper function to get claims from context (can be placed here or in a utils package)
-func GetClaims(c *gin.Context) (*Claims, bool) {
-	claims, exists := c.Get(ContextUserKey)
+func GetClaims(c *gin.Context) (*JWTClaims, bool) {
+	claims, exists := c.Get("userClaims")
 	if !exists {
 		return nil, false
 	}
-	typedClaims, ok := claims.(*Claims)
-	return typedClaims, ok
+	typedClaims, ok := claims.(JWTClaims)
+	return &typedClaims, ok
 }
 
 // GenerateToken - Placeholder for token generation logic (should be in an auth service/handler)
@@ -104,15 +135,17 @@ func GenerateToken(cfg *config.Config, userID, username string) (string, error) 
 	jwtSecret := []byte(cfg.Auth.JWTSecret)
 	expirationTime := time.Now().Add(cfg.Auth.TokenDuration)
 
-	claims := &Claims{
+	claims := &JWTClaims{
 		UserID:   userID,
 		Username: username,
-		// Role:     "admin", // Example
+		JWTCustomClaims: JWTCustomClaims{
+			Scopes: []string{}, // Populate scopes as needed
+		},
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    "PanelBase", // Optional: Identify the issuer
-			// Subject: userID, // Optional: Subject of the token
+			Issuer:    "PanelBase",                 // Optional: Identify the issuer
+			Audience:  []string{AudienceAPIAccess}, // Assuming API access
 		},
 	}
 

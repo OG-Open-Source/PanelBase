@@ -1,15 +1,15 @@
 {
-  "jwt_secret": "yjzyXCihIyU0SsHkgw-fuUtnKAZ337I3",
+  "jwt_secret": "PEMXdGAq1bNzzJ-q5CdFil41bu0zSoBH",
   "users": {
-    "usr_dkLltngb": {
+    "usr_8JeUmsr5": {
       "api": {
         "tokens": []
       },
-      "created_at": "2025-04-02T01:04:14+08:00",
+      "created_at": "2025-04-03T00:47:07+08:00",
       "email": "admin@example.com",
       "is_active": true,
       "name": "Administrator",
-      "password": "$2a$10$GwC9oMpXW63aPw7inCDXEe4xO6cp1H54AGW0ElM5VDMFOBV.U2NpO",
+      "password": "$2a$10$OLx07C3rI5IL9f1xKuV7yeaHRLTZNBIRon3mJ2WhnqgderWq9Zwty",
       "scopes": [
         "*:*:*"
       ],

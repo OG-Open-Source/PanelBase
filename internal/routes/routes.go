@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/OG-Open-Source/PanelBase/internal/auth"
 	"github.com/OG-Open-Source/PanelBase/internal/config"
 	"github.com/OG-Open-Source/PanelBase/internal/middleware"
 	"github.com/OG-Open-Source/PanelBase/internal/server"
@@ -23,7 +24,7 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 		// Authentication routes (public)
 		authGroup := apiV1.Group("/auth")
 		{
-			authGroup.POST("/login", func(c *gin.Context) { server.SuccessResponse(c, "Login endpoint not implemented yet", nil) })
+			authGroup.POST("/login", auth.LoginHandler(cfg))
 			authGroup.POST("/token", func(c *gin.Context) { server.SuccessResponse(c, "Token refresh endpoint not implemented yet", nil) })
 		}
 
@@ -33,19 +34,79 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 		{
 			// Commands (only if enabled)
 			if cfg.Features.Commands {
-				protectedGroup.GET("/commands", func(c *gin.Context) { server.SuccessResponse(c, "Commands endpoint not implemented yet", nil) })
+				cmdGroup := protectedGroup.Group("/commands")
+				{
+					cmdGroup.GET("", func(c *gin.Context) {
+						server.SuccessResponse(c, "GET Commands (List) endpoint not implemented yet", nil)
+					})
+					cmdGroup.POST("", func(c *gin.Context) {
+						server.SuccessResponse(c, "POST Commands (Create) endpoint not implemented yet", nil)
+					})
+					cmdGroup.PUT("", func(c *gin.Context) {
+						server.SuccessResponse(c, "PUT Commands (Update - requires {'id': ...} in body) endpoint not implemented yet", nil)
+					})
+					cmdGroup.DELETE("", func(c *gin.Context) {
+						server.SuccessResponse(c, "DELETE Commands (Delete - requires {'id': ...} in body) endpoint not implemented yet", nil)
+					})
+				}
 			}
 
 			// Plugins (only if enabled)
 			if cfg.Features.Plugins {
-				protectedGroup.GET("/plugins", func(c *gin.Context) { server.SuccessResponse(c, "Plugins endpoint not implemented yet", nil) })
+				pluginGroup := protectedGroup.Group("/plugins")
+				{
+					pluginGroup.GET("", func(c *gin.Context) {
+						server.SuccessResponse(c, "GET Plugins (List) endpoint not implemented yet", nil)
+					})
+					// POST might use {"url": "..."} in body to install from URL
+					pluginGroup.POST("", func(c *gin.Context) {
+						server.SuccessResponse(c, "POST Plugins (Install/Create - may use {'url': ...} in body) endpoint not implemented yet", nil)
+					})
+					// PUT requires {"id": "..."} in body
+					pluginGroup.PUT("", func(c *gin.Context) {
+						server.SuccessResponse(c, "PUT Plugins (Update - requires {'id': ...} in body) endpoint not implemented yet", nil)
+					})
+					// DELETE requires {"id": "..."} in body
+					pluginGroup.DELETE("", func(c *gin.Context) {
+						server.SuccessResponse(c, "DELETE Plugins (Uninstall - requires {'id': ...} in body) endpoint not implemented yet", nil)
+					})
+				}
 			}
 
 			// Themes
-			protectedGroup.GET("/themes", func(c *gin.Context) { server.SuccessResponse(c, "Themes endpoint not implemented yet", nil) })
+			themeGroup := protectedGroup.Group("/themes")
+			{
+				themeGroup.GET("", func(c *gin.Context) { server.SuccessResponse(c, "GET Themes (List) endpoint not implemented yet", nil) })
+				// POST might use {"url": "..."} in body to install from URL
+				themeGroup.POST("", func(c *gin.Context) {
+					server.SuccessResponse(c, "POST Themes (Install/Create - may use {'url': ...} in body) endpoint not implemented yet", nil)
+				})
+				// PUT requires {"id": "..."} in body
+				themeGroup.PUT("", func(c *gin.Context) {
+					server.SuccessResponse(c, "PUT Themes (Update - requires {'id': ...} in body) endpoint not implemented yet", nil)
+				})
+				// DELETE requires {"id": "..."} in body
+				themeGroup.DELETE("", func(c *gin.Context) {
+					server.SuccessResponse(c, "DELETE Themes (Uninstall - requires {'id': ...} in body) endpoint not implemented yet", nil)
+				})
+			}
 
 			// Users
-			protectedGroup.GET("/users", func(c *gin.Context) { server.SuccessResponse(c, "Users endpoint not implemented yet", nil) })
+			userGroup := protectedGroup.Group("/users")
+			{
+				userGroup.GET("", func(c *gin.Context) { server.SuccessResponse(c, "GET Users (List) endpoint not implemented yet", nil) })
+				userGroup.POST("", func(c *gin.Context) {
+					server.SuccessResponse(c, "POST Users (Create) endpoint not implemented yet", nil)
+				})
+				// PUT requires {"id": "..."} in body
+				userGroup.PUT("", func(c *gin.Context) {
+					server.SuccessResponse(c, "PUT Users (Update - requires {'id': ...} in body) endpoint not implemented yet", nil)
+				})
+				// DELETE requires {"id": "..."} in body
+				userGroup.DELETE("", func(c *gin.Context) {
+					server.SuccessResponse(c, "DELETE Users (Delete - requires {'id': ...} in body) endpoint not implemented yet", nil)
+				})
+			}
 		}
 	}
 

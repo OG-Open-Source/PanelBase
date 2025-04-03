@@ -8,44 +8,31 @@ import (
 
 // Response defines the standard API response structure.
 type Response struct {
-	Status  string      `json:"status"`          // "success" or "error" (using "error" instead of "failure" for common practice)
-	Message string      `json:"message"`         // User-friendly message describing the result
-	Data    interface{} `json:"data,omitempty"`  // Optional data payload (omitted if nil)
-	Error   string      `json:"error,omitempty"` // Optional error details (e.g., validation errors, internal error code)
+	Status  string      `json:"status"`         // "success" or "error"
+	Message string      `json:"message"`        // Descriptive message
+	Data    interface{} `json:"data,omitempty"` // Response data (omitted if empty or null for errors)
 }
 
-// SuccessResponse sends a standardized success JSON response.
-// Use this for successful operations (2xx status codes).
+// SuccessResponse sends a standardized success JSON response (HTTP 200 OK).
 func SuccessResponse(c *gin.Context, message string, data interface{}) {
-	c.JSON(http.StatusOK, Response{
+	response := Response{
 		Status:  "success",
 		Message: message,
 		Data:    data,
-	})
+	}
+	// If data is nil, the omitempty tag will exclude it
+	c.JSON(http.StatusOK, response)
 }
 
-// ErrorResponse sends a standardized error JSON response.
-// Use this for client or server errors (4xx, 5xx status codes).
-// The 'errInfo' parameter can provide additional context about the error (e.g., validation details, internal error code).
-func ErrorResponse(c *gin.Context, statusCode int, message string, errInfo ...string) {
-	var errorDetail string
-	if len(errInfo) > 0 {
-		errorDetail = errInfo[0]
-	}
-
-	// Avoid sending detailed internal errors in production unless specifically needed.
-	// Consider logging the full error internally.
-	if statusCode >= 500 && gin.Mode() == gin.ReleaseMode {
-		message = "An internal server error occurred." // Generic message for 5xx in release mode
-		errorDetail = ""                               // Don't expose internal details
-	}
-
-	c.JSON(statusCode, Response{
-		Status:  "error", // Use "error" consistently
+// ErrorResponse sends a standardized error JSON response with the given HTTP status code.
+func ErrorResponse(c *gin.Context, statusCode int, message string) {
+	response := Response{
+		Status:  "error",
 		Message: message,
-		Error:   errorDetail,
-	})
-	c.Abort() // Optional: Abort further middleware execution after sending an error
+		Data:    nil, // Explicitly set data to nil for errors
+	}
+	c.JSON(statusCode, response)
+	// Note: We still use the statusCode for the HTTP header, but the body has the standard format.
 }
 
 // --- Example Usage in a Handler ---
@@ -63,7 +50,7 @@ func ExampleHandler(c *gin.Context) {
 
 	// Simulate validation error
 	if someValue := c.Query("value"); someValue == "" {
-		ErrorResponse(c, http.StatusBadRequest, "Missing required query parameter 'value'.", "validation_error")
+		ErrorResponse(c, http.StatusBadRequest, "Missing required query parameter 'value'.")
 		return
 	}
 
