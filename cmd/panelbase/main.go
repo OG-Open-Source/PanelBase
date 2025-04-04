@@ -16,8 +16,12 @@ import (
 
 	// Import the config package
 	"github.com/OG-Open-Source/PanelBase/internal/bootstrap"
-	"github.com/OG-Open-Source/PanelBase/internal/config" // Use the correct module path
-	"github.com/OG-Open-Source/PanelBase/internal/routes" // Import the routes package
+	"github.com/OG-Open-Source/PanelBase/internal/config"     // Use the correct module path
+	"github.com/OG-Open-Source/PanelBase/internal/middleware" // Import middleware
+	"github.com/OG-Open-Source/PanelBase/internal/routes"     // Import the routes package
+	"github.com/OG-Open-Source/PanelBase/internal/tokenstore" // Import token store
+
+	// Remove cors import: "github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -30,6 +34,13 @@ func main() {
 	if err := bootstrap.Bootstrap(); err != nil {
 		log.Fatalf("Failed to bootstrap application: %v", err)
 	}
+
+	// Initialize the token store database
+	if err := tokenstore.InitStore(); err != nil {
+		log.Fatalf("Failed to initialize token store: %v", err)
+	}
+	// Defer closing the token store
+	defer tokenstore.CloseStore()
 
 	// --- Setup Logging (Reduced Output) ---
 	logFilePath := filepath.Join(logsDir, logFileName)
@@ -64,8 +75,12 @@ func main() {
 
 	// Initialize Gin engine
 	router := gin.New()
-	router.Use(gin.Logger()) // Keep Gin's request logger
 	router.Use(gin.Recovery())
+	router.Use(middleware.CacheRequestBody())
+	router.Use(middleware.CustomLogger())
+
+	// Remove CORS middleware usage
+	// router.Use(cors.Default())
 
 	// Setup routes
 	routes.SetupRoutes(router, cfg)

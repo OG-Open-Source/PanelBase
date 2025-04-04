@@ -3,18 +3,17 @@ package auth
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"sync"
 	"time"
 
-	"github.com/OG-Open-Source/PanelBase/internal/config" // For JWTClaims, Audience constants
-	"github.com/OG-Open-Source/PanelBase/internal/models" // For User structure
-	"github.com/OG-Open-Source/PanelBase/internal/server" // For Response functions
-	"github.com/OG-Open-Source/PanelBase/internal/user"   // Import the user service
+	"github.com/OG-Open-Source/PanelBase/internal/config"     // For JWTClaims, Audience constants
+	"github.com/OG-Open-Source/PanelBase/internal/middleware" // Import middleware
+	"github.com/OG-Open-Source/PanelBase/internal/models"     // For User structure
+	"github.com/OG-Open-Source/PanelBase/internal/server"     // For Response functions
+	"github.com/OG-Open-Source/PanelBase/internal/tokenstore" // Import token store
+	"github.com/OG-Open-Source/PanelBase/internal/user"       // Import the user service
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -24,41 +23,6 @@ import (
 type LoginPayload struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
-}
-
-// UsersData represents the structure of the users.json file.
-// Duplicated here for simplicity, consider a shared model or user service.
-type UsersData struct {
-	JWTSecret string                 `json:"jwt_secret"`
-	Users     map[string]models.User `json:"users"`
-}
-
-const usersFilePath = "configs/users.json"
-
-// loadUsersData reads and parses the users.json file.
-// TODO: Refactor this into a dedicated user service/repository.
-func loadUsersData() (*UsersData, error) {
-	data, err := os.ReadFile(usersFilePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read users file: %w", err)
-	}
-
-	var usersData UsersData
-	if err := json.Unmarshal(data, &usersData); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal users data: %w", err)
-	}
-	return &usersData, nil
-}
-
-// findUserByUsername searches for a user by username in the loaded data.
-// TODO: Refactor this into a dedicated user service/repository.
-func findUserByUsername(username string, usersData *UsersData) (*models.User, string, error) {
-	for userID, user := range usersData.Users {
-		if user.Username == username {
-			return &user, userID, nil
-		}
-	}
-	return nil, "", fmt.Errorf("user not found")
 }
 
 // generateSessionID creates a unique session identifier.
@@ -110,15 +74,16 @@ func LoginHandler(cfg *config.Config) gin.HandlerFunc {
 		// --- Login Successful ---
 
 		// 5. Update LastLogin timestamp
-		now := time.Now().UTC()
-		userInstance.LastLogin = &now
+		nowUTC := time.Now().UTC()
+		rfc3339Now := models.RFC3339Time(nowUTC) // Convert to custom type
+		userInstance.LastLogin = &rfc3339Now     // Assign pointer to custom type
 
-		// Save the updated user data (including LastLogin) using the UserService
+		// Save the updated user data
 		if err := user.UpdateUser(userInstance); err != nil {
 			log.Printf("Warning: Failed to update last_login for user %s: %v", userInstance.Username, err)
 		}
 
-		// 6. Generate JWT token with specified structure and order
+		// 6. Generate JWT token
 		jwtSecret := cfg.Auth.JWTSecret
 		if jwtSecret == "" {
 			log.Printf("Error: JWT secret not configured for session token generation.")
@@ -126,10 +91,9 @@ func LoginHandler(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		expirationTime := time.Now().Add(cfg.Auth.TokenDuration)
-		issuedAt := time.Now()
+		expirationTime := nowUTC.Add(cfg.Auth.TokenDuration)
+		issuedAt := nowUTC
 
-		// Generate session ID
 		sessionID, err := generateSessionID()
 		if err != nil {
 			log.Printf("Error generating session ID for user %s: %v", userInstance.Username, err)
@@ -137,16 +101,15 @@ func LoginHandler(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		// Use jwt.MapClaims for specific order
 		claims := jwt.MapClaims{
-			"aud":    "web",                 // Audience: Web Session
-			"sub":    userInstance.ID,       // Subject: User ID
-			"name":   userInstance.Name,     // Name: User's display name
-			"jti":    sessionID,             // JWT ID: Unique Session ID (ses_...)
-			"scopes": userInstance.Scopes,   // Scopes: User's base permissions
-			"iss":    "PanelBase",           // Issuer
-			"iat":    issuedAt.Unix(),       // Issued At
-			"exp":    expirationTime.Unix(), // Expiration Time
+			"aud":    AudienceWeb,
+			"sub":    userInstance.ID,
+			"name":   userInstance.Name,
+			"jti":    sessionID,
+			"scopes": userInstance.Scopes,
+			"iss":    "PanelBase",
+			"iat":    issuedAt.Unix(),
+			"exp":    expirationTime.Unix(),
 		}
 
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -154,6 +117,19 @@ func LoginHandler(cfg *config.Config) gin.HandlerFunc {
 		if err != nil {
 			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate token")
 			return
+		}
+
+		// 6b. Store session token info in tokenstore
+		sessionInfo := tokenstore.TokenInfo{
+			UserID:    userInstance.ID,
+			Name:      "Web Session",
+			Audience:  AudienceWeb,
+			Scopes:    userInstance.Scopes,
+			CreatedAt: models.RFC3339Time(issuedAt),       // Convert to custom type
+			ExpiresAt: models.RFC3339Time(expirationTime), // Convert to custom type
+		}
+		if err := tokenstore.StoreToken(sessionID, sessionInfo); err != nil {
+			log.Printf("Warning: Failed to store session token metadata for user %s (jti: %s): %v", userInstance.Username, sessionID, err)
 		}
 
 		// 7. Set cookie and return response
@@ -164,30 +140,29 @@ func LoginHandler(cfg *config.Config) gin.HandlerFunc {
 	}
 }
 
-// RefreshTokenHandler handles refreshing the JWT token.
+// RefreshTokenHandler handles refreshing the JWT token and revokes the old one.
 func RefreshTokenHandler(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 1. Extract user information and token audience from context (set by AuthMiddleware)
-		userIDVal, exists := c.Get("userID")
+		// 1. Extract user information, token audience, and OLD JTI from context
+		userIDVal, exists := c.Get(middleware.ContextKeyUserID)
 		if !exists {
 			server.ErrorResponse(c, http.StatusUnauthorized, "User ID missing from context")
 			return
 		}
 		userID := userIDVal.(string)
 
-		permissionsVal, exists := c.Get("userPermissions")
+		permissionsVal, exists := c.Get(middleware.ContextKeyScopes)
 		if !exists {
 			server.ErrorResponse(c, http.StatusUnauthorized, "Permissions missing from context")
 			return
 		}
 		userScopes := permissionsVal.(models.UserPermissions)
 
-		tokenAudienceVal, exists := c.Get("tokenAudience")
+		tokenAudienceVal, exists := c.Get(middleware.ContextKeyAud)
 		if !exists {
 			server.ErrorResponse(c, http.StatusUnauthorized, "Token audience missing from context")
 			return
 		}
-		// Ensure audience is correctly asserted (AuthMiddleware sets it as jwt.ClaimStrings)
 		tokenAudience, ok := tokenAudienceVal.(jwt.ClaimStrings)
 		if !ok {
 			// Fallback check if it was somehow set as []string
@@ -204,22 +179,35 @@ func RefreshTokenHandler(cfg *config.Config) gin.HandlerFunc {
 			}
 		}
 
+		// Get the OLD token's JTI
+		oldJTIVal, exists := c.Get(middleware.ContextKeyJTI)
+		if !exists {
+			// If JTI is missing from the context (shouldn't happen if AuthMiddleware worked),
+			// maybe log an error but potentially allow refresh? Or deny?
+			// Let's deny for now, as JTI is needed for revocation.
+			server.ErrorResponse(c, http.StatusUnauthorized, "Original token ID (jti) missing from context")
+			return
+		}
+		oldTokenJTI, ok := oldJTIVal.(string)
+		if !ok || oldTokenJTI == "" {
+			server.ErrorResponse(c, http.StatusUnauthorized, "Invalid original token ID (jti) format in context")
+			return
+		}
+
 		// 2. Check if the token audience is correct for refresh ('web')
 		audienceValid := false
 		for _, aud := range tokenAudience {
-			if aud == "web" { // Check for the new audience value "web"
+			if aud == AudienceWeb {
 				audienceValid = true
 				break
 			}
 		}
 		if !audienceValid {
-			server.ErrorResponse(c, http.StatusForbidden, "Token refresh requires a token with 'web' audience") // Updated error message
+			server.ErrorResponse(c, http.StatusForbidden, "Token refresh requires a token with 'web' audience")
 			return
 		}
 
-		// 3. Load user data to get Name (needed for new claim structure)
-		// TODO: Optimize this - ideally AuthMiddleware could verify user existence
-		// and maybe even attach the Name to context if needed frequently.
+		// 3. Load user data to get Name
 		userInstance, userExists, err := user.GetUserByID(userID)
 		if err != nil {
 			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to load user data for refresh: "+err.Error())
@@ -230,42 +218,60 @@ func RefreshTokenHandler(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		// 4. Generate a new JWT with updated expiration and potentially a new session ID (jti)
+		// 4. Generate a new JWT
 		jwtSecret := cfg.Auth.JWTSecret
 		if jwtSecret == "" {
-			log.Printf("Error: JWT secret not configured for session token generation.")
+			log.Printf("Error: JWT secret not configured for session token refresh.")
 			server.ErrorResponse(c, http.StatusInternalServerError, "Session token configuration error")
 			return
 		}
 
-		expirationTime := time.Now().Add(cfg.Auth.TokenDuration)
-		issuedAt := time.Now()
-		newSessionID, err := generateSessionID() // Generate a new session ID for the refreshed token
+		newExpirationTime := time.Now().UTC().Add(cfg.Auth.TokenDuration) // Calculate based on UTC
+		newIssuedAt := time.Now().UTC()                                   // Use UTC
+		newSessionID, err := generateSessionID()
 		if err != nil {
-			log.Printf("Error generating session ID for user %s: %v", userInstance.Username, err)
-			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate session identifier")
+			log.Printf("Error generating new session ID for user %s: %v", userInstance.Username, err)
+			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate new session identifier")
 			return
 		}
 
-		claims := jwt.MapClaims{
-			"aud":    "web",
+		newClaims := jwt.MapClaims{
+			"aud":    AudienceWeb, // Keep audience as web
 			"sub":    userID,
-			"name":   userInstance.Name,
+			"name":   userInstance.Name, // Get name from loaded user
 			"jti":    newSessionID,
-			"scopes": userScopes,
+			"scopes": userScopes, // Use scopes from the original token
 			"iss":    "PanelBase",
-			"iat":    issuedAt.Unix(),
-			"exp":    expirationTime.Unix(),
+			"iat":    newIssuedAt.Unix(),
+			"exp":    newExpirationTime.Unix(),
 		}
 
-		newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+		newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, newClaims)
 		newTokenString, err := newToken.SignedString([]byte(jwtSecret))
 		if err != nil {
 			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate refreshed token")
 			return
 		}
 
-		// 5. Set the new token in the cookie and return success
+		// 5. Store new session token info in tokenstore
+		newSessionInfo := tokenstore.TokenInfo{
+			UserID:    userID,
+			Name:      "Web Session",
+			Audience:  AudienceWeb,
+			Scopes:    userScopes,
+			CreatedAt: models.RFC3339Time(newIssuedAt),       // Convert to custom type
+			ExpiresAt: models.RFC3339Time(newExpirationTime), // Convert to custom type
+		}
+		if err := tokenstore.StoreToken(newSessionID, newSessionInfo); err != nil {
+			log.Printf("Warning: Failed to store refreshed session token metadata for user %s (jti: %s): %v", userInstance.Username, newSessionID, err)
+		}
+
+		// 6. Revoke the OLD session token
+		if err := tokenstore.RevokeToken(oldTokenJTI); err != nil {
+			log.Printf("Warning: Failed to revoke old session token (jti: %s) after refresh for user %s: %v", oldTokenJTI, userInstance.Username, err)
+		}
+
+		// 7. Set the new cookie and return the new token
 		c.SetCookie(cfg.Auth.CookieName, newTokenString, int(cfg.Auth.TokenDuration.Seconds()), "/", "", false, true)
 		server.SuccessResponse(c, "Token refreshed successfully", gin.H{
 			"token": newTokenString,
@@ -273,6 +279,5 @@ func RefreshTokenHandler(cfg *config.Config) gin.HandlerFunc {
 	}
 }
 
-// TODO: Remove findUserByUsername and loadUsersData once fully transitioned to userservice.
-// These functions are likely redundant now.
-var fileMutex sync.RWMutex // Keep mutex if these functions stay temporarily
+// Add Audience constant if not already present
+const AudienceWeb = "web"

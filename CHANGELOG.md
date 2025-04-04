@@ -24,14 +24,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Refactored `users.json` file reading and writing logic into a new dedicated service: `internal/user/userservice.go`, including mutex locking for safe concurrent access.
     - Updated `bootstrap` process to use `userservice` for initializing the `users.json` file.
     - Updated `users.json` structure: added `api.jwt_secret` field per user and changed `api.tokens` to store token metadata as a map keyed by token ID.
+    - Added `last_login` timestamp field to user data, updated upon successful login.
 - **API Structure**:
     - Consolidated API token management routes under `/api/v1/users/token` (POST, PUT, DELETE). Removed the standalone `/api/v1/token` group.
     - Removed the `GET /api/v1/users/token` route.
+- **Authentication & Authorization**:
+    - Refactored `AuthMiddleware` to dynamically select JWT validation secret based on token audience (`web` vs `api`).
+    - Implemented permission checking logic in `internal/middleware/permissions.go` (specifically `CheckPermission`) based on scopes defined in `users.json` (exact match, no wildcards initially).
+    - Applied permission checking middleware (`RequirePermission`) to the `POST /api/v1/users/token` route, requiring `api:create` permission.
+    - Unified JWT structure for both login tokens and API tokens (aud, sub, name, jti, scopes, iss, iat, exp).
+    - Corrected JWT `sub` claim to consistently use User ID (`usr_...`).
+    - Corrected audience check in `RefreshTokenHandler` to use `web`.
 
 ### Fixed
 
 - Fixed linter error caused by redeclaration of `UsersConfig` struct in the `models` package by removing `internal/models/users_config.go`.
-- Corrected various issues during refactoring, including function signatures, data structure mismatches, and import errors.
+- Fixed various issues during refactoring, including function signatures, data structure mismatches, import errors, unused variables, and incorrect field access (e.g., `user.IsActive` vs `user.Active`).
+- Resolved `User information missing from context` error in `RefreshTokenHandler` by correcting context keys set by `AuthMiddleware`.
+- Resolved `Authenticated user not found` error in `CreateTokenHandler` by using `GetUserByID` instead of `GetUserByUsername`.
 
 ## [0.3.0] - 2025-04-03
 
@@ -95,52 +105,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initialized Go project (`go mod init github.com/OG-Open-Source/PanelBase`).
 - Added Gin web framework (`go mod tidy`).
-- Created basic Gin server structure in `cmd/panelbase/main.go`.
-- Implemented configuration loading from `configs/config.toml` and environment variables (`PANELBASE_JWT_SECRET`) in `internal/config/config.go`.
-- Updated `cmd/panelbase/main.go` to load configuration on startup and use it to set Gin mode and server address.
-- Implemented standardized API response format (`internal/server/response.go`) with `Response` struct and `SuccessResponse`/`ErrorResponse` helpers.
-- Implemented JWT authentication middleware (`internal/middleware/auth.go`) using `github.com/golang-jwt/jwt/v5`.
-- Applied JWT middleware to protected API routes in `internal/routes/routes.go`.
-- Created data models for User, APIToken, and UsersConfig in `internal/models` reflecting scope-based permissions.
-- Added bootstrap functionality in `internal/bootstrap/bootstrap.go` to automatically create and initialize configuration files:
-  - `themes.json` with empty themes list
-  - `commands.json` with empty commands list
-  - `plugins.json` with empty plugins list
-  - `users.json` with default admin user (username: admin, password: admin) and random user ID
-  - `config.toml` with server settings (including random port with availability check), feature flags, auth settings (cookie name, expiration).
-
-### Changed
-
-- **Project Structure:** Established new directory structure (`themes/`, categorized `commands/`). (Reflected in planning, code changes pending).
-- **API:** Adopted standardized API response format.
-- **Security:**
-  - Changed JWT secret source from environment variable to `configs/users.json` (`jwt_secret` field).
-  - Implemented JWT validation middleware.
-  - Redesigned permission system to use Scopes (e.g., `resource:action:target`).
-  - Removed `role` field from user data structure in favor of explicit Scopes.
-- **Configuration:**
-  - Added automatic configuration file creation on startup.
-  - Changed configuration format from YAML to TOML.
-  - Updated JSON configuration files to use consistent key ordering.
-  - Simplified configuration structure to only include essential fields.
-  - Changed user ID generation to use random string.
-  - Removed default themes, commands, and plugins from initial configuration files.
-- **Routing:**
-  - Restructured API routes initially to match specified limited endpoints (`/api/v1/{commands, plugins, themes, users}` GET only, plus `/api/v1/auth/{login, token}`).
-
-### Fixed
-
-- Fixed configuration loading error by updating `config.go` to use TOML format instead of YAML.
-- Fixed route conflicts between static file serving and API routes by using a custom `NoRoute` handler for the root path (`/`) instead of `router.Static`.
-- Fixed web interface not displaying by implementing proper static file serving within the `NoRoute` handler, including SPA fallback to `index.html`.
-- Fixed `Invalid path` error in `NoRoute` handler by using absolute paths for security checks.
-- Fixed API route structure initially to only include specified limited endpoints.
-- Fixed JWT cookie name configuration error in `internal/middleware/auth.go`.
-- Fixed server mode configuration error in `cmd/panelbase/main.go`.
-- Fixed various linter errors in `internal/routes/routes.go` related to incorrect function arguments during development.
-- Fixed Gin routing panic caused by conflict between `router.Static("/", ...)` and API routes.
-
-[Unreleased]: https://github.com/OG-Open-Source/PanelBase/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/OG-Open-Source/PanelBase/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/OG-Open-Source/PanelBase/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/OG-Open-Source/PanelBase/releases/tag/v0.1.0
+- Created basic Gin server structure in `

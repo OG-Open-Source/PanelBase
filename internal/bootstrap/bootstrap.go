@@ -198,12 +198,11 @@ func initializeUsersFile() error {
 			Password:  string(hashedPassword),
 			Name:      u.Name,
 			Email:     u.Email,
-			CreatedAt: time.Now().UTC(),
+			CreatedAt: models.RFC3339Time(time.Now().UTC()),
 			Active:    true,
 			Scopes:    u.Scopes,
 			API: models.UserAPISettings{
 				JwtSecret: userJwtSecret,
-				Tokens:    make(map[string]models.APIToken), // Initialize correctly
 			},
 		}
 		usersConfig.Users[u.Username] = userData // Add user to the map using username as key

@@ -12,8 +12,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const userPermissionsKey = "userPermissions"
-const userIDKey = "userID"
+// Removed local constants, use exported constants from auth.go
+// const userPermissionsKey = "userPermissions"
+// const userIDKey = "userID"
 
 // Helper function to extract ID from request body
 // Note: This reads the body, so it might interfere if the handler needs to read it again.
@@ -43,9 +44,10 @@ func extractIDFromRequestBody(c *gin.Context) (string, bool) {
 
 // checkBasicPermission is an internal helper performing the core permission check.
 func checkBasicPermission(c *gin.Context, resource string, requiredAction string) bool {
-	permissionsVal, exists := c.Get(userPermissionsKey)
+	permissionsVal, exists := c.Get(ContextKeyScopes) // Use exported constant
 	if !exists {
-		fmt.Printf("Error: Permissions not found in context for user %s\n", c.GetString(userIDKey))
+		// Log or handle the error appropriately. Avoid fmt.Printf in production.
+		// log.Printf("Error: Permissions not found in context for user %s", c.GetString(ContextKeyUserID))
 		server.ErrorResponse(c, http.StatusInternalServerError, "User permissions not found in context")
 		c.Abort()
 		return false
@@ -53,25 +55,37 @@ func checkBasicPermission(c *gin.Context, resource string, requiredAction string
 
 	userPermissions, ok := permissionsVal.(models.UserPermissions)
 	if !ok {
-		fmt.Printf("Error: Invalid permissions format in context for user %s (%T)\n", c.GetString(userIDKey), permissionsVal)
+		// log.Printf("Error: Invalid permissions format in context for user %s (%T)", c.GetString(ContextKeyUserID), permissionsVal)
 		server.ErrorResponse(c, http.StatusInternalServerError, "Invalid user permissions format")
 		c.Abort()
 		return false
 	}
 
 	actions, resourceExists := userPermissions[resource]
-	if !resourceExists {
+	// Remove wildcard resource check
+	// wildcardActions, wildcardResourceExists := userPermissions["*"]
+
+	if !resourceExists /* && !wildcardResourceExists */ {
+		// Update error message to only mention the specific resource
 		server.ErrorResponse(c, http.StatusForbidden, fmt.Sprintf("Permission denied: No permissions defined for resource '%s'", resource))
 		c.Abort()
 		return false
 	}
 
-	for _, allowedAction := range actions {
-		if allowedAction == requiredAction {
-			return true // Permission granted
+	// Remove logic combining or checking wildcard resource actions
+
+	// Check only the specific resource actions for an exact match
+	if resourceExists { // Technically redundant now, as !resourceExists causes early return
+		for _, allowedAction := range actions {
+			if allowedAction == requiredAction /* || allowedAction == "*" */ { // Remove wildcard action check
+				return true // Permission granted
+			}
 		}
 	}
 
+	// Remove second loop checking wildcard actions
+
+	// If loop completes without finding the exact action
 	server.ErrorResponse(c, http.StatusForbidden, fmt.Sprintf("Permission denied: Action '%s' not allowed for resource '%s'", requiredAction, resource))
 	c.Abort()
 	return false
@@ -100,16 +114,23 @@ func CheckReadPermission(c *gin.Context, resource string) bool {
 		}
 
 		// Now, check if the user can read *this specific* item
-		loggedInUserID, exists := c.Get(userIDKey)
+		loggedInUserIDVal, exists := c.Get(ContextKeyUserID) // Use exported constant
 		if !exists {
-			fmt.Printf("Error: UserID not found in context during read item check\n")
+			// log.Printf("Error: UserID not found in context during read item check")
 			server.ErrorResponse(c, http.StatusInternalServerError, "User ID not found in context")
+			c.Abort()
+			return false
+		}
+		loggedInUserID, ok := loggedInUserIDVal.(string)
+		if !ok {
+			// log.Printf("Error: Invalid UserID format in context (%T)", loggedInUserIDVal)
+			server.ErrorResponse(c, http.StatusInternalServerError, "Invalid UserID format in context")
 			c.Abort()
 			return false
 		}
 
 		// If the target ID is the user's own ID, 'read:item' is sufficient.
-		if targetID == loggedInUserID.(string) {
+		if targetID == loggedInUserID {
 			return true // Allowed to read own item
 		}
 
@@ -132,4 +153,3 @@ func CheckReadPermission(c *gin.Context, resource string) bool {
 
 // TODO: Refine extractIDFromRequestBody - reading body here might be problematic.
 // Consider requiring handlers to parse the body and pass the ID to permission checks.
- 

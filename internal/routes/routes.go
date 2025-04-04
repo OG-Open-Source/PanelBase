@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/OG-Open-Source/PanelBase/internal/apitoken"
+	"github.com/OG-Open-Source/PanelBase/internal/api_token"
 	"github.com/OG-Open-Source/PanelBase/internal/auth"
 	"github.com/OG-Open-Source/PanelBase/internal/config"
 	"github.com/OG-Open-Source/PanelBase/internal/middleware"
@@ -150,31 +150,17 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 				// Mounted under /api/v1/users/token
 				selfTokenGroup := userGroup.Group("/token")
 				{
-					// GET route remains removed/commented out
-					// selfTokenGroup.GET("", apitoken.GetTokensHandler)
+					// GET /api/v1/users/token - List own API tokens or get specific one via body ID
+					selfTokenGroup.GET("", api_token.GetTokensHandler)
 
 					// POST /api/v1/users/token - Create a new API token for the user
-					// Apply AuthMiddleware first (already on protectedGroup/userGroup),
-					// then apply permission check middleware.
-					selfTokenGroup.POST("", middleware.RequirePermission("api", "create"), apitoken.CreateTokenHandler)
+					selfTokenGroup.POST("", middleware.RequirePermission("api", "create"), api_token.CreateTokenHandler)
 
-					// PUT /api/v1/users/token - Placeholder for updating own token
-					// TODO: Apply middleware.RequirePermission("api", "update") when implemented
-					selfTokenGroup.PUT("", func(c *gin.Context) {
-						if !middleware.CheckPermission(c, "api", "update:token") { // Example permission check
-							return
-						}
-						server.SuccessResponse(c, "PUT /api/v1/users/token (Update own) endpoint not implemented", nil)
-					})
+					// PUT /api/v1/users/token - Update own token metadata (name, description)
+					selfTokenGroup.PUT("", middleware.RequirePermission("api", "update"), api_token.UpdateTokenHandler)
 
-					// DELETE /api/v1/users/token - Placeholder for deleting own token
-					// TODO: Apply middleware.RequirePermission("api", "delete") when implemented
-					selfTokenGroup.DELETE("", func(c *gin.Context) {
-						if !middleware.CheckPermission(c, "api", "delete:token") { // Example permission check
-							return
-						}
-						server.SuccessResponse(c, "DELETE /api/v1/users/token (Delete own) endpoint not implemented", nil)
-					})
+					// DELETE /api/v1/users/token - Delete own token
+					selfTokenGroup.DELETE("", middleware.RequirePermission("api", "delete"), api_token.DeleteTokenHandler)
 				}
 			}
 		}

@@ -2,15 +2,16 @@ package middleware
 
 import (
 	"fmt"
-	// "log" // Ensure this line is commented out or removed
+	"log" // Need log for revocation check errors
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/OG-Open-Source/PanelBase/internal/config"
 	"github.com/OG-Open-Source/PanelBase/internal/models"
-	"github.com/OG-Open-Source/PanelBase/internal/server" // For ErrorResponse
-	"github.com/OG-Open-Source/PanelBase/internal/user"   // Import user service
+	"github.com/OG-Open-Source/PanelBase/internal/server"     // For ErrorResponse
+	"github.com/OG-Open-Source/PanelBase/internal/tokenstore" // Import tokenstore
+	"github.com/OG-Open-Source/PanelBase/internal/user"       // Import user service
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -36,12 +37,18 @@ const (
 	AudienceAPI = "api"
 )
 
-// UsernameKey is the key used to store the authenticated username in the Gin context.
-const UsernameKey = "username"
+// Context keys for storing information.
+const (
+	UsernameKey      = "username"      // DEPRECATED? Might not be needed if using UserID directly
+	ContextKeyUserID = "userID"        // Key for User ID (sub claim)
+	ContextKeyScopes = "scopes"        // Key for token scopes
+	ContextKeyAud    = "tokenAudience" // Key for token audience
+	ContextKeyJTI    = "tokenJTI"      // Key for token JTI (ID)
+)
 
 // --- AuthMiddleware ---
 
-// AuthMiddleware validates JWT tokens, selecting the correct secret based on audience.
+// AuthMiddleware validates JWT tokens, checks revocation status, and sets context.
 func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 1. Extract token string (from cookie or header)
@@ -116,7 +123,7 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 				userInstance, userExists, err := user.GetUserByID(sub)
 				if err != nil {
 					// Log the internal error, but return a generic validation error
-					// log.Printf("Error fetching user %s for API token validation: %v", sub, err)
+					log.Printf("Error fetching user %s for API token validation: %v", sub, err)
 					return nil, fmt.Errorf("failed to verify API token user")
 				}
 				if !userExists {
@@ -154,7 +161,7 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 		// Simplified Error Handling:
 		if err != nil {
 			// Log the specific error for debugging if needed
-			// log.Printf("Token parsing error: %v", err)
+			log.Printf("Token parsing error: %v", err)
 			server.ErrorResponse(c, http.StatusUnauthorized, "Invalid or expired token") // Generic message
 			c.Abort()
 			return
@@ -169,28 +176,25 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 		// 3. Extract claims and set context
 		if claims, ok := token.Claims.(jwt.MapClaims); ok {
 			var userID string
+			var tokenJTI string
 
 			// Store userID (from sub claim)
 			if sub, subOk := claims["sub"].(string); subOk {
 				userID = sub
-				c.Set("userID", userID) // Set the key RefreshTokenHandler expects
+				c.Set(ContextKeyUserID, userID) // Use exported constant
 				// Set the UsernameKey context with the UserID as well for now.
-				c.Set(UsernameKey, userID)
+				// c.Set(UsernameKey, userID) // Keep this commented out unless needed
+			}
+
+			// Store JTI (token ID)
+			if jti, jtiOk := claims["jti"].(string); jtiOk {
+				tokenJTI = jti
+				c.Set(ContextKeyJTI, tokenJTI) // Store JTI
 			}
 
 			// Store audience as []string
-			if aud, audOk := claims["aud"]; audOk {
-				var audienceList []string
-				if audStr, ok := aud.(string); ok {
-					audienceList = []string{audStr}
-				} else if audSlice, ok := aud.([]interface{}); ok {
-					for _, v := range audSlice {
-						if audStr, ok := v.(string); ok {
-							audienceList = append(audienceList, audStr)
-						}
-					}
-				}
-				c.Set("tokenAudience", jwt.ClaimStrings(audienceList)) // Set the key RefreshTokenHandler expects, using compatible type
+			if aud, audOk := claims["aud"].(string); audOk { // Simplified assuming single string audience
+				c.Set(ContextKeyAud, jwt.ClaimStrings{aud}) // Use exported constant
 			}
 
 			// Store scopes as models.UserPermissions
@@ -198,31 +202,51 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 				var perms models.UserPermissions = make(models.UserPermissions)
 				if scopesMap, ok := scopes.(map[string]interface{}); ok {
 					// Convert map[string]interface{} to map[string][]string
-					for k, v := range scopesMap {
-						if actionsInterface, ok := v.([]interface{}); ok {
-							actions := []string{}
-							for _, act := range actionsInterface {
-								if actStr, ok := act.(string); ok {
-									actions = append(actions, actStr)
+					for resource, actions := range scopesMap {
+						if actionSlice, ok := actions.([]interface{}); ok {
+							var actionStrings []string
+							for _, action := range actionSlice {
+								if actionStr, ok := action.(string); ok {
+									actionStrings = append(actionStrings, actionStr)
 								}
 							}
-							perms[k] = actions
-						} // else: handle unexpected scope format?
+							perms[resource] = actionStrings
+						}
 					}
-				} else if scopesPerms, ok := scopes.(models.UserPermissions); ok {
-					// If it's already the correct type
-					perms = scopesPerms
 				}
-				c.Set("userPermissions", perms) // Set the key RefreshTokenHandler expects
+				c.Set(ContextKeyScopes, perms) // Use exported constant
 			}
 
-		} else {
-			server.ErrorResponse(c, http.StatusInternalServerError, "Invalid token claims format")
-			c.Abort()
-			return
-		}
+			// 4. Check revocation status using tokenstore
+			if tokenJTI != "" {
+				isRevoked, err := tokenstore.IsTokenRevoked(tokenJTI)
+				if err != nil {
+					// Log the error and return 500 Internal Server Error
+					log.Printf("ERROR: Failed to check token revocation status for jti %s: %v", tokenJTI, err)
+					server.ErrorResponse(c, http.StatusInternalServerError, "Failed to check token status")
+					c.Abort()
+					return
+				}
+				if isRevoked {
+					// Token is validly signed and not expired, but has been revoked
+					server.ErrorResponse(c, http.StatusUnauthorized, "Token has been revoked")
+					c.Abort()
+					return
+				}
+			} else {
+				// Token is missing JTI claim, should we allow or deny?
+				// For now, let's deny as JTI is crucial for revocation.
+				server.ErrorResponse(c, http.StatusUnauthorized, "Token missing required ID (jti)")
+				c.Abort()
+				return
+			}
 
-		c.Next()
+			c.Next() // Proceed to the next handler if token is valid and not revoked
+		} else {
+			// This should technically not happen if token parsing succeeded
+			server.ErrorResponse(c, http.StatusUnauthorized, "Invalid token claims")
+			c.Abort()
+		}
 	}
 }
 

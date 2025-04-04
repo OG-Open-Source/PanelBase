@@ -1,9 +1,5 @@
 package models
 
-import (
-	"time"
-)
-
 // UserPermissions defines the structure for user permissions (scopes).
 // It maps resource names (string) to a list of allowed actions (string slice).
 // Example: {"commands": ["list", "execute"], "users": ["read:self"]}
@@ -11,8 +7,7 @@ type UserPermissions map[string][]string
 
 // UserAPISettings holds API-specific settings for a user.
 type UserAPISettings struct {
-	JwtSecret string              `json:"jwt_secret"` // User-specific secret for signing API tokens (JWTs)
-	Tokens    map[string]APIToken `json:"tokens"`     // Map of API Tokens, keyed by Token ID (tok_...)
+	JwtSecret string `json:"jwt_secret"` // User-specific secret for signing API tokens (JWTs)
 }
 
 // APIToken represents the metadata for an API token.
@@ -23,8 +18,8 @@ type APIToken struct {
 	Name        string          `json:"name"`                  // Required name for the token
 	Description string          `json:"description,omitempty"` // Optional description
 	Scopes      UserPermissions `json:"scopes"`                // Scopes granted to this token
-	CreatedAt   time.Time       `json:"created_at"`            // Timestamp when the token was created
-	ExpiresAt   time.Time       `json:"expires_at"`            // Timestamp when the token expires (Required, non-pointer)
+	CreatedAt   RFC3339Time     `json:"created_at"`            // Timestamp when the token was created
+	ExpiresAt   RFC3339Time     `json:"expires_at"`            // Timestamp when the token expires (Required, non-pointer)
 	// Token string field removed
 	// LastUsed    *time.Time      `json:"last_used,omitempty"` // Optional: Timestamp when the token was last used
 }
@@ -36,9 +31,9 @@ type User struct {
 	Password  string          `json:"password"`             // Hashed password
 	Name      string          `json:"name,omitempty"`       // Optional display name
 	Email     string          `json:"email,omitempty"`      // Optional email address
-	CreatedAt time.Time       `json:"created_at"`           // Timestamp when the user was created
+	CreatedAt RFC3339Time     `json:"created_at"`           // Timestamp when the user was created
 	Active    bool            `json:"active"`               // Whether the user account is active
-	LastLogin *time.Time      `json:"last_login,omitempty"` // Pointer to timestamp of last successful login
+	LastLogin *RFC3339Time    `json:"last_login,omitempty"` // Pointer to timestamp of last successful login
 	Scopes    UserPermissions `json:"scopes"`               // Base permissions granted to the user
 	API       UserAPISettings `json:"api"`                  // API-specific settings (secret, tokens)
 }
