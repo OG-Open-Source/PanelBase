@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 
 	"github.com/OG-Open-Source/PanelBase/internal/models"
@@ -12,28 +13,20 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Removed local constants, use exported constants from auth.go
-// const userPermissionsKey = "userPermissions"
-// const userIDKey = "userID"
+// Constants for context keys are now defined in context_keys.go
 
-// Helper function to extract ID from request body
-// Note: This reads the body, so it might interfere if the handler needs to read it again.
-// Consider alternative ways like binding to a struct with only ID or passing parsed body.
+// Helper function to extract ID from request body (Potentially problematic, consider alternatives)
 func extractIDFromRequestBody(c *gin.Context) (string, bool) {
 	bodyBytes, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		// Handle error, maybe log it. Cannot determine ID.
 		return "", false
 	}
-	// IMPORTANT: Restore the body so the handler can read it later
-	c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes)) // Restore body
 
 	var data map[string]interface{}
 	if err := json.Unmarshal(bodyBytes, &data); err != nil {
-		// Handle error, not valid JSON or doesn't fit map.
 		return "", false
 	}
-
 	if idVal, ok := data["id"]; ok {
 		if idStr, ok := idVal.(string); ok {
 			return idStr, true
@@ -42,12 +35,12 @@ func extractIDFromRequestBody(c *gin.Context) (string, bool) {
 	return "", false
 }
 
-// checkBasicPermission is an internal helper performing the core permission check.
+// checkBasicPermission verifies if the user associated with the context
+// has the required action permission for the specified resource.
 func checkBasicPermission(c *gin.Context, resource string, requiredAction string) bool {
-	permissionsVal, exists := c.Get(ContextKeyScopes) // Use exported constant
+	permissionsVal, exists := c.Get(ContextKeyScopes)
 	if !exists {
-		// Log or handle the error appropriately. Avoid fmt.Printf in production.
-		// log.Printf("Error: Permissions not found in context for user %s", c.GetString(ContextKeyUserID))
+		log.Printf("[DEBUG PERM CHECK] ContextKeyScopes not found in context for user %s", c.GetString(ContextKeyUserID))
 		server.ErrorResponse(c, http.StatusInternalServerError, "User permissions not found in context")
 		c.Abort()
 		return false
@@ -55,101 +48,56 @@ func checkBasicPermission(c *gin.Context, resource string, requiredAction string
 
 	userPermissions, ok := permissionsVal.(models.UserPermissions)
 	if !ok {
-		// log.Printf("Error: Invalid permissions format in context for user %s (%T)", c.GetString(ContextKeyUserID), permissionsVal)
+		log.Printf("[DEBUG PERM CHECK] Invalid permissions format in context for user %s. Expected models.UserPermissions, got %T. Value: %+v", c.GetString(ContextKeyUserID), permissionsVal, permissionsVal)
 		server.ErrorResponse(c, http.StatusInternalServerError, "Invalid user permissions format")
 		c.Abort()
 		return false
 	}
 
-	actions, resourceExists := userPermissions[resource]
-	// Remove wildcard resource check
-	// wildcardActions, wildcardResourceExists := userPermissions["*"]
+	// Log the permissions being checked against
+	log.Printf("[DEBUG PERM CHECK] User: %s, Resource: %s, Required Action: %s, User Permissions: %+v", c.GetString(ContextKeyUserID), resource, requiredAction, userPermissions)
 
-	if !resourceExists /* && !wildcardResourceExists */ {
-		// Update error message to only mention the specific resource
+	actions, resourceExists := userPermissions[resource]
+	if !resourceExists {
+		log.Printf("[DEBUG PERM CHECK] Result: DENIED - Resource '%s' not found in user permissions.", resource)
 		server.ErrorResponse(c, http.StatusForbidden, fmt.Sprintf("Permission denied: No permissions defined for resource '%s'", resource))
 		c.Abort()
 		return false
 	}
 
-	// Remove logic combining or checking wildcard resource actions
-
-	// Check only the specific resource actions for an exact match
-	if resourceExists { // Technically redundant now, as !resourceExists causes early return
-		for _, allowedAction := range actions {
-			if allowedAction == requiredAction /* || allowedAction == "*" */ { // Remove wildcard action check
-				return true // Permission granted
-			}
+	// Check for the exact required action within the resource's actions
+	for _, allowedAction := range actions {
+		if allowedAction == requiredAction {
+			log.Printf("[DEBUG PERM CHECK] Result: GRANTED - Found matching action '%s' for resource '%s'.", requiredAction, resource)
+			return true // Permission granted
 		}
 	}
 
-	// Remove second loop checking wildcard actions
-
 	// If loop completes without finding the exact action
+	log.Printf("[DEBUG PERM CHECK] Result: DENIED - Action '%s' not found in allowed actions [%+v] for resource '%s'.", requiredAction, actions, resource)
 	server.ErrorResponse(c, http.StatusForbidden, fmt.Sprintf("Permission denied: Action '%s' not allowed for resource '%s'", requiredAction, resource))
 	c.Abort()
 	return false
 }
 
-// CheckPermission checks non-read permissions (create, update, delete, execute, install).
-// For read operations, use CheckReadPermission.
+// CheckPermission checks if the user has the specified permission scope.
+// It's a simple wrapper around checkBasicPermission.
+// Ownership checks must be performed by the handler.
 func CheckPermission(c *gin.Context, resource string, requiredAction string) bool {
-	// For now, it directly calls the basic check. Can add more logic later if needed.
 	return checkBasicPermission(c, resource, requiredAction)
 }
 
-// CheckReadPermission handles the specific logic for read operations, differentiating
-// between listing resources ('read:list') and accessing a specific item ('read:item').
-// It checks if an 'id' is provided in the request body to determine the required action.
-func CheckReadPermission(c *gin.Context, resource string) bool {
-	// Determine if an ID is provided in the request body
-	targetID, idProvided := extractIDFromRequestBody(c)
-
-	if idProvided {
-		// Request is for a specific item
-		requiredAction := "read:item"
-		// Check basic permission first
-		if !checkBasicPermission(c, resource, requiredAction) {
-			return false
+// RequirePermission is a middleware factory that checks for a specific permission.
+// It uses the CheckPermission function.
+func RequirePermission(resource string, requiredAction string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !CheckPermission(c, resource, requiredAction) {
+			// CheckPermission already calls Abort and sends an error response
+			return
 		}
-
-		// Now, check if the user can read *this specific* item
-		loggedInUserIDVal, exists := c.Get(ContextKeyUserID) // Use exported constant
-		if !exists {
-			// log.Printf("Error: UserID not found in context during read item check")
-			server.ErrorResponse(c, http.StatusInternalServerError, "User ID not found in context")
-			c.Abort()
-			return false
-		}
-		loggedInUserID, ok := loggedInUserIDVal.(string)
-		if !ok {
-			// log.Printf("Error: Invalid UserID format in context (%T)", loggedInUserIDVal)
-			server.ErrorResponse(c, http.StatusInternalServerError, "Invalid UserID format in context")
-			c.Abort()
-			return false
-		}
-
-		// If the target ID is the user's own ID, 'read:item' is sufficient.
-		if targetID == loggedInUserID {
-			return true // Allowed to read own item
-		}
-
-		// If the target ID is different, the user needs 'read:list' permission
-		// to view *other* users' specific items.
-		if checkBasicPermission(c, resource, "read:list") {
-			return true // Has list permission, can read specific other item
-		} else {
-			server.ErrorResponse(c, http.StatusForbidden, fmt.Sprintf("Permission denied: Action 'read:item' on resource '%s' requires 'read:list' permission to view other items", resource))
-			c.Abort()
-			return false
-		}
-
-	} else {
-		// Request is for the list
-		requiredAction := "read:list"
-		return checkBasicPermission(c, resource, requiredAction)
+		c.Next()
 	}
 }
 
-// TODO: Refine extractIDFromRequestBody - reading body here might be problematic.
-// Consider requiring handlers to parse the body and pass the ID to permission checks.
+// CacheRequestBody reads the request body and stores it in the context.
+// ... rest of CacheRequestBody ...

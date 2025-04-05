@@ -15,6 +15,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/OG-Open-Source/PanelBase/internal/models"
+	"github.com/OG-Open-Source/PanelBase/internal/uisettings"
 	"github.com/OG-Open-Source/PanelBase/internal/user" // Import the user service
 	"golang.org/x/crypto/bcrypt"
 )
@@ -69,49 +70,23 @@ func Bootstrap() error {
 		return fmt.Errorf("failed to ensure logs directory: %w", err)
 	}
 
+	// Check/Create users.json
+	if err := ensureUsersFile(); err != nil {
+		return err
+	}
+
+	// Check/Create config.toml
+	if err := ensureConfigFile(); err != nil {
+		return err
+	}
+
+	// Check/Create ui_settings.json
+	if err := uisettings.EnsureUISettingsFile(); err != nil {
+		return err
+	}
+
 	// Create default config structure (used if files need creation)
 	configs := NewConfigs()
-
-	// --- Check/Create individual config files if they don't exist ---
-
-	// Check/Create users.json (handles dynamic values)
-	usersPath := filepath.Join(configsDir, "users.json")
-	if _, err := os.Stat(usersPath); os.IsNotExist(err) {
-		log.Printf("File '%s' not found, creating with defaults...", usersPath)
-		if err := initializeUsersFile(); err != nil {
-			return fmt.Errorf("failed to initialize users file: %w", err)
-		}
-	} else if err != nil {
-		return fmt.Errorf("failed to check users file '%s': %w", usersPath, err)
-	}
-
-	// Check/Create config.toml (handles dynamic port)
-	configTomlPath := filepath.Join(configsDir, "config.toml")
-	if _, err := os.Stat(configTomlPath); os.IsNotExist(err) {
-		log.Printf("File '%s' not found, creating with defaults...", configTomlPath)
-		// Generate dynamic port ONLY if creating the file
-		port, err := findAvailablePort(1024, 49151)
-		if err != nil {
-			return fmt.Errorf("failed to find available port for new config file: %w", err)
-		}
-
-		// Start with the default static config structure
-		defaultConfigData := configs.Config // Get map[string]interface{} from NewConfigs()
-
-		// Inject the dynamic port
-		if serverConf, ok := defaultConfigData["server"].(map[string]interface{}); ok {
-			serverConf["port"] = port
-		} else {
-			// This should not happen if NewConfigs is correct
-			return fmt.Errorf("internal error: invalid structure for default server config")
-		}
-
-		if err := writeTomlFile(configTomlPath, defaultConfigData); err != nil {
-			return err
-		}
-	} else if err != nil {
-		return fmt.Errorf("failed to check config file '%s': %w", configTomlPath, err)
-	}
 
 	// Check/Create other simple JSON files (themes, commands, plugins)
 	simpleJsonConfigs := map[string]interface{}{
@@ -130,6 +105,52 @@ func Bootstrap() error {
 		}
 	}
 
+	return nil
+}
+
+// ensureUsersFile handles checking/creating users.json
+func ensureUsersFile() error {
+	usersPath := filepath.Join(configsDir, "users.json")
+	if _, err := os.Stat(usersPath); os.IsNotExist(err) {
+		log.Printf("File '%s' not found, creating with defaults...", usersPath)
+		if err := initializeUsersFile(); err != nil {
+			return fmt.Errorf("failed to initialize users file: %w", err)
+		}
+	} else if err != nil {
+		return fmt.Errorf("failed to check users file '%s': %w", usersPath, err)
+	}
+	return nil
+}
+
+// ensureConfigFile handles checking/creating config.toml
+func ensureConfigFile() error {
+	configTomlPath := filepath.Join(configsDir, "config.toml")
+	if _, err := os.Stat(configTomlPath); os.IsNotExist(err) {
+		log.Printf("File '%s' not found, creating with defaults...", configTomlPath)
+		// Generate dynamic port ONLY if creating the file
+		port, err := findAvailablePort(1024, 49151)
+		if err != nil {
+			return fmt.Errorf("failed to find available port for new config file: %w", err)
+		}
+
+		// Start with the default static config structure
+		configs := NewConfigs()
+		defaultConfigData := configs.Config // Get map[string]interface{} from NewConfigs()
+
+		// Inject the dynamic port
+		if serverConf, ok := defaultConfigData["server"].(map[string]interface{}); ok {
+			serverConf["port"] = port
+		} else {
+			// This should not happen if NewConfigs is correct
+			return fmt.Errorf("internal error: invalid structure for default server config")
+		}
+
+		if err := writeTomlFile(configTomlPath, defaultConfigData); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return fmt.Errorf("failed to check config file '%s': %w", configTomlPath, err)
+	}
 	return nil
 }
 
@@ -155,12 +176,16 @@ func initializeUsersFile() error {
 			Password: "admin",
 			Name:     "Administrator",
 			Email:    "admin@example.com",
-			Scopes: models.UserPermissions{ // Define admin scopes directly
+			Scopes: models.UserPermissions{
 				"commands": {"read:list", "read:item", "install", "execute", "update", "delete"},
 				"plugins":  {"read:list", "read:item", "install", "update", "delete"},
 				"themes":   {"read:list", "read:item", "install", "update", "delete"},
 				"users":    {"read:list", "read:item", "create", "update", "delete"},
-				"api":      {"read:list", "read:item", "create", "update", "delete"},
+				"api": {
+					"read:list", "read:item", "create", "update", "delete", // Standard self-perms
+					"read:list:all", "read:item:all", "create:all", "update:all", "delete:all", // Admin perms
+				},
+				"settings": {"read", "update"},
 			},
 		},
 	}

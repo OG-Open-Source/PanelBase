@@ -11,98 +11,100 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - (Future changes will go here)
 
-## [0.4.0] - 2025-04-04
-
-### Changed
-
-- **API Token Implementation**: 
-    - Changed API token generation from opaque random strings to JWTs signed with a user-specific secret (`api.jwt_secret` in `users.json`).
-    - Implemented a limit of 10 active API tokens per user.
-    - `POST /api/v1/users/token` endpoint now requires `name`, `scopes`, and `duration` in the request body.
-    - The response for token creation now includes the token `id`, metadata (`name`, `description`, `scopes`, `created_at`, `expires_at`), and the signed `token` (JWT string).
-- **User Data Management**:
-    - Refactored `users.json` file reading and writing logic into a new dedicated service: `internal/user/userservice.go`, including mutex locking for safe concurrent access.
-    - Updated `bootstrap` process to use `userservice` for initializing the `users.json` file.
-    - Updated `users.json` structure: added `api.jwt_secret` field per user and changed `api.tokens` to store token metadata as a map keyed by token ID.
-    - Added `last_login` timestamp field to user data, updated upon successful login.
-- **API Structure**:
-    - Consolidated API token management routes under `/api/v1/users/token` (POST, PUT, DELETE). Removed the standalone `/api/v1/token` group.
-    - Removed the `GET /api/v1/users/token` route.
-- **Authentication & Authorization**:
-    - Refactored `AuthMiddleware` to dynamically select JWT validation secret based on token audience (`web` vs `api`).
-    - Implemented permission checking logic in `internal/middleware/permissions.go` (specifically `CheckPermission`) based on scopes defined in `users.json` (exact match, no wildcards initially).
-    - Applied permission checking middleware (`RequirePermission`) to the `POST /api/v1/users/token` route, requiring `api:create` permission.
-    - Unified JWT structure for both login tokens and API tokens (aud, sub, name, jti, scopes, iss, iat, exp).
-    - Corrected JWT `sub` claim to consistently use User ID (`usr_...`).
-    - Corrected audience check in `RefreshTokenHandler` to use `web`.
-
-### Fixed
-
-- Fixed linter error caused by redeclaration of `UsersConfig` struct in the `models` package by removing `internal/models/users_config.go`.
-- Fixed various issues during refactoring, including function signatures, data structure mismatches, import errors, unused variables, and incorrect field access (e.g., `user.IsActive` vs `user.Active`).
-- Resolved `User information missing from context` error in `RefreshTokenHandler` by correcting context keys set by `AuthMiddleware`.
-- Resolved `Authenticated user not found` error in `CreateTokenHandler` by using `GetUserByID` instead of `GetUserByUsername`.
-
-## [0.3.0] - 2025-04-03
+## [0.6.0] - 2025-04-06 UI Settings and Template Rendering
 
 ### Added
 
-- Basic `/api/v1/auth/login` handler (`internal/auth/auth_service.go`): validates credentials, generates JWT, sets cookie, returns token.
-- Basic `/api/v1/auth/token` handler (`internal/auth/auth_service.go`) for refreshing `web_session` tokens (requires valid session token).
-- `/logs` directory creation during bootstrap (`internal/bootstrap/bootstrap.go`).
-- Logging configuration (`cmd/panelbase/main.go`) to output logs to console and `/logs/panelbase.log`.
-- Graceful server shutdown implementation (`cmd/panelbase/main.go`).
-- `/api/v1/users/token` routes (GET, POST, PUT, DELETE) placeholders for managing user's own API tokens.
-- Basic permission checking framework (`internal/middleware/permissions.go`) with `CheckPermission` and `CheckReadPermission` helpers.
+- **UI Settings**: Implemented backend service (`internal/uisettings`) to manage global UI settings (Title, LogoURL, FaviconURL, CustomCSS, CustomJS) stored in `configs/ui_settings.json`.
+- **API**: Added new API endpoints for UI settings under `/api/v1/settings`:
+  - `GET /ui`: Retrieves current UI settings (requires `settings:read` permission).
+  - `PUT /ui`: Updates UI settings, accepting partial updates (requires `settings:update` permission).
+- **Permissions**: Added `settings:read` and `settings:update` permissions to the default `admin` user created during bootstrap (`internal/bootstrap/bootstrap.go`).
+- **Documentation**: Created `DEVELOP_UI.md` detailing the available UI settings and their usage in templates.
+- **Documentation**: Updated `COMMANDS.md` to include documentation for the new `/api/v1/settings/ui` endpoints.
 
 ### Changed
 
-- **Authentication:**
-    - Enhanced `AuthMiddleware` (`internal/middleware/auth.go`) to check JWT from Cookie/Header and store actual audience.
-    - Updated JWT Claims (`internal/middleware/auth.go`) to use `username` tag.
-    - Moved `POST /api/v1/auth/token` route under authentication protection.
-    - Changed user/token permission structure to `map[string][]string` (`models.UserPermissions`).
-    - Updated auth handlers and middleware to use new permission structure.
-- **API Structure:**
-    - Consolidated API token management for the current user under `/api/v1/users/token` (replacing the previously planned `/api/v1/account/tokens`).
-- **Models:**
-    - Updated `User` model (`internal/models/user.go`) for correct JSON unmarshalling of `api: {tokens: [...]}`.
-- **Server:**
-    - Standardized API response format (`internal/server/response.go`).
-- **Configuration:**
-    - Set default `server.mode` to `"release"` in bootstrap.
-    - Changed `main.go` to use `server.mode` directly for Gin mode setting.
-    - Removed explicit `gin.TestMode` support in `main.go`.
-- **Code:**
-    - Translated comments in `bootstrap.go` and `main.go` to English.
-    - Removed verbose logging from `main.go` startup.
+- **Templating**: Modified the server routing (`internal/routes/routes.go`) to render all `.html` and `.htm` files within the `web/` directory using Go's `html/template` engine. UI settings are automatically injected into these templates.
+- **Static Files**: Refactored static file serving. Files under `web/assets/` are served efficiently via `router.Static`. Other non-HTML files under `web/` are served directly by the `NoRoute` handler.
+- **Templating**: Ensured CustomCSS and CustomJS from UI settings are treated as safe content (`template.CSS`, `template.JS`) during HTML rendering to prevent incorrect escaping.
 
 ### Fixed
 
-- Fixed `auth_service.go` syntax errors.
-- Resolved `undefined: auth.LoginHandler` error.
-- Fixed JSON unmarshal error for User model.
-- Corrected Gin mode setting logic.
-- Fixed `Invalid audience format` error in `RefreshTokenHandler`.
+- **HTML**: Corrected a syntax error (missing `>`) in `web/index.html` that caused template parsing errors.
+- **Logging**: Fixed an issue where requests served by the HTML template renderer (`serveHTMLTemplate`) might incorrectly log a 404 status code. Status is now explicitly set to 200 OK.
+- Removed reference to non-existent `main.js` from `web/index.html`.
 
-## [0.2.0] - 2025-04-02
+## [0.5.0] - 2025-04-05 Logger Major Updates and Changes
 
 ### Changed
 
-- **API:**
-  - Consolidated resource endpoints to use the base path (e.g., `/api/v1/commands`) for all methods (GET, POST, PUT, DELETE).
-  - Defined specific behaviors based on HTTP method and request body content (details below require handler implementation):
-    - `GET /resource`: List all items. Optionally provide `{"id": "..."}` in body (non-standard) or query param (preferred) to get a specific item.
-    - `POST /resource`: Behavior depends on body. For commands, `{"url": "..."}` could mean download/install, `{"id": "..."}` could mean execute (non-standard), otherwise create.
-    - `PUT /resource`: Update item(s). Requires `{"id": "..."}` in body for a specific item. Omitting `id` might imply updating the list/batch update (non-standard).
-    - `DELETE /resource`: Delete item(s). Requires `{"id": "..."}` in body for a specific item. Omitting `id` might imply clearing the list (non-standard).
-- **Routing:**
-  - Updated API route definitions in `internal/routes/routes.go` to support GET, POST, PUT, DELETE on the base resource paths (`/api/v1/{resource}`), removing `/resource/:id` style routes.
+- **API**: The `GET /api/v1/users/token` list endpoint now correctly returns only API tokens associated with the requesting user, filtering out web session tokens based on the `Audience` field in the token store (`api:read:list` permission still required).
+- **Logging**: Updates to the custom logger format (`internal/middleware/logger.go`):
+  - Status code color formatting based on range (2xx green, 3xx cyan, 4xx yellow, 5xx red).
+  - Request body (if present and readable) is logged on a second line, prefixed with `[REQ BODY]`, for relevant methods (POST, PUT, PATCH, DELETE).
+  - Log prefix determination (`[GIN]`, `[PANELBASE]`) based on route path (`/api/`).
+  - Standardized timestamps to UTC RFC3339 format.
+  - Slightly adjusted spacing and formatting for better readability.
+- **Logging**: Removed redundant logging of detailed token parsing errors (`Token parsing error: ...`) from the authentication middleware (`internal/middleware/auth.go`). The main log line already indicates an invalid/expired token.
 
-## [0.1.0] - 2025-04-01
+## [0.4.0] - 2025-04-04 Token Storage and Time Standardization
+
+### Changed
+
+- **Token Management**:
+  - Integrated `tokenstore` (using BoltDB at `configs/tokens.db`) for persistent storage of API and session token metadata.
+  - Removed `Tokens map[string]APIToken` from `UserAPISettings` in `users.json`.
+  - Updated token service functions (`CreateAPIToken`, `DeleteTokenHandler`, `GetTokensHandler`, `UpdateTokenHandler`) and `LoginHandler` to use `tokenstore` instead of modifying `users.json` directly for token operations.
+  - Implemented listing of user's API tokens in `GET /api/v1/users/token` using `tokenstore`.
+  - Implemented session token rotation on refresh in `RefreshTokenHandler`.
+- **Bootstrap**: Removed initialization of the `Tokens` map.
+- **Authorization**: Corrected permission check in `GET /api/v1/users/token` to `read:item`. Fixed context key mismatches for permissions, user ID, and audience.
+- **Authentication**: `AuthMiddleware` now checks token revocation status via `tokenstore`.
+- **Time**: Standardized internal timestamps and JSON serialization to UTC RFC3339 via `models.RFC3339Time`.
+
+### Fixed
+
+- Fixed various Linter/Build errors related to package renames, unused variables, function signatures, undefined context keys, and incorrect type usage.
+
+## [0.3.0] - 2025-04-03 Basic Authentication and Routing
 
 ### Added
 
-- Initialized Go project (`go mod init github.com/OG-Open-Source/PanelBase`).
-- Added Gin web framework (`go mod tidy`).
-- Created basic Gin server structure in `
+- Basic `/api/v1/auth/login`, `/api/v1/auth/token` (refresh) handlers.
+- `/logs` directory creation and basic file logging.
+- Graceful server shutdown.
+- `/api/v1/users/token` placeholder routes.
+- Basic permission checking framework (`internal/middleware/permissions.go`).
+
+### Changed
+
+- **Authentication**: Enhanced `AuthMiddleware` (JWT from Cookie/Header, audience check). Updated JWT claims. Moved refresh token route under auth. Changed permission structure to `map[string][]string`.
+- **API Structure**: Consolidated user API token management under `/api/v1/users/token`.
+- **Models**: Updated `User` model for `api: {tokens: [...]}` JSON.
+- **Server**: Standardized API response format.
+- **Configuration**: Set default server mode to "release".
+- **Code**: Translated comments, removed verbose logging.
+
+### Fixed
+
+- Fixed various syntax errors, undefined handler errors, JSON unmarshal errors, Gin mode logic, and audience format errors.
+
+## [0.2.0] - 2025-04-02 API Route Structure Adjustment
+
+### Changed
+
+- **API**: Consolidated resource endpoints to use base paths (e.g., `/api/v1/commands`) for all methods (GET, POST, PUT, DELETE).
+- **Routing**: Updated route definitions to reflect the consolidated API structure.
+
+## [0.1.0] - 2025-04-01 Project Initialization
+
+### Added
+
+- Initialized Go project.
+- Added Gin framework.
+- Basic server and routing structure.
+- Configuration loading (TOML).
+- Bootstrap logic (directories, default config/users.json).
+- Basic User model.
+- Initial commit.

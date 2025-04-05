@@ -160,8 +160,8 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 
 		// Simplified Error Handling:
 		if err != nil {
-			// Log the specific error for debugging if needed
-			log.Printf("Token parsing error: %v", err)
+			// Remove or comment out the redundant log statement
+			// log.Printf("Token parsing error: %v", err)
 			server.ErrorResponse(c, http.StatusUnauthorized, "Invalid or expired token") // Generic message
 			c.Abort()
 			return
@@ -198,23 +198,49 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 			}
 
 			// Store scopes as models.UserPermissions
-			if scopes, scopesOk := claims["scopes"]; scopesOk {
-				var perms models.UserPermissions = make(models.UserPermissions)
-				if scopesMap, ok := scopes.(map[string]interface{}); ok {
-					// Convert map[string]interface{} to map[string][]string
-					for resource, actions := range scopesMap {
-						if actionSlice, ok := actions.([]interface{}); ok {
-							var actionStrings []string
-							for _, action := range actionSlice {
-								if actionStr, ok := action.(string); ok {
-									actionStrings = append(actionStrings, actionStr)
-								}
-							}
-							perms[resource] = actionStrings
+			if scopesClaim, scopesOk := claims["scopes"]; scopesOk {
+				// Attempt direct type assertion and conversion
+				scopesMap, mapOk := scopesClaim.(map[string]interface{}) // Assert to generic map first
+				if mapOk {
+					convertedScopes := make(models.UserPermissions)
+					conversionOK := true
+					for resource, actionsInterface := range scopesMap {
+						actionsSlice, sliceOk := actionsInterface.([]interface{}) // Assert actions to slice of interfaces
+						if !sliceOk {
+							log.Printf("Warning: Invalid format for scopes actions in JWT for resource '%s' (expected slice). Data: %+v", resource, actionsInterface)
+							conversionOK = false
+							break
 						}
+						var actions []string
+						for _, actionInterface := range actionsSlice {
+							if actionStr, strOk := actionInterface.(string); strOk {
+								actions = append(actions, actionStr)
+							} else {
+								log.Printf("Warning: Non-string action found in JWT scopes for resource '%s'. Data: %+v", resource, actionInterface)
+								conversionOK = false
+								break // Break inner loop
+							}
+						}
+						if !conversionOK {
+							break
+						} // Break outer loop if inner failed
+						convertedScopes[resource] = actions
 					}
+
+					if conversionOK {
+						c.Set(ContextKeyScopes, convertedScopes) // Store the correctly typed map
+					} else {
+						log.Printf("Error: Failed to fully convert JWT 'scopes' claim to models.UserPermissions due to format issues. Claim data: %+v", scopesClaim)
+						// Decide how to handle - deny access? For now, proceed without scopes.
+					}
+				} else {
+					// Log error if the claim wasn't a map[string]interface{}
+					log.Printf("Error: JWT 'scopes' claim is not a map[string]interface{}. Type: %T, Data: %+v", scopesClaim, scopesClaim)
 				}
-				c.Set(ContextKeyScopes, perms) // Use exported constant
+			} else {
+				// Scopes claim doesn't exist
+				// Set empty scopes? Or deny access if scopes are mandatory?
+				c.Set(ContextKeyScopes, models.UserPermissions{}) // Set empty map
 			}
 
 			// 4. Check revocation status using tokenstore
@@ -306,17 +332,17 @@ func CheckReadPermission(c *gin.Context, resource string) bool {
 }
 */
 
-// RequirePermission returns a Gin middleware handler that checks if the user
-// has the required permission (action) for a specific resource.
-// It utilizes the CheckPermission function.
-func RequirePermission(resource string, action string) gin.HandlerFunc {
+// Remove the redundant declaration below
+/*
+// RequirePermission is a middleware factory that checks for a specific permission.
+// It uses the CheckPermission function.
+func RequirePermission(resource string, requiredAction string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// CheckPermission already handles sending the error response and aborting.
-		if CheckPermission(c, resource, action) {
-			// Permission granted, continue to the next handler.
-			c.Next()
+		if !CheckPermission(c, resource, requiredAction) {
+			// CheckPermission already calls Abort and sends an error response
+			return
 		}
-		// If CheckPermission returns false, it has already aborted the context,
-		// so we don't need to explicitly call c.Abort() here again.
+		c.Next()
 	}
 }
+*/

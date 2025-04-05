@@ -124,21 +124,39 @@ func generateTokenJWT(user models.User, tokenID string, tokenMeta models.APIToke
 	return signedTokenString, nil
 }
 
+// validateScopes checks if requested scopes are a subset of user's allowed scopes.
+func validateScopes(requested models.UserPermissions, userScopes models.UserPermissions) bool {
+	for resource, reqActions := range requested {
+		userActions, ok := userScopes[resource]
+		if !ok {
+			return false // User doesn't have access to this resource at all
+		}
+		userActionSet := make(map[string]bool)
+		for _, action := range userActions {
+			userActionSet[action] = true
+		}
+		for _, reqAction := range reqActions {
+			if !userActionSet[reqAction] {
+				return false // Requested action not allowed for the user on this resource
+			}
+		}
+	}
+	return true
+}
+
 // CreateAPIToken creates metadata, generates JWT, and stores token info.
 func CreateAPIToken(user models.User, payload models.CreateAPITokenPayload) (string, models.APIToken, string, error) {
-	// 1. Check token limit - This check needs to change!
-	// We can't rely on user.API.Tokens anymore. Need a way to count tokens in the store.
-	// TODO: Implement token count check using tokenstore (requires user index or iteration).
-	// For now, remove the check or keep a non-functional placeholder.
-	/*
-		if len(user.API.Tokens) >= MaxTokensPerUser { // This is now incorrect
-			return "", models.APIToken{}, "", fmt.Errorf("maximum token limit (%d) reached", MaxTokensPerUser)
+	// 2. Determine and Validate Scopes
+	var finalScopes models.UserPermissions
+	if payload.Scopes == nil || len(payload.Scopes) == 0 {
+		// If no scopes requested, inherit all user scopes
+		finalScopes = user.Scopes
+	} else {
+		// If scopes are requested, validate they are a subset of user scopes
+		if !validateScopes(payload.Scopes, user.Scopes) {
+			return "", models.APIToken{}, "", errors.New("requested scopes exceed user permissions")
 		}
-	*/
-
-	// 2. Validate Scopes (assuming user.Scopes exists)
-	if !validateScopes(payload.Scopes, user.Scopes) {
-		return "", models.APIToken{}, "", errors.New("requested scopes exceed user permissions")
+		finalScopes = payload.Scopes // Use the validated requested scopes
 	}
 
 	// 3. Calculate expiration time
@@ -165,33 +183,31 @@ func CreateAPIToken(user models.User, payload models.CreateAPITokenPayload) (str
 	}
 	tokenID := "tok_" + randomPart // This ID will be the map key and JWT jti
 
-	// 5. Create API Token Metadata
+	// 5. Create API Token Metadata using finalScopes
 	apiTokenMeta := models.APIToken{
 		Name:        payload.Name,
 		Description: payload.Description,
-		Scopes:      payload.Scopes,
+		Scopes:      finalScopes, // Use the determined final scopes
 		CreatedAt:   createdAtRFC3339,
 		ExpiresAt:   expiresAtRFC3339,
 	}
 
-	// 6. Generate JWT using the helper function
+	// 6. Generate JWT using the helper function (using apiTokenMeta with finalScopes)
 	signedTokenString, err := generateTokenJWT(user, tokenID, apiTokenMeta)
 	if err != nil {
-		// Error already formatted by helper
 		return "", models.APIToken{}, "", err
 	}
 
-	// 7. Store Token Info in the token store
+	// 7. Store Token Info in the token store (using apiTokenMeta with finalScopes)
 	storeInfo := tokenstore.TokenInfo{
 		UserID:    user.ID,
 		Name:      apiTokenMeta.Name,
 		Audience:  AudienceAPI,
-		Scopes:    apiTokenMeta.Scopes,
+		Scopes:    apiTokenMeta.Scopes, // Use scopes from metadata
 		CreatedAt: apiTokenMeta.CreatedAt,
 		ExpiresAt: apiTokenMeta.ExpiresAt,
 	}
 	if err := tokenstore.StoreToken(tokenID, storeInfo); err != nil {
-		// Failing seems safer if we can't record the token.
 		return "", models.APIToken{}, "", fmt.Errorf("failed to store token metadata: %w", err)
 	}
 
@@ -199,61 +215,53 @@ func CreateAPIToken(user models.User, payload models.CreateAPITokenPayload) (str
 	return tokenID, apiTokenMeta, signedTokenString, nil
 }
 
-// parseISODurationSimpleRelativeTo calculates expiration based on a reference time.
-// Modified from parseISODurationSimple to accept a starting point.
-func parseISODurationSimpleRelativeTo(durationStr string, startTime time.Time) (time.Time, error) {
+// parseISODurationSimpleRelativeTo is the correct duration parsing logic needed by CreateAPIToken
+func parseISODurationSimpleRelativeTo(durationStr string, baseTime time.Time) (time.Time, error) {
+	// Simplified parser, only handles PnYnMnD format
 	if durationStr == "" || !strings.HasPrefix(durationStr, "P") {
 		return time.Time{}, fmt.Errorf("invalid duration format: must start with P")
 	}
 	durationStr = strings.TrimPrefix(durationStr, "P")
 
-	var years, months, days int
+	years, months, days := 0, 0, 0
 	currentNumStr := ""
 
 	for _, r := range durationStr {
 		switch r {
 		case 'Y':
-			val, err := parseInt(&currentNumStr)
+			val, err := strconv.Atoi(currentNumStr)
 			if err != nil {
 				return time.Time{}, fmt.Errorf("invalid year value: %w", err)
 			}
 			years = val
+			currentNumStr = ""
 		case 'M':
-			val, err := parseInt(&currentNumStr)
+			val, err := strconv.Atoi(currentNumStr)
 			if err != nil {
 				return time.Time{}, fmt.Errorf("invalid month value: %w", err)
 			}
 			months = val
+			currentNumStr = ""
 		case 'D':
-			val, err := parseInt(&currentNumStr)
+			val, err := strconv.Atoi(currentNumStr)
 			if err != nil {
 				return time.Time{}, fmt.Errorf("invalid day value: %w", err)
 			}
 			days = val
-		case 'W', 'T':
-			return time.Time{}, fmt.Errorf("W and T designators are not supported")
+			currentNumStr = ""
+		case 'T': // Time component - ignore for this simple version
+			return baseTime.AddDate(years, months, days), nil // Return date part only
 		default:
 			if r >= '0' && r <= '9' {
 				currentNumStr += string(r)
 			} else {
-				return time.Time{}, fmt.Errorf("invalid character: %c", r)
+				return time.Time{}, fmt.Errorf("invalid character in duration: %c", r)
 			}
 		}
 	}
-
-	if currentNumStr != "" {
-		return time.Time{}, fmt.Errorf("trailing number: %s", currentNumStr)
+	if currentNumStr != "" { // Handle number without designator at the end - Error?
+		return time.Time{}, fmt.Errorf("duration ended with unassigned numbers: %s", currentNumStr)
 	}
 
-	// Use AddDate on the provided startTime
-	calculatedTime := startTime.AddDate(years, months, days)
-	return calculatedTime, nil
-}
-
-// validateScopes checks if the requested scopes are a valid subset of the user's permissions.
-// Make this function potentially reusable by handler (or move logic).
-// For now, keep it internal. If handler needs it, call a service method wrapping this.
-func validateScopes(requested models.UserPermissions, userScopes models.UserPermissions) bool {
-	// TODO: Implement robust scope validation logic.
-	return true
+	return baseTime.AddDate(years, months, days), nil
 }

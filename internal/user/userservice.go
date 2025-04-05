@@ -94,6 +94,38 @@ func GetUserByID(userID string) (models.User, bool, error) {
 	return models.User{}, false, nil // User not found
 }
 
+// UsernameExists checks if a username already exists.
+func UsernameExists(username string) (bool, error) {
+	config, err := loadUsersConfig()
+	if err != nil {
+		return false, fmt.Errorf("failed to load user config for exists check: %w", err)
+	}
+	_, exists := config.Users[username]
+	return exists, nil
+}
+
+// AddUser adds a new user to the configuration.
+// Assumes validation (like username uniqueness) is done beforehand.
+// Returns an error if saving fails.
+func AddUser(user models.User) error {
+	config, err := loadUsersConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load user config for adding user: %w", err)
+	}
+
+	// Double-check uniqueness before adding (though caller should ideally check first)
+	if _, exists := config.Users[user.Username]; exists {
+		return fmt.Errorf("cannot add user: username '%s' already exists", user.Username)
+	}
+
+	config.Users[user.Username] = user // Add the new user
+
+	if err := saveUsersConfig(config); err != nil {
+		return fmt.Errorf("failed to save user config after adding user: %w", err)
+	}
+	return nil
+}
+
 // UpdateUser updates the entire user object in the configuration.
 // It reads the current config, updates the specific user, and saves it back.
 // TODO: Consider more granular update functions (e.g., UpdateUserPassword, UpdateUserAPI) for safety.

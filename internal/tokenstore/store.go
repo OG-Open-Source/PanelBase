@@ -57,15 +57,15 @@ func InitStore() error {
 
 	// Ensure buckets exist
 	return db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists(tokenInfoBucket)
+		_, err := tx.CreateBucketIfNotExists([]byte(tokensBucketName))
 		if err != nil {
-			return fmt.Errorf("failed to create bucket '%s': %w", string(tokenInfoBucket), err)
+			return fmt.Errorf("failed to create bucket '%s': %w", tokensBucketName, err)
 		}
-		_, err = tx.CreateBucketIfNotExists(revokedTokenBucket)
+		_, err = tx.CreateBucketIfNotExists([]byte(revokedBucketName))
 		if err != nil {
-			return fmt.Errorf("failed to create bucket '%s': %w", string(revokedTokenBucket), err)
+			return fmt.Errorf("failed to create bucket '%s': %w", revokedBucketName, err)
 		}
-		// TODO: Create user index bucket if needed
+		log.Printf("Required token store buckets ensured: %s, %s", tokensBucketName, revokedBucketName)
 		return nil
 	})
 }
@@ -86,15 +86,15 @@ func StoreToken(jti string, info TokenInfo) error {
 		return fmt.Errorf("token store not initialized")
 	}
 	return db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(tokenInfoBucket)
+		b := tx.Bucket([]byte(tokensBucketName))
 		if b == nil {
-			return fmt.Errorf("bucket %s not found", string(tokenInfoBucket))
+			return fmt.Errorf("bucket %s not found", tokensBucketName)
 		}
 
 		// Marshal the TokenInfo struct to JSON
 		jsonData, err := json.Marshal(info)
 		if err != nil {
-			return fmt.Errorf("failed to marshal token info for jti %s: %w", jti, err)
+			return fmt.Errorf("failed to marshal token info: %w", err)
 		}
 
 		// Store jti -> jsonData
@@ -113,26 +113,31 @@ func GetTokenInfo(jti string) (TokenInfo, bool, error) {
 	var info TokenInfo
 	found := false
 	err := db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(tokenInfoBucket)
+		b := tx.Bucket([]byte(tokensBucketName))
 		if b == nil {
-			return fmt.Errorf("bucket %s not found", string(tokenInfoBucket))
+			return fmt.Errorf("bucket %s not found", tokensBucketName)
 		}
 
 		jsonData := b.Get([]byte(jti))
 		if jsonData == nil {
-			// Not found is not an error, just return found = false
-			return nil
+			return nil // Not found
 		}
 
 		if err := json.Unmarshal(jsonData, &info); err != nil {
 			return fmt.Errorf("failed to unmarshal token info for jti %s: %w", jti, err)
 		}
 		found = true
+		// Log the retrieved info for debugging
+		log.Printf("[DEBUG TOKENSTORE GET] JTI: %s, Retrieved Info: %+v", jti, info)
 		return nil
 	})
 
 	if err != nil {
 		return TokenInfo{}, false, err
+	}
+	// Another log before returning, just in case
+	if found {
+		log.Printf("[DEBUG TOKENSTORE GET RET] JTI: %s, Returning Info: %+v", jti, info)
 	}
 	return info, found, nil
 }
@@ -143,30 +148,15 @@ func RevokeToken(jti string) error {
 		return fmt.Errorf("token store not initialized")
 	}
 	return db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(revokedTokenBucket)
+		b := tx.Bucket([]byte(revokedBucketName))
 		if b == nil {
-			return fmt.Errorf("bucket %s not found", string(revokedTokenBucket))
+			return fmt.Errorf("bucket %s not found", revokedBucketName)
 		}
 
 		// Store the revocation time (or just a marker)
 		// Storing timestamp allows potential cleanup based on time later
-		revocationTime := time.Now().UTC()
-		timestampBytes, err := revocationTime.MarshalBinary()
-		if err != nil {
-			return fmt.Errorf("failed to marshal revocation timestamp for jti %s: %w", jti, err)
-		}
-
-		if err := b.Put([]byte(jti), timestampBytes); err != nil {
-			return fmt.Errorf("failed to revoke token for jti %s: %w", jti, err)
-		}
-
-		// Optional: Remove from the main info bucket as well?
-		// infoBucket := tx.Bucket(tokenInfoBucket)
-		// if infoBucket != nil {
-		//     infoBucket.Delete([]byte(jti))
-		// }
-
-		return nil
+		revocationTime := time.Now().UTC().Format(time.RFC3339)
+		return b.Put([]byte(jti), []byte(revocationTime))
 	})
 }
 
@@ -177,11 +167,11 @@ func IsTokenRevoked(jti string) (bool, error) {
 	}
 	revoked := false
 	err := db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(revokedTokenBucket)
+		b := tx.Bucket([]byte(revokedBucketName))
 		if b == nil {
 			// If bucket doesn't exist, token cannot be revoked (treat as error or false?)
 			// Let's assume bucket should exist from InitStore
-			return fmt.Errorf("bucket %s not found", string(revokedTokenBucket))
+			return fmt.Errorf("bucket %s not found", revokedBucketName)
 		}
 
 		val := b.Get([]byte(jti))
@@ -198,64 +188,53 @@ func IsTokenRevoked(jti string) (bool, error) {
 	return revoked, nil
 }
 
-// GetUserTokens retrieves all non-revoked tokens for a specific user.
-// It returns a slice of TokenInfo, a slice of corresponding JTIs (Token IDs), and an error.
+// GetUserTokens retrieves all non-revoked API tokens for a specific user.
+// It filters by UserID and ensures the Audience is "api".
+// Returns slices of TokenInfo, corresponding JTIs, and an error.
 func GetUserTokens(userID string) ([]TokenInfo, []string, error) {
 	if db == nil {
 		return nil, nil, fmt.Errorf("token store not initialized")
 	}
-
 	var tokensInfo []TokenInfo
 	var tokenIDs []string
-
 	err := db.View(func(tx *bolt.Tx) error {
 		tokensBucket := tx.Bucket([]byte(tokensBucketName))
 		revokedBucket := tx.Bucket([]byte(revokedBucketName))
 		if tokensBucket == nil || revokedBucket == nil {
-			// This shouldn't happen if InitStore was successful
 			return fmt.Errorf("required buckets not found")
 		}
 
-		// Iterate over all tokens in the tokens bucket
 		return tokensBucket.ForEach(func(k, v []byte) error {
 			tokenID := string(k)
-
-			// Check if the token is revoked first
 			if revokedBucket.Get(k) != nil {
-				return nil // Skip revoked tokens
+				return nil // Skip revoked
 			}
 
-			// Unmarshal the token info
 			var info TokenInfo
 			if err := json.Unmarshal(v, &info); err != nil {
-				// Log error but continue iterating? Or return error?
-				// Let's log and skip this specific token.
 				log.Printf("Error unmarshaling token info for JTI %s: %v. Skipping.", tokenID, err)
-				return nil // Continue to next item
+				return nil
 			}
 
-			// Check if the token belongs to the requested user
-			if info.UserID == userID {
+			// Check if it belongs to the user AND is an API token
+			if info.UserID == userID && info.Audience == "api" {
 				tokensInfo = append(tokensInfo, info)
 				tokenIDs = append(tokenIDs, tokenID)
 			}
 
-			return nil // Continue iteration
+			return nil
 		})
 	})
 
 	if err != nil {
 		return nil, nil, fmt.Errorf("error retrieving user tokens: %w", err)
 	}
-
-	// Ensure non-nil slices are returned even if empty
 	if tokensInfo == nil {
 		tokensInfo = []TokenInfo{}
 	}
 	if tokenIDs == nil {
 		tokenIDs = []string{}
 	}
-
 	return tokensInfo, tokenIDs, nil
 }
 

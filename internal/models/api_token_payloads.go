@@ -3,11 +3,13 @@ package models
 import "time"
 
 // CreateAPITokenPayload defines the structure for the request body when creating a new API token.
+// Username is optional for admin actions.
 type CreateAPITokenPayload struct {
+	Username    *string         `json:"username,omitempty"`          // Optional: Target username for admin actions
 	Name        string          `json:"name" binding:"required"`     // Required: A unique name for this token
 	Description string          `json:"description,omitempty"`       // Optional: A longer description
-	Scopes      UserPermissions `json:"scopes" binding:"required"`   // Required: Subset of user's permissions requested for the token
-	Duration    string          `json:"duration" binding:"required"` // Required: Token lifetime duration in ISO 8601 format (e.g., "P7D", "P1M")
+	Scopes      UserPermissions `json:"scopes,omitempty"`            // Optional: If empty, inherit target user's scopes. Validation happens in service.
+	Duration    string          `json:"duration" binding:"required"` // Required: Duration in ISO 8601 format (Date part only, e.g., "P7D", "P1M", "P1Y6M")
 }
 
 // UpdateAPITokenPayload defines the structure for the request body when updating an API token.

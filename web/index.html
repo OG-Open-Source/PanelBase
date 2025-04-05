@@ -4,7 +4,7 @@
 <head>
 	<meta charset="UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<title>Linux 系统管理面板</title>
+	<title>{{ .Title }}</title>
 	<link rel="stylesheet" href="/style.css" />
 	<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
 </head>
@@ -14,7 +14,7 @@
 		<div class="nav-container">
 			<div class="nav-brand">
 				<i class="fas fa-server"></i>
-				<span>科技lion面板</span>
+				<span>{{ .Title }}</span>
 			</div>
 			<div class="nav-links">
 				<a href="index.html" class="nav-link active">
@@ -128,7 +128,7 @@
 						<div class="memory-item">
 							<span class="memory-label">已用内存</span>
 							<span class="memory-value" data-command="get_info" data-args='["mem_usage_used"]'
-							data-max-calls="1"</span>
+							data-max-calls="1"></span>
 						</div>
 						<div class="memory-item">
 							<span class="memory-label">缓存</span>
@@ -142,10 +142,8 @@
 						</div>
 					</div>
 					<div class="progress-bar">
-						<div class="progress-stack">
-							<div class="progress progress-used" style="width: 46.02%"></div>
-							<div class="progress progress-cache" style="width: 12.78%"></div>
-						</div>
+						<div class="progress progress-used" style="width: 46.02%"></div>
+						<div class="progress progress-cache" style="width: 12.78%"></div>
 					</div>
 					<span class="progress-text" data-command="get_info" data-args='["mem_usage"]'
 							data-max-calls="1"></span>
@@ -363,7 +361,6 @@
 	</div>
 	<script src="js/script.js"></script>
 	<script src="js/nav.js"></script>
-	<script src="main.js"></script>
 	<div class="modal" id="progressModal">
 		<div class="modal-content">
 			<div class="modal-header">

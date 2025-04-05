@@ -21,73 +21,114 @@ import (
 // Struct to bind optional ID from GET request body
 type GetTokenPayload struct {
 	ID string `json:"id,omitempty"` // Optional: ID (JTI) of the specific token to fetch
+	// Username string `json:"username,omitempty"` // Removed: Username for GET should be query param if needed, but we handle via permissions
 }
 
 // UpdateTokenPayload defines the structure for updating token metadata.
 // Name, Description, and Scopes can be updated.
+// Username is optional for admin actions.
 type UpdateTokenPayload struct {
 	ID          string                 `json:"id" binding:"required"`
+	Username    *string                `json:"username,omitempty"` // Optional: Target username for admin actions
 	Name        *string                `json:"name,omitempty"`
 	Description *string                `json:"description,omitempty"`
-	Scopes      models.UserPermissions `json:"scopes,omitempty"` // Allow updating scopes
+	Scopes      models.UserPermissions `json:"scopes,omitempty"`
 }
 
 // DeleteTokenPayload defines the structure for deleting a token.
+// Username is optional for admin actions.
 type DeleteTokenPayload struct {
-	TokenID string `json:"token_id" binding:"required"`
+	TokenID  string  `json:"token_id" binding:"required"`
+	Username *string `json:"username,omitempty"` // Optional: Target username for admin actions
 }
 
-// CreateTokenHandler handles the creation of a new API token for the authenticated user.
-// POST /api/v1/users/token
-func CreateTokenHandler(c *gin.Context) {
-	// 1. Get User ID from authenticated context (set by AuthMiddleware from 'sub' claim)
-	userIDVal, exists := c.Get(middleware.ContextKeyUserID) // Use exported constant
+// Helper to get target user ID and check admin permission if needed
+func getTargetUserID(c *gin.Context, requestedUsername *string) (targetUserID string, isAdminAction bool, err error) {
+	currentUserID, exists := c.Get(middleware.ContextKeyUserID)
 	if !exists {
-		server.ErrorResponse(c, http.StatusUnauthorized, "User ID not found in context")
-		return
+		return "", false, fmt.Errorf("current user ID not found in context")
 	}
-	userIDStr, ok := userIDVal.(string)
-	if !ok || userIDStr == "" {
-		server.ErrorResponse(c, http.StatusUnauthorized, "Invalid User ID format in context")
-		return
-	}
+	currentUserIDStr := currentUserID.(string)
 
-	// 2. Bind request payload
-	var payload models.CreateAPITokenPayload // Use models.CreateAPITokenPayload
+	if requestedUsername != nil && *requestedUsername != "" {
+		// Admin action requested
+		targetUser, userExists, userErr := user.GetUserByUsername(*requestedUsername)
+		if userErr != nil {
+			return "", true, fmt.Errorf("failed to lookup target user '%s': %w", *requestedUsername, userErr)
+		}
+		if !userExists {
+			return "", true, fmt.Errorf("target user '%s' not found", *requestedUsername)
+		}
+		// If target is self, treat as non-admin action for permission check later
+		if targetUser.ID == currentUserIDStr {
+			return currentUserIDStr, false, nil
+		}
+		return targetUser.ID, true, nil
+	} else {
+		// Action is for the current user
+		return currentUserIDStr, false, nil
+	}
+}
+
+// CreateTokenHandler handles creating an API token, potentially for another user if admin.
+func CreateTokenHandler(c *gin.Context) {
+	var payload models.CreateAPITokenPayload
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		server.ErrorResponse(c, http.StatusBadRequest, "Invalid request payload: "+err.Error())
 		return
 	}
 
-	// 3. Load user data (needed for JWT secret and scope validation)
-	userInstance, userExists, err := user.GetUserByID(userIDStr) // Use GetUserByID
+	// Determine target user and check if it's an admin action
+	targetUserID, isAdminAction, err := getTargetUserID(c, payload.Username)
 	if err != nil {
-		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to load user data: "+err.Error())
-		return
-	}
-	if !userExists {
-		server.ErrorResponse(c, http.StatusNotFound, "Authenticated user not found") // Correct error message now
+		statusCode := http.StatusInternalServerError
+		if strings.Contains(err.Error(), "not found") {
+			statusCode = http.StatusNotFound
+		} else if strings.Contains(err.Error(), "context") {
+			statusCode = http.StatusUnauthorized
+		}
+		server.ErrorResponse(c, statusCode, err.Error())
 		return
 	}
 
-	// 4. Call the token service to create the token metadata and JWT
-	// This now also handles storing the metadata in tokenstore
-	tokenID, apiTokenMeta, signedTokenString, err := CreateAPIToken(userInstance, payload)
+	// Check permission
+	requiredAction := "create"
+	if isAdminAction {
+		requiredAction = "create:all"
+	}
+	if !middleware.CheckPermission(c, "api", requiredAction) {
+		return
+	}
+
+	// Load the *target* user data (needed for JWT secret and scope validation)
+	targetUserInstance, targetUserExists, err := user.GetUserByID(targetUserID)
+	if err != nil {
+		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to load target user data: "+err.Error())
+		return
+	}
+	if !targetUserExists {
+		// Should be unlikely if getTargetUserID worked, but check anyway
+		server.ErrorResponse(c, http.StatusNotFound, "Target user not found after permission check")
+		return
+	}
+
+	// Call the token service with the target user and payload
+	tokenID, apiTokenMeta, signedTokenString, err := CreateAPIToken(targetUserInstance, payload)
 	if err != nil {
 		if strings.Contains(err.Error(), "exceed user permissions") || strings.Contains(err.Error(), "invalid duration format") {
 			server.ErrorResponse(c, http.StatusBadRequest, err.Error())
 		} else if strings.Contains(err.Error(), "failed to store token metadata") {
-			log.Printf("ERROR: Failed to store token metadata for user %s: %v", userIDStr, err)
+			log.Printf("ERROR: Failed to store token metadata for user %s: %v", targetUserID, err)
 			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to store token metadata")
 		} else {
-			log.Printf("ERROR: Failed to create API token for user %s: %v", userIDStr, err)
+			log.Printf("ERROR: Failed to create API token for user %s: %v", targetUserID, err)
 			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to create API token: "+err.Error())
 		}
 		return
 	}
 
-	// 7. Prepare and return the success response
-	responseData := map[string]interface{}{ // Use map[string]interface{} for flexibility
+	// Prepare and return the success response
+	responseData := map[string]interface{}{
 		"id":          tokenID,
 		"name":        apiTokenMeta.Name,
 		"description": apiTokenMeta.Description,
@@ -96,76 +137,74 @@ func CreateTokenHandler(c *gin.Context) {
 		"expires_at":  apiTokenMeta.ExpiresAt.Time().Format(time.RFC3339),
 		"token":       signedTokenString,
 	}
-
 	server.SuccessResponse(c, "API token created successfully", responseData)
 }
 
-// GetTokensHandler handles retrieving all or a specific API token metadata for the user.
-// Reads optional 'id' from request body to determine mode.
-// Checks 'api:read:list' for all tokens, 'api:read:item' for a specific token.
+// GetTokensHandler handles retrieving API token metadata.
+// Reads optional 'id' from the JSON request body.
+// - If no 'id' is provided, lists tokens for the current user (requires 'api:read:list').
+// - If 'id' is provided:
+//   - If the token belongs to the current user, requires 'api:read:item'.
+//   - If the token belongs to another user, requires 'api:read:item:all'.
 func GetTokensHandler(c *gin.Context) {
-	// 1. Get User ID from authenticated context
-	userIDVal, exists := c.Get(middleware.ContextKeyUserID) // Use exported constant
+	// 1. Get current User ID from authenticated context
+	userIDVal, exists := c.Get(middleware.ContextKeyUserID)
 	if !exists {
 		server.ErrorResponse(c, http.StatusUnauthorized, "User ID not found in context")
 		return
 	}
-	userIDStr, ok := userIDVal.(string)
-	if !ok || userIDStr == "" {
-		server.ErrorResponse(c, http.StatusUnauthorized, "Invalid User ID format in context")
-		return
-	}
+	currentUserIDStr := userIDVal.(string)
 
-	// 2. Try to read and bind the request body to get optional ID
+	// 2. Try to bind optional payload from request body
 	var payload GetTokenPayload
-	// Note: Binding JSON for GET is non-standard. Consider query params later.
-	if err := c.ShouldBindJSON(&payload); err != nil && err.Error() != "EOF" { // Allow empty body (EOF)
+	// Allow empty body (EOF) or binding errors if no body is sent for list action
+	if err := c.ShouldBindJSON(&payload); err != nil && err.Error() != "EOF" {
+		// If there's a body but it's malformed JSON
 		server.ErrorResponse(c, http.StatusBadRequest, "Invalid request payload format: "+err.Error())
 		return
 	}
+	targetTokenID := payload.ID // Get ID from body payload
 
-	// 3. Determine action based on presence of ID in payload
-	if payload.ID != "" {
+	// 3. Determine action based on presence of targetTokenID
+	if targetTokenID != "" {
 		// --- Get Specific Token ---
 
-		// 3a. Check permission for reading specific item
-		if !middleware.CheckPermission(c, "api", "read:item") { // Corrected permission check
-			return
-		}
-
-		// 3b. Get token info from store
-		tokenInfo, found, err := tokenstore.GetTokenInfo(payload.ID)
+		// 3a. Get token info from store FIRST
+		tokenInfo, found, err := tokenstore.GetTokenInfo(targetTokenID)
 		if err != nil {
 			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to retrieve token info: "+err.Error())
 			return
 		}
 		if !found {
-			server.ErrorResponse(c, http.StatusNotFound, fmt.Sprintf("API token with ID '%s' not found", payload.ID))
+			server.ErrorResponse(c, http.StatusNotFound, fmt.Sprintf("API token with ID '%s' not found", targetTokenID))
 			return
 		}
 
-		// 3c. Verify ownership
-		if tokenInfo.UserID != userIDStr {
-			server.ErrorResponse(c, http.StatusForbidden, "You do not have permission to view this token")
+		// 3b. Check ownership and permissions
+		isOwner := tokenInfo.UserID == currentUserIDStr
+		requiredAction := "read:item"
+		if !isOwner {
+			requiredAction = "read:item:all"
+		}
+		if !middleware.CheckPermission(c, "api", requiredAction) {
 			return
 		}
 
-		// 3d. Check if revoked
-		isRevoked, err := tokenstore.IsTokenRevoked(payload.ID)
+		// 3c. Check if revoked (after permission check)
+		isRevoked, err := tokenstore.IsTokenRevoked(targetTokenID)
 		if err != nil {
 			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to check token revocation status: "+err.Error())
 			return
 		}
 		if isRevoked {
-			server.ErrorResponse(c, http.StatusNotFound, "Token not found (or has been revoked)")
+			server.ErrorResponse(c, http.StatusNotFound, fmt.Sprintf("API token with ID '%s' not found (or revoked)", targetTokenID))
 			return
 		}
 
-		// 3e. Prepare and return response for the single token
+		// 3d. Prepare and return response
 		responseData := map[string]interface{}{
-			"id":   payload.ID,
-			"name": tokenInfo.Name,
-			// "description": tokenInfo.Description, // TODO: Add Description to TokenInfo
+			"id":         targetTokenID,
+			"name":       tokenInfo.Name,
 			"scopes":     tokenInfo.Scopes,
 			"created_at": tokenInfo.CreatedAt.Time().Format(time.RFC3339),
 			"expires_at": tokenInfo.ExpiresAt.Time().Format(time.RFC3339),
@@ -173,81 +212,52 @@ func GetTokensHandler(c *gin.Context) {
 		server.SuccessResponse(c, "API token retrieved successfully", responseData)
 
 	} else {
-		// --- Get All Tokens (List) ---
-
-		// 4a. Check permission for listing items
-		if !middleware.CheckPermission(c, "api", "read:list") {
+		// --- Get Token List (for current user) ---
+		requiredAction := "read:list"
+		if !middleware.CheckPermission(c, "api", requiredAction) {
 			return
 		}
 
-		// 4b. Call tokenstore to get user's tokens
-		tokensInfo, tokenIDs, err := tokenstore.GetUserTokens(userIDStr)
+		// Get tokens for the currentUserIDStr
+		tokensInfo, tokenIDs, err := tokenstore.GetUserTokens(currentUserIDStr)
 		if err != nil {
-			log.Printf("Error retrieving tokens for user %s: %v", userIDStr, err)
+			log.Printf("Error retrieving tokens for user %s: %v", currentUserIDStr, err)
 			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to retrieve tokens")
 			return
 		}
 
-		// 4c. Prepare the response data list
 		tokenList := make([]map[string]interface{}, len(tokensInfo))
 		for i, info := range tokensInfo {
 			tokenList[i] = map[string]interface{}{
-				"id":   tokenIDs[i],
-				"name": info.Name,
-				// "description": info.Description, // TODO
+				"id":         tokenIDs[i],
+				"name":       info.Name,
 				"scopes":     info.Scopes,
 				"created_at": info.CreatedAt.Time().Format(time.RFC3339),
 				"expires_at": info.ExpiresAt.Time().Format(time.RFC3339),
 			}
 		}
 
-		// 4d. Return the list
 		server.SuccessResponse(c, "API tokens retrieved successfully", tokenList)
 	}
 }
 
-// UpdateTokenHandler handles updating an API token's metadata.
-// PUT /api/v1/users/token
+// UpdateTokenHandler handles updating API token metadata, supporting admin actions.
 func UpdateTokenHandler(c *gin.Context) {
-	// 1. Get User ID from context
-	userIDVal, exists := c.Get(middleware.ContextKeyUserID) // Use exported constant
-	if !exists {                                            /* ... error handling ... */
-		server.ErrorResponse(c, http.StatusUnauthorized, "User ID missing from context")
-		return
-	}
-	userIDStr, ok := userIDVal.(string)
-	if !ok || userIDStr == "" { /* ... error handling ... */
-		server.ErrorResponse(c, http.StatusUnauthorized, "Invalid User ID format in context")
-		return
-	}
-
-	// 2. Bind request payload
 	var payload UpdateTokenPayload
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		server.ErrorResponse(c, http.StatusBadRequest, "Invalid request payload: "+err.Error())
 		return
 	}
 
-	// 3. Permission Check (Handled by RequirePermission middleware)
-
-	// 4. Load user data (needed ONLY if validating scopes)
-	var userInstance models.User // Declare userInstance variable
-	var userErr error
-	var userExists bool
-	if payload.Scopes != nil && len(payload.Scopes) > 0 {
-		userInstance, userExists, userErr = user.GetUserByID(userIDStr)
-		if userErr != nil {
-			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to load user data for scope validation: "+userErr.Error())
-			return
-		}
-		if !userExists {
-			server.ErrorResponse(c, http.StatusNotFound, "Authenticated user not found for scope validation")
-			return
-		}
+	currentUserID, exists := c.Get(middleware.ContextKeyUserID)
+	if !exists {
+		server.ErrorResponse(c, http.StatusUnauthorized, "User ID missing from context")
+		return
 	}
+	currentUserIDStr := currentUserID.(string)
 
-	// 5. Get current token info, check existence and ownership
-	currentTokenInfo, found, err := tokenstore.GetTokenInfo(payload.ID)
+	// 1. Get Token Info FIRST to determine ownership
+	targetTokenInfo, found, err := tokenstore.GetTokenInfo(payload.ID)
 	if err != nil {
 		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to retrieve current token info: "+err.Error())
 		return
@@ -256,12 +266,72 @@ func UpdateTokenHandler(c *gin.Context) {
 		server.ErrorResponse(c, http.StatusNotFound, fmt.Sprintf("API token with ID '%s' not found", payload.ID))
 		return
 	}
-	if currentTokenInfo.UserID != userIDStr {
-		server.ErrorResponse(c, http.StatusForbidden, "You do not have permission to update this token")
+
+	// 2. Determine target user and required permission
+	targetUserID := targetTokenInfo.UserID
+	isOwner := targetUserID == currentUserIDStr
+	isExplicitAdminAction := payload.Username != nil && *payload.Username != ""
+	var requiredAction string
+	var effectiveTargetUser models.User // User whose context we operate under
+	var targetUserExists bool
+
+	if isExplicitAdminAction {
+		// Admin explicitly specified target user via payload.Username
+		lookupUsername := *payload.Username
+		targetUserLookup, userLookupExists, userLookupErr := user.GetUserByUsername(lookupUsername)
+		if userLookupErr != nil {
+			server.ErrorResponse(c, http.StatusBadRequest, fmt.Sprintf("Failed to lookup target user '%s': %v", lookupUsername, userLookupErr))
+			return
+		}
+		if !userLookupExists {
+			server.ErrorResponse(c, http.StatusBadRequest, fmt.Sprintf("Target user '%s' not found", lookupUsername))
+			return
+		}
+
+		// Verify the specified username matches the token's owner ID
+		if targetUserLookup.ID != targetUserID {
+			server.ErrorResponse(c, http.StatusBadRequest, fmt.Sprintf("Mismatch: Token '%s' belongs to user ID '%s', not specified username '%s' (ID '%s')", payload.ID, targetUserID, lookupUsername, targetUserLookup.ID))
+			return
+		}
+
+		requiredAction = "update:all"
+		effectiveTargetUser = targetUserLookup
+		targetUserExists = true
+	} else {
+		// No username specified, assume action on own token OR admin implicit action
+		if isOwner {
+			requiredAction = "update" // Standard self-update
+			effectiveTargetUser, targetUserExists, err = user.GetUserByID(currentUserIDStr)
+			if err != nil {
+				server.ErrorResponse(c, http.StatusInternalServerError, "Failed to load user data for scope validation: "+err.Error())
+				return
+			}
+			if !targetUserExists {
+				server.ErrorResponse(c, http.StatusNotFound, "Authenticated user not found for scope validation")
+				return
+			}
+		} else {
+			// Trying to update someone else's token without specifying username? Requires admin perm.
+			requiredAction = "update:all"
+			// We need the *owner's* user data for scope validation
+			effectiveTargetUser, targetUserExists, err = user.GetUserByID(targetUserID)
+			if err != nil {
+				server.ErrorResponse(c, http.StatusInternalServerError, "Failed to load user data for scope validation: "+err.Error())
+				return
+			}
+			if !targetUserExists {
+				server.ErrorResponse(c, http.StatusNotFound, "Target user not found for scope validation")
+				return
+			}
+		}
+	}
+
+	// 3. Check Permission
+	if !middleware.CheckPermission(c, "api", requiredAction) {
 		return
 	}
 
-	// 6. Check if revoked
+	// 4. Check if revoked (can't update revoked)
 	isRevoked, err := tokenstore.IsTokenRevoked(payload.ID)
 	if err != nil {
 		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to check token revocation status: "+err.Error())
@@ -272,48 +342,37 @@ func UpdateTokenHandler(c *gin.Context) {
 		return
 	}
 
-	// 7. Prepare updates and validate scopes if necessary
-	updatedInfo := currentTokenInfo // Start with current info
+	// 5. Prepare updates and validate scopes (using effectiveTargetUser)
+	updatedInfo := targetTokenInfo
 	needsResave := false
-	// Removed: Re-issuing JWT logic is complex and likely not needed just for metadata update.
-	// The original JWT remains valid.
-
 	if payload.Name != nil {
 		updatedInfo.Name = *payload.Name
 		needsResave = true
 	}
-	// TODO: Add Description to TokenInfo struct and handle update here
-	// if payload.Description != nil { updatedInfo.Description = *payload.Description; needsResave = true }
-
+	// TODO: Description update
 	if payload.Scopes != nil && len(payload.Scopes) > 0 {
-		// Use the validateScopes function from token_service implicitly via CreateAPIToken or explicitly?
-		// For now, let's use the local helper, assuming it will be replaced.
-		if !validateScopesHelper(payload.Scopes, userInstance.Scopes) { // Use helper
-			server.ErrorResponse(c, http.StatusBadRequest, "Requested scopes exceed user permissions")
+		if !validateScopesHelper(payload.Scopes, effectiveTargetUser.Scopes) {
+			server.ErrorResponse(c, http.StatusBadRequest, "Requested scopes exceed target user permissions")
 			return
 		}
 		updatedInfo.Scopes = payload.Scopes
 		needsResave = true
 	}
-
 	if !needsResave {
 		server.ErrorResponse(c, http.StatusBadRequest, "No updateable fields provided (name, description, scopes allowed)")
 		return
 	}
 
-	// 8. Save updated info back to tokenstore
+	// 6. Save updated info back to tokenstore
 	if err := tokenstore.StoreToken(payload.ID, updatedInfo); err != nil {
 		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to update token metadata: "+err.Error())
 		return
 	}
 
-	// 9. Removed: Saving updated user data (user object wasn't modified)
-
-	// 10. Return success response with updated metadata
-	responseData := map[string]interface{}{ // Use map
-		"id":   payload.ID,
-		"name": updatedInfo.Name,
-		// "description": updatedInfo.Description, // TODO: Add when description is handled
+	// 7. Return success response
+	responseData := map[string]interface{}{
+		"id":         payload.ID,
+		"name":       updatedInfo.Name,
 		"scopes":     updatedInfo.Scopes,
 		"created_at": updatedInfo.CreatedAt.Time().Format(time.RFC3339),
 		"expires_at": updatedInfo.ExpiresAt.Time().Format(time.RFC3339),
@@ -321,26 +380,23 @@ func UpdateTokenHandler(c *gin.Context) {
 	server.SuccessResponse(c, "API token metadata updated successfully", responseData)
 }
 
-// DeleteTokenHandler handles deleting (revoking) an API token.
-// Requires "api:delete" permission.
+// DeleteTokenHandler handles deleting (revoking) an API token, supporting admin actions.
 func DeleteTokenHandler(c *gin.Context) {
-	// 1. Extract user info from context (set by AuthMiddleware)
-	userIDVal, exists := c.Get(middleware.ContextKeyUserID) // Use exported constant
-	if !exists {
-		server.ErrorResponse(c, http.StatusUnauthorized, "User ID missing from context")
-		return
-	}
-	userID := userIDVal.(string) // Assuming User ID is always string
-
-	// 2. Bind the request payload
 	var payload DeleteTokenPayload
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		server.ErrorResponse(c, http.StatusBadRequest, "Invalid request payload: "+err.Error())
 		return
 	}
 
-	// 3. Check if the token belongs to the user making the request
-	tokenInfo, found, err := tokenstore.GetTokenInfo(payload.TokenID)
+	currentUserID, exists := c.Get(middleware.ContextKeyUserID)
+	if !exists {
+		server.ErrorResponse(c, http.StatusUnauthorized, "User ID missing from context")
+		return
+	}
+	currentUserIDStr := currentUserID.(string)
+
+	// 1. Get Token Info FIRST to determine ownership
+	targetTokenInfo, found, err := tokenstore.GetTokenInfo(payload.TokenID)
 	if err != nil {
 		server.ErrorResponse(c, http.StatusInternalServerError, "Error checking token ownership: "+err.Error())
 		return
@@ -349,8 +405,43 @@ func DeleteTokenHandler(c *gin.Context) {
 		server.ErrorResponse(c, http.StatusNotFound, "Token not found")
 		return
 	}
-	if tokenInfo.UserID != userID {
-		server.ErrorResponse(c, http.StatusForbidden, "You do not have permission to delete this token")
+
+	// 2. Determine required permission based on ownership and explicit admin request
+	targetUserID := targetTokenInfo.UserID
+	isOwner := targetUserID == currentUserIDStr
+	isExplicitAdminAction := payload.Username != nil && *payload.Username != ""
+	var requiredAction string
+
+	if isExplicitAdminAction {
+		// Admin explicitly specified target user via payload.Username
+		lookupUsername := *payload.Username
+		targetUserLookup, userLookupExists, userLookupErr := user.GetUserByUsername(lookupUsername)
+		if userLookupErr != nil {
+			server.ErrorResponse(c, http.StatusBadRequest, fmt.Sprintf("Failed to lookup target user '%s': %v", lookupUsername, userLookupErr))
+			return
+		}
+		if !userLookupExists {
+			server.ErrorResponse(c, http.StatusBadRequest, fmt.Sprintf("Target user '%s' not found", lookupUsername))
+			return
+		}
+
+		// Verify the specified username matches the token's owner ID
+		if targetUserLookup.ID != targetUserID {
+			server.ErrorResponse(c, http.StatusBadRequest, fmt.Sprintf("Mismatch: Token '%s' belongs to user ID '%s', not specified username '%s' (ID '%s')", payload.TokenID, targetUserID, lookupUsername, targetUserLookup.ID))
+			return
+		}
+		requiredAction = "delete:all"
+	} else {
+		if isOwner {
+			requiredAction = "delete"
+		} else {
+			// Trying to delete someone else's token without specifying username? Requires admin perm.
+			requiredAction = "delete:all"
+		}
+	}
+
+	// 3. Check Permission
+	if !middleware.CheckPermission(c, "api", requiredAction) {
 		return
 	}
 
@@ -361,7 +452,7 @@ func DeleteTokenHandler(c *gin.Context) {
 	}
 
 	// 5. Return success response
-	server.SuccessResponse(c, "API token revoked successfully", nil) // No data needed on success
+	server.SuccessResponse(c, "API token revoked successfully", nil)
 }
 
 // validateScopesHelper is a temporary helper until validation logic is consolidated.

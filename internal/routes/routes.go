@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"html/template"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -10,7 +12,9 @@ import (
 	"github.com/OG-Open-Source/PanelBase/internal/auth"
 	"github.com/OG-Open-Source/PanelBase/internal/config"
 	"github.com/OG-Open-Source/PanelBase/internal/middleware"
+	"github.com/OG-Open-Source/PanelBase/internal/models"
 	"github.com/OG-Open-Source/PanelBase/internal/server"
+	"github.com/OG-Open-Source/PanelBase/internal/uisettings"
 	"github.com/gin-gonic/gin"
 )
 
@@ -23,6 +27,7 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 		authGroup := apiV1.Group("/auth")
 		{
 			authGroup.POST("/login", auth.LoginHandler(cfg))
+			authGroup.POST("/register", auth.RegisterHandler)
 		}
 
 		// Protected API routes
@@ -96,118 +101,155 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 			{
 				// GET /users - List users OR Get specific user by ID in body
 				userGroup.GET("", func(c *gin.Context) {
-					// Use the new CheckReadPermission function
-					if !middleware.CheckReadPermission(c, "users") {
-						return // CheckReadPermission handles the error response and aborts
-					}
-					// TODO: Implement actual logic to fetch user(s) based on whether ID was in body
-					server.SuccessResponse(c, "GET Users (List/Item) endpoint needs implementation", nil)
+					// Permission check (read:list or read:item) and ownership check
+					// should be implemented INSIDE the handler logic, using middleware.CheckPermission
+					// and comparing target ID with context user ID.
+					// Removed: if !middleware.CheckReadPermission(c, "users") { return }
+					server.SuccessResponse(c, "GET Users (List/Item) endpoint needs permission checks and implementation", nil)
 				})
 
 				// POST /users - Create user (Action: create)
-				userGroup.POST("", func(c *gin.Context) {
-					// Use the regular CheckPermission for non-read actions
-					if !middleware.CheckPermission(c, "users", "create") {
-						return // CheckPermission handles the error response and aborts
-					}
-					// TODO: Implement actual logic to parse body and create user
+				userGroup.POST("", middleware.RequirePermission("users", "create"), func(c *gin.Context) {
+					// Handler needs implementation
 					server.SuccessResponse(c, "POST Users (Create) endpoint needs implementation", nil)
 				})
 
 				// PUT /users - Update user (Action: update, requires {"id": ...} in body)
-				userGroup.PUT("", func(c *gin.Context) {
-					// TODO: Parse body *first* to get the target ID for potential ownership checks later.
-					// targetID, idProvided := extractIDFromRequestBody(c) // Example, maybe bind struct
-					// if !idProvided { /* handle error */ }
-
-					// Check basic permission
-					if !middleware.CheckPermission(c, "users", "update") {
-						return
-					}
-					// TODO: Add logic here to check if user is updating self vs other (if needed)
-					// using targetID and userID from context.
-					// TODO: Implement actual logic to update user
-					server.SuccessResponse(c, "PUT Users (Update) endpoint needs implementation", nil)
+				userGroup.PUT("", middleware.RequirePermission("users", "update"), func(c *gin.Context) {
+					// Handler needs to perform ownership check before updating.
+					server.SuccessResponse(c, "PUT Users (Update) endpoint needs ownership check and implementation", nil)
 				})
 
 				// DELETE /users - Delete user (Action: delete, requires {"id": ...} in body)
-				userGroup.DELETE("", func(c *gin.Context) {
-					// TODO: Parse body *first* to get the target ID.
-					// targetID, idProvided := extractIDFromRequestBody(c)
-					// if !idProvided { /* handle error */ }
-
-					// Check basic permission
-					if !middleware.CheckPermission(c, "users", "delete") {
-						return
-					}
-					// TODO: Add logic here to check if user is deleting self vs other (if needed)
-					// using targetID and userID from context.
-					// TODO: Implement actual logic to delete user
-					server.SuccessResponse(c, "DELETE Users (Delete) endpoint needs implementation", nil)
+				userGroup.DELETE("", middleware.RequirePermission("users", "delete"), func(c *gin.Context) {
+					// Handler needs to perform ownership check before deleting.
+					server.SuccessResponse(c, "DELETE Users (Delete) endpoint needs ownership check and implementation", nil)
 				})
 
-				// --- User's Own API Token Management ---
+				// --- User's Own API Token Management (and Admin) ---
 				// Mounted under /api/v1/users/token
 				selfTokenGroup := userGroup.Group("/token")
 				{
-					// GET /api/v1/users/token - List own API tokens or get specific one via body ID
+					// GET /api/v1/users/token - List/Get tokens (self or admin)
+					// Permission checks are handled inside GetTokensHandler.
 					selfTokenGroup.GET("", api_token.GetTokensHandler)
 
-					// POST /api/v1/users/token - Create a new API token for the user
-					selfTokenGroup.POST("", middleware.RequirePermission("api", "create"), api_token.CreateTokenHandler)
+					// POST /api/v1/users/token - Create token (self or admin)
+					// Permission check (api:create or api:create:all) is inside CreateTokenHandler
+					selfTokenGroup.POST("", api_token.CreateTokenHandler)
 
-					// PUT /api/v1/users/token - Update own token metadata (name, description)
-					selfTokenGroup.PUT("", middleware.RequirePermission("api", "update"), api_token.UpdateTokenHandler)
+					// PUT /api/v1/users/token - Update token (self or admin)
+					// Permission check (api:update or api:update:all) is inside UpdateTokenHandler
+					selfTokenGroup.PUT("", api_token.UpdateTokenHandler)
 
-					// DELETE /api/v1/users/token - Delete own token
-					selfTokenGroup.DELETE("", middleware.RequirePermission("api", "delete"), api_token.DeleteTokenHandler)
+					// DELETE /api/v1/users/token - Delete token (self or admin)
+					// Permission check (api:delete or api:delete:all) is inside DeleteTokenHandler
+					selfTokenGroup.DELETE("", api_token.DeleteTokenHandler)
 				}
+			}
+
+			// Settings Routes
+			settingsGroup := protectedGroup.Group("/settings")
+			{
+				// UI Settings
+				settingsGroup.GET("/ui", middleware.RequirePermission("settings", "read"), uisettings.GetSettingsHandler)
+				settingsGroup.PUT("/ui", middleware.RequirePermission("settings", "update"), uisettings.UpdateSettingsHandler)
 			}
 		}
 	}
 
-	// Custom NoRoute handler to serve static files from './web'
-	// and fallback to index.html for SPA support.
+	// Serve static files specifically from the web/assets directory
+	router.Static("/assets", "./web/assets")
+
+	// Handle all other requests (potential frontend pages or 404s)
 	router.NoRoute(func(c *gin.Context) {
-		// 1. Check if it's an API route
+		// Skip if it's an API call (already handled or should be 404)
 		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
-			server.ErrorResponse(c, http.StatusNotFound, "API route not found")
+			c.JSON(http.StatusNotFound, gin.H{"error": "API route not found"})
 			return
 		}
 
-		// 2. Get absolute path for the web directory
-		webDir, err := filepath.Abs("./web")
-		if err != nil {
-			server.ErrorResponse(c, http.StatusInternalServerError, "Internal server error (web dir)")
-			return
-		}
+		// Determine the target file path based on the request URL
+		requestedPath := c.Request.URL.Path
+		filePath := filepath.Join("web", requestedPath)
 
-		// 3. Construct and clean the potential file path
-		requestedPath := filepath.Join(webDir, filepath.Clean(c.Request.URL.Path))
-
-		// 4. Security Check: Ensure the cleaned absolute path is still within the web directory
-		if !strings.HasPrefix(requestedPath, webDir) {
-			server.ErrorResponse(c, http.StatusBadRequest, "Invalid path (security check failed)")
-			return
-		}
-
-		// 5. Check if the file exists and is not a directory
-		if fileInfo, err := os.Stat(requestedPath); err == nil {
-			if !fileInfo.IsDir() {
-				// Serve the existing file
-				http.ServeFile(c.Writer, c.Request, requestedPath)
+		// Handle root path specifically -> serve index.html
+		if requestedPath == "/" || requestedPath == "/index.html" {
+			filePath = filepath.Join("web", "index.html")
+		} else {
+			// Clean the path to prevent directory traversal
+			filePath = filepath.Clean(filePath)
+			// Ensure the path still starts with "web/" after cleaning
+			if !strings.HasPrefix(filePath, "web"+string(filepath.Separator)) {
+				c.String(http.StatusBadRequest, "Invalid path")
 				return
 			}
-			// If it's a directory, fall through to serving index.html (SPA behavior)
 		}
 
-		// 6. If file doesn't exist or is a directory, serve index.html (SPA fallback)
-		indexPath := filepath.Join(webDir, "index.html")
-		if _, err := os.Stat(indexPath); err == nil {
-			http.ServeFile(c.Writer, c.Request, indexPath)
+		// Check if the requested file exists
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			// If file doesn't exist, try serving index.html for client-side routing
+			// (This assumes a single-page application structure)
+			indexPath := filepath.Join("web", "index.html")
+			if _, indexErr := os.Stat(indexPath); indexErr == nil {
+				serveHTMLTemplate(c, indexPath)
+			} else {
+				c.String(http.StatusNotFound, "Resource not found")
+			}
+			return
+		}
+
+		// Check if it's an HTML file that needs template rendering
+		if strings.HasSuffix(strings.ToLower(filePath), ".html") || strings.HasSuffix(strings.ToLower(filePath), ".htm") {
+			serveHTMLTemplate(c, filePath)
 		} else {
-			// If index.html doesn't exist either, return a proper 404
-			server.ErrorResponse(c, http.StatusNotFound, "Resource not found")
+			// Serve other static files directly
+			c.File(filePath)
 		}
 	})
+}
+
+// serveHTMLTemplate loads UI settings, parses and executes an HTML template
+func serveHTMLTemplate(c *gin.Context, templatePath string) {
+	// Load UI settings
+	settings, err := uisettings.GetUISettings()
+	if err != nil {
+		log.Printf("Error getting UI settings for template %s: %v", templatePath, err)
+		// Fallback to default settings or render a basic error page
+		settings = &models.UISettings{Title: "PanelBase Error"} // Basic fallback
+	}
+
+	// Parse the specified HTML template file
+	tmpl, err := template.ParseFiles(templatePath)
+	if err != nil {
+		log.Printf("Error parsing template %s: %v", templatePath, err)
+		c.String(http.StatusInternalServerError, "Error loading page template")
+		return
+	}
+
+	// Prepare data for the template, explicitly marking CSS and JS
+	templateData := struct {
+		Title      string
+		LogoURL    string
+		FaviconURL string
+		CustomCSS  template.CSS // Mark as safe CSS
+		CustomJS   template.JS  // Mark as safe JS
+	}{
+		Title:      settings.Title,
+		LogoURL:    settings.LogoURL,
+		FaviconURL: settings.FaviconURL,
+		CustomCSS:  template.CSS(settings.CustomCSS),
+		CustomJS:   template.JS(settings.CustomJS),
+	}
+
+	// Explicitly set status code to 200 OK
+	c.Status(http.StatusOK)
+	// Set content type header
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	// Execute the template with the UI settings data
+	err = tmpl.Execute(c.Writer, templateData)
+	if err != nil {
+		log.Printf("Error executing template %s: %v", templatePath, err)
+		// Avoid writing error string if headers already sent
+	}
 }

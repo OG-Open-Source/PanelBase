@@ -25,7 +25,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const logFileName = "panelbase.log"
 const logsDir = "logs" // Consistent with bootstrap
 
 func main() {
@@ -43,6 +42,9 @@ func main() {
 	defer tokenstore.CloseStore()
 
 	// --- Setup Logging (Reduced Output) ---
+	// Generate timestamped log filename
+	timestamp := time.Now().UTC().Format("2006-01-02T15_04_05Z") // Use underscores for filename compatibility
+	logFileName := fmt.Sprintf("%s.log", timestamp)
 	logFilePath := filepath.Join(logsDir, logFileName)
 	logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {

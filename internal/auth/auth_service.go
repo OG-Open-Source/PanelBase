@@ -5,7 +5,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"math/big"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/OG-Open-Source/PanelBase/internal/config"     // For JWTClaims, Audience constants
@@ -16,6 +18,7 @@ import (
 	"github.com/OG-Open-Source/PanelBase/internal/user"       // Import the user service
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -281,3 +284,83 @@ func RefreshTokenHandler(cfg *config.Config) gin.HandlerFunc {
 
 // Add Audience constant if not already present
 const AudienceWeb = "web"
+
+// RegisterUser performs the user registration logic.
+func RegisterUser(req RegisterRequest) (models.User, error) {
+	// 1. Check if username already exists
+	exists, err := user.UsernameExists(req.Username)
+	if err != nil {
+		return models.User{}, fmt.Errorf("failed to check username existence: %w", err)
+	}
+	if exists {
+		return models.User{}, fmt.Errorf("username '%s' is already taken", req.Username)
+	}
+
+	// 2. Hash the password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return models.User{}, fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	// 3. Generate user ID
+	userID := "usr_" + strings.ReplaceAll(uuid.New().String(), "-", "")[:12]
+
+	// 4. Generate user-specific API JWT secret
+	userJwtSecret, err := generateRandomString(32)
+	if err != nil {
+		// Handle error - maybe use a fallback or return error?
+		log.Printf("Warning: Failed to generate JWT secret for new user %s: %v. Using fallback.", req.Username, err)
+		userJwtSecret = "fallback_secret_" + userID // Less secure fallback
+	}
+
+	// 5. Define default permissions for new users
+	defaultScopes := models.UserPermissions{
+		"api":      {"read:list", "read:item", "create", "update", "delete"},
+		"users":    {"update", "delete"}, // Allow updating/deleting self
+		"commands": {},                   // Empty by default
+		"plugins":  {},                   // Empty by default
+		"themes":   {},                   // Empty by default
+	}
+
+	// Default Name to Username if Name is empty in the request
+	if req.Name == "" {
+		req.Name = req.Username
+	}
+
+	// 6. Create the user object
+	newUser := models.User{
+		ID:        userID,
+		Username:  req.Username,
+		Password:  string(hashedPassword),
+		Email:     req.Email,
+		Name:      req.Name, // Use req.Name, which is now guaranteed to be non-empty
+		Active:    true,
+		CreatedAt: models.RFC3339Time(time.Now().UTC()),
+		Scopes:    defaultScopes,
+		API: models.UserAPISettings{
+			JwtSecret: userJwtSecret,
+		},
+	}
+
+	// 7. Add user using user service
+	if err := user.AddUser(newUser); err != nil {
+		return models.User{}, fmt.Errorf("failed to add user: %w", err)
+	}
+
+	return newUser, nil
+}
+
+// generateRandomString generates a random string (used for secrets/IDs).
+// TODO: Consider moving to a shared utility package.
+func generateRandomString(length int) (string, error) {
+	const letters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
+	ret := make([]byte, length)
+	for i := 0; i < length; i++ {
+		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
+		if err != nil {
+			return "", fmt.Errorf("failed to generate random number: %w", err)
+		}
+		ret[i] = letters[num.Int64()]
+	}
+	return string(ret), nil
+}

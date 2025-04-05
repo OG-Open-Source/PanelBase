@@ -28,9 +28,9 @@ type APIToken struct {
 type User struct {
 	ID        string          `json:"id"`                   // Unique user identifier (e.g., usr_...)
 	Username  string          `json:"username"`             // Login username (must be unique)
-	Password  string          `json:"password"`             // Hashed password
+	Password  string          `json:"password"`             // Hashed password (allow loading from JSON)
 	Name      string          `json:"name,omitempty"`       // Optional display name
-	Email     string          `json:"email,omitempty"`      // Optional email address
+	Email     string          `json:"email"`                // Optional email address
 	CreatedAt RFC3339Time     `json:"created_at"`           // Timestamp when the user was created
 	Active    bool            `json:"active"`               // Whether the user account is active
 	LastLogin *RFC3339Time    `json:"last_login,omitempty"` // Pointer to timestamp of last successful login

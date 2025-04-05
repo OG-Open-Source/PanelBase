@@ -21,6 +21,7 @@ const (
 	Magenta = "\033[35m"
 	Cyan    = "\033[36m"
 	White   = "\033[37m"
+	Black   = "\033[30m"
 )
 
 // ANSI background color codes
@@ -74,10 +75,11 @@ func ColorForMethod(method string) string {
 // CustomLogger returns a gin.HandlerFunc (middleware) that logs requests.
 func CustomLogger() gin.HandlerFunc {
 	return gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
-		var statusColor, methodColor, resetColor string
-		statusColor = BgColorForStatus(param.StatusCode)
+		var statusBgColor, methodColor, resetColor, blackColor string
+		statusBgColor = BgColorForStatus(param.StatusCode)
 		methodColor = ColorForMethod(param.Method)
 		resetColor = Reset
+		blackColor = Black
 
 		// Determine log prefix based on path
 		logPrefix := "[WEB]"
@@ -123,7 +125,7 @@ func CustomLogger() gin.HandlerFunc {
 			// isBodyEmpty remains true
 		}
 
-		// Get User ID (sub) from context if available
+		// Get User ID (sub) from context if available, default to "-"
 		var userIDStr string = "-"
 		userIDVal, userExists := param.Keys[ContextKeyUserID]
 		if userExists {
@@ -135,10 +137,10 @@ func CustomLogger() gin.HandlerFunc {
 		}
 
 		// Main log line format
-		logLine := fmt.Sprintf("%s %s | %s %3d %s | %13v | %15s |%s %-7s %s %s%s",
+		logLine := fmt.Sprintf("%s %s | %s%s %3d %s | %13v | %15s |%s %-7s %s %s%s",
 			logPrefix,
 			param.TimeStamp.UTC().Format(time.RFC3339),
-			statusColor, param.StatusCode, resetColor,
+			statusBgColor, blackColor, param.StatusCode, resetColor,
 			param.Latency,
 			param.ClientIP,
 			methodColor, param.Method, resetColor,
@@ -146,8 +148,9 @@ func CustomLogger() gin.HandlerFunc {
 			param.ErrorMessage,
 		)
 
-		// Append User ID and request body on a new line if body is not considered empty
+		// Append second line IF body exists, regardless of method or auth status
 		if !isBodyEmpty {
+			// userIDStr will correctly be "-" if user wasn't authenticated
 			logLine += fmt.Sprintf("\n      %s: %s", userIDStr, requestBodyStr)
 		}
 
