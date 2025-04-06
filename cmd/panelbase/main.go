@@ -19,7 +19,8 @@ import (
 	"github.com/OG-Open-Source/PanelBase/internal/config"     // Use the correct module path
 	"github.com/OG-Open-Source/PanelBase/internal/middleware" // Import middleware
 	"github.com/OG-Open-Source/PanelBase/internal/routes"     // Import the routes package
-	"github.com/OG-Open-Source/PanelBase/internal/tokenstore" // Import token store
+	"github.com/OG-Open-Source/PanelBase/internal/token_store" // Import token store
+	"github.com/OG-Open-Source/PanelBase/internal/user"       // Import user package
 
 	// Remove cors import: "github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -29,17 +30,20 @@ const logsDir = "logs" // Consistent with bootstrap
 
 func main() {
 	// Bootstrap: Ensure config/logs directories exist first
-	// Bootstrap itself logs if it creates files/dirs.
 	if err := bootstrap.Bootstrap(); err != nil {
 		log.Fatalf("Failed to bootstrap application: %v", err)
 	}
 
 	// Initialize the token store database
-	if err := tokenstore.InitStore(); err != nil {
+	if err := token_store.InitStore(); err != nil {
 		log.Fatalf("Failed to initialize token store: %v", err)
 	}
-	// Defer closing the token store
-	defer tokenstore.CloseStore()
+	defer token_store.CloseStore()
+
+	// Load user configuration AFTER bootstrap and token store init
+	if err := user.LoadUsersConfig(); err != nil {
+		log.Fatalf("Failed to load user configuration: %v", err)
+	}
 
 	// --- Setup Logging (Reduced Output) ---
 	// Generate timestamped log filename

@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"bytes"
 	crand "crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -177,24 +178,13 @@ func initializeUsersFile() error {
 			Name:     "Administrator",
 			Email:    "admin@example.com",
 			Scopes: models.UserPermissions{
+				"account":  {"read", "update", "delete"},                             // Manage own account (read, update via PATCH, delete)
+				"users":    {"read:list", "read:item", "create", "update", "delete"}, // Manage other users
+				"api":      {"read:list", "read:item", "create", "update", "delete", "read:list:all", "read:item:all", "create:all", "update:all", "delete:all"},
+				"settings": {"read", "update"}, // Manage global settings
 				"commands": {"read:list", "read:item", "install", "execute", "update", "delete"},
 				"plugins":  {"read:list", "read:item", "install", "update", "delete"},
 				"themes":   {"read:list", "read:item", "install", "update", "delete"},
-				"users":    {"read:list", "read:item", "create", "update", "delete"},
-				"api": {
-					"read:list",     // List own API tokens
-					"read:item",     // Get own specific API token
-					"create",        // Create own API token
-					"update",        // Update own API token
-					"delete",        // Delete own API token
-					"read:list:all", // List ANY user's API tokens
-					"read:item:all", // Get ANY user's specific API token
-					"create:all",    // Create API token for ANY user
-					"update:all",    // Update ANY user's API token
-					"delete:all",    // Delete ANY user's API token
-				},
-				"settings": {"read", "update"},           // Manage global settings
-				"account":  {"read", "update", "delete"}, // Manage own account (read, update via PATCH, delete)
 			},
 		},
 	}
@@ -207,12 +197,12 @@ func initializeUsersFile() error {
 
 	// Create user entries using the models.User struct
 	for _, u := range defaultUserDetails {
-		userID, err := generateRandomString(8) // Generate ID for each user
+		userID, err := generateUserID() // Generate ID for each user
 		if err != nil {
 			log.Printf("Warning: Failed to generate unique user ID for %s: %v. Skipping user.", u.Username, err)
 			continue
 		}
-		userID = "usr_" + userID
+		// userID = "usr_" + userID // Prefix is now handled by generateUserID
 
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
 		if err != nil {
@@ -239,13 +229,12 @@ func initializeUsersFile() error {
 				JwtSecret: userJwtSecret,
 			},
 		}
-		usersConfig.Users[u.Username] = userData // Add user to the map using username as key
+		// usersConfig.Users[u.Username] = userData // Old way: Use username as key
+		usersConfig.Users[userData.ID] = userData // New way: Use UserID as the key
 	}
 
 	// Save the initialized users config using the user service save function
-	// Need to access the save function from the user service.
-	// For now, assume user package has a SaveConfig function (needs adding to userservice.go)
-	if err := user.SaveUsersConfigForBootstrap(usersConfig); err != nil { // Placeholder name
+	if err := user.SaveUsersConfigForBootstrap(usersConfig); err != nil {
 		log.Printf("Error initializing users.json via service: %v", err)
 		return err
 	}
@@ -363,4 +352,15 @@ func isPortInUseError(err error) bool {
 		strings.Contains(errStr, "bind: address already in use") ||
 		// Add other potential OS-specific messages if needed
 		strings.Contains(errStr, "Only one usage of each socket address") // Windows
+}
+
+// generateUserID creates a unique user identifier (e.g., usr_xxxxxxxxxxxxxxxx)
+func generateUserID() (string, error) {
+	bytesLength := 8 // 8 bytes = 16 hex chars
+	b := make([]byte, bytesLength)
+	_, err := crand.Read(b)
+	if err != nil {
+		return "", fmt.Errorf("failed to read random bytes for user ID: %w", err)
+	}
+	return "usr_" + hex.EncodeToString(b), nil
 }

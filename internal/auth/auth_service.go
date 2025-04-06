@@ -5,20 +5,17 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
-	"math/big"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/OG-Open-Source/PanelBase/internal/config"     // For JWTClaims, Audience constants
 	"github.com/OG-Open-Source/PanelBase/internal/middleware" // Import middleware
 	"github.com/OG-Open-Source/PanelBase/internal/models"     // For User structure
 	"github.com/OG-Open-Source/PanelBase/internal/server"     // For Response functions
-	"github.com/OG-Open-Source/PanelBase/internal/tokenstore" // Import token store
+	"github.com/OG-Open-Source/PanelBase/internal/token_store"// Import token store
 	"github.com/OG-Open-Source/PanelBase/internal/user"       // Import the user service
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -122,8 +119,8 @@ func LoginHandler(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		// 6b. Store session token info in tokenstore
-		sessionInfo := tokenstore.TokenInfo{
+		// 6b. Store session token info in token_store
+		sessionInfo := token_store.TokenInfo{
 			UserID:    userInstance.ID,
 			Name:      "Web Session",
 			Audience:  AudienceWeb,
@@ -131,7 +128,7 @@ func LoginHandler(cfg *config.Config) gin.HandlerFunc {
 			CreatedAt: models.RFC3339Time(issuedAt),       // Convert to custom type
 			ExpiresAt: models.RFC3339Time(expirationTime), // Convert to custom type
 		}
-		if err := tokenstore.StoreToken(sessionID, sessionInfo); err != nil {
+		if err := token_store.StoreToken(sessionID, sessionInfo); err != nil {
 			log.Printf("Warning: Failed to store session token metadata for user %s (jti: %s): %v", userInstance.Username, sessionID, err)
 		}
 
@@ -256,8 +253,8 @@ func RefreshTokenHandler(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		// 5. Store new session token info in tokenstore
-		newSessionInfo := tokenstore.TokenInfo{
+		// 5. Store new session token info in token_store
+		newSessionInfo := token_store.TokenInfo{
 			UserID:    userID,
 			Name:      "Web Session",
 			Audience:  AudienceWeb,
@@ -265,12 +262,12 @@ func RefreshTokenHandler(cfg *config.Config) gin.HandlerFunc {
 			CreatedAt: models.RFC3339Time(newIssuedAt),       // Convert to custom type
 			ExpiresAt: models.RFC3339Time(newExpirationTime), // Convert to custom type
 		}
-		if err := tokenstore.StoreToken(newSessionID, newSessionInfo); err != nil {
+		if err := token_store.StoreToken(newSessionID, newSessionInfo); err != nil {
 			log.Printf("Warning: Failed to store refreshed session token metadata for user %s (jti: %s): %v", userInstance.Username, newSessionID, err)
 		}
 
 		// 6. Revoke the OLD session token
-		if err := tokenstore.RevokeToken(oldTokenJTI); err != nil {
+		if err := token_store.RevokeToken(oldTokenJTI); err != nil {
 			log.Printf("Warning: Failed to revoke old session token (jti: %s) after refresh for user %s: %v", oldTokenJTI, userInstance.Username, err)
 		}
 
@@ -285,82 +282,129 @@ func RefreshTokenHandler(cfg *config.Config) gin.HandlerFunc {
 // Add Audience constant if not already present
 const AudienceWeb = "web"
 
-// RegisterUser performs the user registration logic.
-func RegisterUser(req RegisterRequest) (models.User, error) {
-	// 1. Check if username already exists
-	exists, err := user.UsernameExists(req.Username)
+// RegisterPayload defines the structure for the registration request body.
+// Assuming this is defined in models package, otherwise define here.
+type RegisterPayload struct { // If not in models, define here
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+	Email    string `json:"email"` // Removed binding:"required"
+	Name     string `json:"name"`
+}
+
+// RegisterHandler handles new user registration.
+func RegisterHandler(c *gin.Context) {
+	var payload RegisterPayload // Use local or models.RegisterPayload
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		server.ErrorResponse(c, http.StatusBadRequest, "Invalid request payload: "+err.Error())
+		return
+	}
+
+	// Basic validation (Email is now optional)
+	if payload.Username == "" || payload.Password == "" {
+		server.ErrorResponse(c, http.StatusBadRequest, "Username and password are required")
+		return
+	}
+
+	// Check if username already exists
+	_, exists, err := user.GetUserByUsername(payload.Username)
 	if err != nil {
-		return models.User{}, fmt.Errorf("failed to check username existence: %w", err)
+		server.ErrorResponse(c, http.StatusInternalServerError, "Error checking username availability: "+err.Error())
+		return
 	}
 	if exists {
-		return models.User{}, fmt.Errorf("username '%s' is already taken", req.Username)
+		server.ErrorResponse(c, http.StatusConflict, "Username already exists")
+		return
 	}
 
-	// 2. Hash the password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	// Hash the password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(payload.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return models.User{}, fmt.Errorf("failed to hash password: %w", err)
+		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to hash password: "+err.Error())
+		return
 	}
 
-	// 3. Generate user ID
-	userID := "usr_" + strings.ReplaceAll(uuid.New().String(), "-", "")[:12]
+	// Generate user ID
+	userID, err := generateUserID()
+	if err != nil {
+		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate user ID: "+err.Error())
+		return
+	}
 
-	// 4. Generate user-specific API JWT secret
+	// Generate user-specific JWT secret
 	userJwtSecret, err := generateRandomString(32)
 	if err != nil {
-		// Handle error - maybe use a fallback or return error?
-		log.Printf("Warning: Failed to generate JWT secret for new user %s: %v. Using fallback.", req.Username, err)
-		userJwtSecret = "fallback_secret_" + userID // Less secure fallback
+		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate JWT secret: "+err.Error())
+		return
 	}
 
-	// 5. Define default permissions for new users
+	// Determine user's name
+	userName := payload.Name
+	if userName == "" {
+		userName = payload.Username
+	}
+
+	// Define default scopes for new users (MODIFIED HERE)
 	defaultScopes := models.UserPermissions{
-		"api":      {"read:list", "read:item", "create", "update", "delete"},
-		"users":    {"update", "delete"}, // Allow updating/deleting self
-		"commands": {},                   // Empty by default
-		"plugins":  {},                   // Empty by default
-		"themes":   {},                   // Empty by default
+		"account": {"read", "update", "delete"},
+		"api":     {"read:list", "read:item", "create", "update", "delete"},
+		// No other scopes assigned by default
 	}
 
-	// Default Name to Username if Name is empty in the request
-	if req.Name == "" {
-		req.Name = req.Username
-	}
-
-	// 6. Create the user object
+	// Create the new user object
 	newUser := models.User{
 		ID:        userID,
-		Username:  req.Username,
+		Username:  payload.Username,
 		Password:  string(hashedPassword),
-		Email:     req.Email,
-		Name:      req.Name, // Use req.Name, which is now guaranteed to be non-empty
-		Active:    true,
+		Name:      userName,
+		Email:     payload.Email,
 		CreatedAt: models.RFC3339Time(time.Now().UTC()),
-		Scopes:    defaultScopes,
+		Active:    true,
+		Scopes:    defaultScopes, // Assign the restricted default scopes
 		API: models.UserAPISettings{
 			JwtSecret: userJwtSecret,
 		},
 	}
 
-	// 7. Add user using user service
+	// Save the new user
 	if err := user.AddUser(newUser); err != nil {
-		return models.User{}, fmt.Errorf("failed to add user: %w", err)
+		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to register user: "+err.Error())
+		return
 	}
 
-	return newUser, nil
+	// Create response map, explicitly omitting sensitive data like password and secrets
+	responseMap := map[string]interface{}{
+		"id":         newUser.ID,
+		"username":   newUser.Username,
+		"name":       newUser.Name,
+		"email":      newUser.Email,
+		"created_at": newUser.CreatedAt, // Assuming RFC3339Time marshals correctly
+		"active":     newUser.Active,
+		"scopes":     newUser.Scopes,
+		// "password" key is omitted
+		// "api" key (containing jwt_secret) is omitted
+	}
+
+	server.SuccessResponse(c, "User registered successfully", responseMap)
 }
 
-// generateRandomString generates a random string (used for secrets/IDs).
-// TODO: Consider moving to a shared utility package.
-func generateRandomString(length int) (string, error) {
-	const letters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
-	ret := make([]byte, length)
-	for i := 0; i < length; i++ {
-		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
-		if err != nil {
-			return "", fmt.Errorf("failed to generate random number: %w", err)
-		}
-		ret[i] = letters[num.Int64()]
+// generateUserID creates a unique user identifier.
+func generateUserID() (string, error) {
+	bytesLength := 8
+	b := make([]byte, bytesLength)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", fmt.Errorf("failed to read random bytes for user ID: %w", err)
 	}
-	return string(ret), nil
+	return "usr_" + hex.EncodeToString(b), nil
+}
+
+// generateRandomString generates a secure random hex string.
+// (Assuming this function exists or is added)
+func generateRandomString(length int) (string, error) {
+	b := make([]byte, length)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }

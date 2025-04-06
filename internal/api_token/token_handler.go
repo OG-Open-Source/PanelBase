@@ -9,7 +9,7 @@ import (
 	"github.com/OG-Open-Source/PanelBase/internal/middleware"
 	"github.com/OG-Open-Source/PanelBase/internal/models"
 	"github.com/OG-Open-Source/PanelBase/internal/server"
-	"github.com/OG-Open-Source/PanelBase/internal/tokenstore"
+	"github.com/OG-Open-Source/PanelBase/internal/token_store"
 	"github.com/OG-Open-Source/PanelBase/internal/user"
 	"github.com/gin-gonic/gin"
 )
@@ -252,8 +252,8 @@ func DeleteTokenHandler(c *gin.Context) {
 
 	log.Printf("[Placeholder] DeleteTokenHandler: Action permitted for user %s targeting user %s (token: %s) with perm: %s", requestingUserID, targetUserID, tokenID, requiredPermission)
 
-	// Call actual revoke from tokenstore
-	err := tokenstore.RevokeToken(tokenID)
+	// Call actual revoke from token_store
+	err := token_store.RevokeToken(tokenID)
 	if err != nil {
 		// Handle not found gracefully
 		if strings.Contains(strings.ToLower(err.Error()), "not found") {

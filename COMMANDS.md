@@ -1,16 +1,7 @@
 ```bash
-PORT=23160 # Or your actual configured port
+PORT=48685 # Or your actual configured port
 TOKEN=$(curl -s -X POST http://localhost:$PORT/api/v1/auth/login -H "Content-Type: application/json" -d '{"username":"admin", "password":"admin"}' | jq -r '.data.token')
 echo "Using Token: $TOKEN"
-
-# Example: Generate a token for testing (if needed)
-ADMIN_TOKEN_INFO=$(curl -s -X POST http://localhost:$PORT/api/v1/users/token) \
-#     -H "Authorization: Bearer $TOKEN" \
-#     -H "Content-Type: application/json" \
-#     -d '{"name":"Test Token","duration":"1h","scopes":{"api":["read:list"]}}')
-# TEST_TOKEN_ID=$(echo $ADMIN_TOKEN_INFO | jq -r '.data.id')
-# echo "Test Token ID: $TEST_TOKEN_ID"
-TEST_TOKEN_ID="tok_REPLACE_WITH_ACTUAL_ID" # <-- Replace with an actual token ID
 ```
 
 ## API v1 Endpoints
@@ -35,8 +26,7 @@ TEST_TOKEN_ID="tok_REPLACE_WITH_ACTUAL_ID" # <-- Replace with an actual token ID
     "status": "success",
     "message": "Login successful",
     "data": {
-      "token": "eyJhbGciOi...",
-      "expires_at": "2025-04-06T12:00:00Z"
+      "token": "eyJhbGciOi..."
     }
   }
   ```
@@ -56,6 +46,20 @@ TEST_TOKEN_ID="tok_REPLACE_WITH_ACTUAL_ID" # <-- Replace with an actual token ID
   }
   ```
 - **Response Body (Success):** User object (excluding password).
+  ```json
+  {
+    "status": "success",
+    "message": "User registered successfully",
+    "data": {
+      "active": true,
+      "created_at": "2025-04-06T12:41:09Z",
+      "email": "random6759@example.com",
+      "id": "usr_f4b14d9f079a",
+      "name": "GUK853H7ox",
+      "username": "GUK853H7ox"
+    }
+  }
+  ```
 
 **Refresh Token**
 

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/OG-Open-Source/PanelBase/internal/models"
-	"github.com/OG-Open-Source/PanelBase/internal/tokenstore"
+	"github.com/OG-Open-Source/PanelBase/internal/token_store"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -199,7 +199,7 @@ func CreateAPIToken(user models.User, payload models.CreateAPITokenPayload) (str
 	}
 
 	// 7. Store Token Info in the token store (using apiTokenMeta with finalScopes)
-	storeInfo := tokenstore.TokenInfo{
+	storeInfo := token_store.TokenInfo{
 		UserID:    user.ID,
 		Name:      apiTokenMeta.Name,
 		Audience:  AudienceAPI,
@@ -207,7 +207,7 @@ func CreateAPIToken(user models.User, payload models.CreateAPITokenPayload) (str
 		CreatedAt: apiTokenMeta.CreatedAt,
 		ExpiresAt: apiTokenMeta.ExpiresAt,
 	}
-	if err := tokenstore.StoreToken(tokenID, storeInfo); err != nil {
+	if err := token_store.StoreToken(tokenID, storeInfo); err != nil {
 		return "", models.APIToken{}, "", fmt.Errorf("failed to store token metadata: %w", err)
 	}
 

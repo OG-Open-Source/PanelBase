@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - (Future changes will go here)
 
+## [0.7.1] - 2025-04-06 Minor Adjustments
+
+### Changed
+
+- **Registration**: The `email` field is now optional during user registration (`POST /api/v1/auth/register`).
+- **User Management**: Renamed user data file key from `username` to `user_id` (`configs/users.json`). Updated user service (`internal/user/userservice.go`) and bootstrap process (`internal/bootstrap/bootstrap.go`) accordingly.
+
+### Fixed
+
+- Resolved build errors caused by duplicate function declarations and incorrect imports related to previous file edits.
+- Corrected the user registration response (`POST /api/v1/auth/register`) to completely omit the `password` and `api` keys, rather than just setting them to empty values.
+
 ## [0.7.0] - 2025-04-06 New Permissions and HTTP Method Support
 
 ### Added

@@ -10,7 +10,7 @@ import (
 	"github.com/OG-Open-Source/PanelBase/internal/config"
 	"github.com/OG-Open-Source/PanelBase/internal/models"
 	"github.com/OG-Open-Source/PanelBase/internal/server"     // For ErrorResponse
-	"github.com/OG-Open-Source/PanelBase/internal/tokenstore" // Import tokenstore
+	"github.com/OG-Open-Source/PanelBase/internal/token_store" // Import token_store
 	"github.com/OG-Open-Source/PanelBase/internal/user"       // Import user service
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -243,9 +243,9 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 				c.Set(ContextKeyScopes, models.UserPermissions{}) // Set empty map
 			}
 
-			// 4. Check revocation status using tokenstore
+			// 4. Check revocation status using token_store
 			if tokenJTI != "" {
-				isRevoked, err := tokenstore.IsTokenRevoked(tokenJTI)
+				isRevoked, err := token_store.IsTokenRevoked(tokenJTI)
 				if err != nil {
 					// Log the error and return 500 Internal Server Error
 					log.Printf("ERROR: Failed to check token revocation status for jti %s: %v", tokenJTI, err)
