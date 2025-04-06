@@ -1,4 +1,4 @@
-package uisettings
+package ui_settings
 
 import (
 	"encoding/json"

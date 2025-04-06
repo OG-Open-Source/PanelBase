@@ -21,278 +21,216 @@ TEST_TOKEN_ID="tok_REPLACE_WITH_ACTUAL_ID" # <-- Replace with an actual token ID
 
 - **Method:** `POST`
 - **Path:** `/api/v1/auth/login`
-- **Description:** Authenticates a user and returns a JWT token (valid for web sessions by default).
-- **Permissions:** None (Public)
+- **Description:** Authenticates a user and returns a JWT (`web_session` audience) set as an HTTP-only cookie and also in the response body.
 - **Request Body:**
   ```json
   {
-    "username": "user",
-    "password": "password"
+    "username": "admin",
+    "password": "admin"
   }
   ```
-- **Example:** (Used in header to get `$TOKEN`)
+- **Response Body (Success):**
+  ```json
+  {
+    "status": "success",
+    "message": "Login successful",
+    "data": {
+      "token": "eyJhbGciOi...",
+      "expires_at": "2025-04-06T12:00:00Z"
+    }
+  }
+  ```
 
 **Register**
 
 - **Method:** `POST`
 - **Path:** `/api/v1/auth/register`
-- **Description:** Registers a new user.
-- **Permissions:** None (Public)
+- **Description:** Creates a new user account. Default permissions are assigned.
 - **Request Body:**
   ```json
   {
     "username": "newuser",
-    "password": "complexpassword",
-    "email": "user@example.com",
-    "name": "Optional Name" // Optional
+    "password": "password123",
+    "email": "newuser@example.com",
+    "name": "New User" // Optional, defaults to username if omitted
   }
   ```
-- **Example:**
-  ```bash
-  curl -X POST http://localhost:$PORT/api/v1/auth/register \
-       -H "Content-Type: application/json" \
-       -d '{"username":"testuser","password":"testpassword123","email":"test@example.com"}'
-  ```
+- **Response Body (Success):** User object (excluding password).
 
 **Refresh Token**
 
 - **Method:** `POST`
 - **Path:** `/api/v1/auth/token`
-- **Description:** Refreshes an existing web session JWT token. Requires a valid token passed via Cookie (`panelbase_jwt`).
-- **Permissions:** Requires valid web session token.
-- **Request Body:** None
-- **Example:** (Requires browser context or manually setting the cookie)
+- **Requires Auth:** Yes (Valid `web_session` token via Cookie or Header)
+- **Description:** Refreshes an existing `web_session` token, returning a new token and revoking the old one.
+- **Response Body (Success):** Same structure as Login response.
+
+### Account Management (Self) (`/api/v1/account`)
+
+_(Note: These endpoints manage the logged-in user's own account)_
+
+**Get Own Profile**
+
+- **Method:** `GET`
+- **Path:** `/api/v1/account`
+- **Requires Auth:** Yes
+- **Permissions:** `account:read`
+- **Description:** Retrieves the profile information of the currently authenticated user.
+
+**Update Own Profile**
+
+- **Method:** `PATCH`
+- **Path:** `/api/v1/account`
+- **Requires Auth:** Yes
+- **Permissions:** `account:update`
+- **Description:** Partially updates the profile information (e.g., name, email) or password of the currently authenticated user. Only include fields to be updated.
+- **Request Body Examples:**
+  ```json
+  // Update name
+  { "name": "Updated Name" }
+  ```
+  ```json
+  // Update password
+  { "password": "newS3cureP@ssword" }
+  ```
+
+**Delete Own Account**
+
+- **Method:** `DELETE`
+- **Path:** `/api/v1/account`
+- **Requires Auth:** Yes
+- **Permissions:** `account:delete`
+- **Description:** Deletes the account of the currently authenticated user.
+
+### User Management (Admin) (`/api/v1/users`)
+
+_(Note: These endpoints are for administrative management of user accounts)_
+
+**List/Get Users**
+
+- **Method:** `GET`
+- **Path:** `/api/v1/users`
+- **Requires Auth:** Yes
+- **Permissions:** `users:read:list` or `users:read:item` (Handler needs implementation)
+- **Description:** Lists all users (requires `users:read:list`). Can potentially be used to get a specific user by ID (requires `users:read:item`), but details TBD.
+
+**Create User**
+
+- **Method:** `POST`
+- **Path:** `/api/v1/users`
+- **Requires Auth:** Yes
+- **Permissions:** `users:create`
+- **Description:** Creates a new user account (Handler needs implementation).
+- **Request Body:** Similar to `/auth/register`.
+
+**Update User**
+
+- **Method:** `PATCH`
+- **Path:** `/api/v1/users` (or potentially `/api/v1/users/{id}` - TBD)
+- **Requires Auth:** Yes
+- **Permissions:** `users:update`
+- **Description:** Partially updates a user's details (Handler needs implementation). Using PATCH on the collection is non-standard; a route like `/users/{id}` might be preferable.
+- **Request Body:** `{"id": "usr_...", "name": "...", ...}`
+
+**Delete User**
+
+- **Method:** `DELETE`
+- **Path:** `/api/v1/users/{id}` (Example route, actual TBD)
+- **Requires Auth:** Yes
+- **Permissions:** `users:delete`
+- **Description:** Deletes a specific user account (Handler needs implementation).
 
 ### API Token Management (`/api/v1/users/token`)
 
-Requires Authorization Header: `-H "Authorization: Bearer $TOKEN"`
-
-**Get API Tokens**
+**List/Get API Tokens**
 
 - **Method:** `GET`
 - **Path:** `/api/v1/users/token`
-- **Description:** Retrieves API token metadata.
-  - No request body: Lists tokens for the current user.
-  - Body `{"id": "TOKEN_JTI"}`: Gets details for a specific token.
-- **Permissions:**
-  - List self: `read:list`
-  - Get self item: `read:item`
-  - Get others' item: `read:item:all` (Admin only, based on token ownership)
-- **Request Body (Optional for specific token):**
-  ```json
-  {
-    "id": "tok_..."
-  }
-  ```
-- **Examples:**
-
-  ```bash
-  # List own tokens (No Request Body)
-  curl -X GET http://localhost:$PORT/api/v1/users/token \
-       -H "Authorization: Bearer $TOKEN"
-
-  # Get own token with JTI (replace TEST_TOKEN_ID)
-  curl -X GET http://localhost:$PORT/api/v1/users/token \
-       -H "Authorization: Bearer $TOKEN" \
-       -H "Content-Type: application/json" \
-       -d "{\"id\": \"$TEST_TOKEN_ID\"}"
-
-  # Get someone else's token (Admin, replace TEST_TOKEN_ID)
-  curl -X GET http://localhost:$PORT/api/v1/users/token \
-       -H "Authorization: Bearer $TOKEN" \
-       -H "Content-Type: application/json" \
-       -d "{\"id\": \"tok_SOME_OTHER_USERS_TOKEN_ID\"}" # Requires read:item:all
-  ```
+- **Requires Auth:** Yes
+- **Permissions:** `api:read:list` (for self) or `api:read:list:all` (for admin, requires `user_id` in body - TBD)
+- **Description:** Lists API tokens for the current user or, if admin, for a specified user (requires `user_id`). Can potentially get a specific token by `token_id`.
+- **Request Body (Admin/Get Specific):** `{"user_id": "usr_...", "token_id": "tkn_..."}` (Optional fields)
 
 **Create API Token**
 
 - **Method:** `POST`
 - **Path:** `/api/v1/users/token`
-- **Description:** Creates a new API token.
-- **Permissions:**
-  - Create for self: `api:create`
-  - Create for other user: `api:create:all`
+- **Requires Auth:** Yes
+- **Permissions:** `api:create` (for self) or `api:create:all` (for admin, requires `user_id`)
+- **Description:** Creates a new API token for the current user or a specified user.
 - **Request Body:**
-
   ```json
-  // For self
   {
-    "name": "My New Token",
-    "duration": "P7D", // ISO 8601 Date Duration (e.g., P7D, P1M, P1Y6M)
-    "description": "Optional description", // Optional
-    "scopes": { "api": ["read:list"] } // Optional, defaults to user scopes if omitted.
-  }
-
-  // For another user (Admin)
-  {
-    "username": "testuser",
-    "name": "Token For TestUser",
-    "duration": "P30D", // ISO 8601 Date Duration
-    "scopes": { "api": ["read:list"] } // Optional
+    "user_id": "usr_...", // Required only for admin action (api:create:all)
+    "name": "My Script Token",
+    "description": "Token for automation script", // Optional
+    "duration": "P30D", // Optional (ISO 8601 Duration), defaults based on config
+    "scopes": ["commands:execute"] // Optional, defaults to user's scopes if omitted
   }
   ```
-
-- **Examples:**
-
-  ```bash
-  # Create token for self (scopes optional, duration P90D)
-  curl -X POST http://localhost:$PORT/api/v1/users/token \
-       -H "Authorization: Bearer $TOKEN" \
-       -H "Content-Type: application/json" \
-       -d '{"name":"MyCLI Token","duration":"P90D"}'
-
-  # Create token for user 'testuser' (Admin, duration P1H -> use P1D instead)
-  curl -X POST http://localhost:$PORT/api/v1/users/token \
-       -H "Authorization: Bearer $TOKEN" \
-       -H "Content-Type: application/json" \
-       -d '{"username":"testuser","name":"Test User Token","duration":"P1D"}' # Using P1D for 1 day
-  ```
+- **Response Body (Success):** Token details including the JWT string.
 
 **Update API Token**
 
-- **Method:** `PUT`
+- **Method:** `PATCH`
 - **Path:** `/api/v1/users/token`
-- **Description:** Updates the metadata (name, description, scopes) of an existing API token.
-- **Permissions:**
-  - Update own token: `api:update`
-  - Update other's token: `api:update:all`
+- **Requires Auth:** Yes
+- **Permissions:** `api:update` (for self) or `api:update:all` (for admin, requires `user_id`)
+- **Description:** Partially updates an API token's metadata (e.g., name, description, scopes). Requires `token_id`.
 - **Request Body:**
-
   ```json
-  // Update own token
   {
-    "id": "tok_...", // JTI of the token to update
-    "name": "Updated Token Name", // Optional
-    "description": "New optional description", // Optional
-    "scopes": { "api": ["read:list"] } // Optional
+    "token_id": "tkn_...", // Required
+    "user_id": "usr_...", // Required only for admin action (api:update:all)
+    "name": "Updated Token Name", // Optional field to update
+    "description": "New desc" // Optional field to update
+    // Cannot update scopes or duration via PATCH currently
   }
-
-  // Update other's token (Admin)
-  {
-    "username": "testuser",
-    "id": "tok_...", // JTI of the token to update
-    "name": "Updated TestUser Token Name" // Optional
-  }
-  ```
-
-- **Examples:**
-
-  ```bash
-  # Update own token 'tok_...'
-  curl -X PUT http://localhost:$PORT/api/v1/users/token \
-       -H "Authorization: Bearer $TOKEN" \
-       -H "Content-Type: application/json" \
-       -d '{"id":"tok_...","name":"Renamed My Token"}'
-
-  # Update user 'testuser' token 'tok_...' (Admin)
-  curl -X PUT http://localhost:$PORT/api/v1/users/token \
-       -H "Authorization: Bearer $TOKEN" \
-       -H "Content-Type: application/json" \
-       -d '{"username":"testuser","id":"tok_...","description":"Admin updated description"}'
   ```
 
 **Delete API Token**
 
 - **Method:** `DELETE`
 - **Path:** `/api/v1/users/token`
-- **Description:** Deletes (revokes) an API token.
-- **Permissions:**
-  - Delete own token: `api:delete`
-  - Delete other's token: `api:delete:all`
+- **Requires Auth:** Yes
+- **Permissions:** `api:delete` (for self) or `api:delete:all` (for admin, requires `user_id`)
+- **Description:** Deletes (revokes) an API token. Requires `token_id`.
 - **Request Body:**
-
   ```json
-  // Delete own token
   {
-    "token_id": "tok_..." // JTI of the token to delete
+    "token_id": "tkn_...", // Required
+    "user_id": "usr_..." // Required only for admin action (api:delete:all)
   }
-
-  // Delete other's token (Admin)
-  {
-    "username": "testuser",
-    "token_id": "tok_..." // JTI of the token to delete
-  }
-  ```
-
-- **Examples:**
-
-  ```bash
-  # Delete own token 'tok_...'
-  curl -X DELETE http://localhost:$PORT/api/v1/users/token \
-       -H "Authorization: Bearer $TOKEN" \
-       -H "Content-Type: application/json" \
-       -d '{"token_id":"tok_..."}'
-
-  # Delete user 'testuser' token 'tok_...' (Admin)
-  curl -X DELETE http://localhost:$PORT/api/v1/users/token \
-       -H "Authorization: Bearer $TOKEN" \
-       -H "Content-Type: application/json" \
-       -d '{"username":"testuser","token_id":"tok_..."}'
   ```
 
 ### Settings (`/api/v1/settings`)
-
-Requires Authorization Header: `-H "Authorization: Bearer $TOKEN"`
 
 **Get UI Settings**
 
 - **Method:** `GET`
 - **Path:** `/api/v1/settings/ui`
-- **Description:** Retrieves global UI settings (title, logo, etc.).
+- **Requires Auth:** Yes
 - **Permissions:** `settings:read`
-- **Example:**
-  ```bash
-  curl -X GET http://localhost:$PORT/api/v1/settings/ui \
-       -H "Authorization: Bearer $TOKEN"
-  ```
+- **Description:** Retrieves global UI settings.
 
 **Update UI Settings**
 
-- **Method:** `PUT`
+- **Method:** `PUT` (or potentially PATCH)
 - **Path:** `/api/v1/settings/ui`
-- **Description:** Updates global UI settings. Only provided fields are updated.
+- **Requires Auth:** Yes
 - **Permissions:** `settings:update`
-- **Request Body:**
+- **Description:** Updates global UI settings. PUT typically replaces the entire structure, while PATCH could allow partial updates. Only provide fields to be updated.
+- **Request Body Examples (PATCH):**
+  ```json
+  { "title": "My Custom Title" }
+  ```
   ```json
   {
-    "title": "My Custom Panel Title", // Optional
-    "logo_url": "/assets/images/custom_logo.png", // Optional
-    "favicon_url": "/assets/images/favicon.ico", // Optional
-    "custom_css": "body { background-color: #f0f0f0; }", // Optional
-    "custom_js": "console.log('UI settings updated!');" // Optional
+    "logo_url": "/assets/new_logo.png",
+    "custom_css": "body { background: #eee; }"
   }
   ```
-- **Example:**
 
-  ```bash
-  # Update only the title
-  curl -X PUT http://localhost:$PORT/api/v1/settings/ui \
-       -H "Authorization: Bearer $TOKEN" \
-       -H "Content-Type: application/json" \
-       -d '{"title":"My Awesome Panel"}'
+### Commands, Plugins, Themes
 
-  # Update multiple fields
-  curl -X PUT http://localhost:$PORT/api/v1/settings/ui \
-       -H "Authorization: Bearer $TOKEN" \
-       -H "Content-Type: application/json" \
-       -d '{"logo_url":"/img/new_logo.svg", "custom_css":"h1 { color: blue; }"}'
-  ```
-
-### User Management (`/api/v1/users`)
-
-Requires Authorization Header: `-H "Authorization: Bearer $TOKEN"`
-_(Note: Handlers for these are mostly placeholders and need implementation)_
-
-- **GET /users**: List/Get users (Requires `users:read:list`/`users:read:item`, handler needs implementation)
-- **POST /users**: Create user (Requires `users:create`, handler needs implementation)
-- **PUT /users**: Update user (Requires `users:update`, handler needs implementation + ownership check)
-- **DELETE /users**: Delete user (Requires `users:delete`, handler needs implementation + ownership check)
-
-### Other Resources (Placeholders)
-
-Requires Authorization Header: `-H "Authorization: Bearer $TOKEN"`
-_(Note: These are placeholders and need implementation and permission checks)_
-
-- `/api/v1/commands` (GET, POST, PUT, DELETE)
-- `/api/v1/plugins` (GET, POST, PUT, DELETE)
-- `/api/v1/themes` (GET, POST, PUT, DELETE)
+_(Endpoints exist but handlers are placeholders. Permissions defined but not enforced yet. Updates might typically use PUT.)_

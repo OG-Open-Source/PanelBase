@@ -11,6 +11,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - (Future changes will go here)
 
+## [0.7.0] - 2025-04-06 New Permissions and HTTP Method Support
+
+### Added
+
+- **Permissions**: Introduced new `account` permission scope for self-service account actions (`read`, `update`, `delete`), distinguishing it from the administrative `users` scope.
+- **Documentation**: Created `PERMISSION.md` to document all defined permissions and their usage.
+
+### Changed
+
+- **Permissions**: Refined default admin permissions to include the new `account` scope.
+- **HTTP Methods**: Standardized the use of HTTP methods for updates across resources:
+  - `PATCH` is now used for routes updating `account`, `users`, `api`, and `settings` (`/api/v1/users`, `/api/v1/settings/ui`, `/api/v1/users/token`).
+  - `PUT` remains the intended method for `commands`, `plugins`, `themes`.
+- **API Token Admin**: Administrative actions (`*:all`) on API tokens (`/api/v1/users/token`) now require targeting the user via `user_id` in the request body instead of `username`.
+- **Documentation**: Updated `PERMISSION.md` and `COMMANDS.md` to reflect the new `account` scope, HTTP method usage (PATCH/PUT), and `user_id` requirement for admin token actions.
+
+### Fixed
+
+- Updated API routes in `internal/routes/routes.go` to use `PATCH` instead of `PUT` for `users` and `settings` updates.
+
 ## [0.6.0] - 2025-04-06 UI Settings and Template Rendering
 
 ### Added

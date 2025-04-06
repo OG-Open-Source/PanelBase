@@ -15,7 +15,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/OG-Open-Source/PanelBase/internal/models"
-	"github.com/OG-Open-Source/PanelBase/internal/uisettings"
+	"github.com/OG-Open-Source/PanelBase/internal/ui_settings"
 	"github.com/OG-Open-Source/PanelBase/internal/user" // Import the user service
 	"golang.org/x/crypto/bcrypt"
 )
@@ -81,7 +81,7 @@ func Bootstrap() error {
 	}
 
 	// Check/Create ui_settings.json
-	if err := uisettings.EnsureUISettingsFile(); err != nil {
+	if err := ui_settings.EnsureUISettingsFile(); err != nil {
 		return err
 	}
 
@@ -182,10 +182,19 @@ func initializeUsersFile() error {
 				"themes":   {"read:list", "read:item", "install", "update", "delete"},
 				"users":    {"read:list", "read:item", "create", "update", "delete"},
 				"api": {
-					"read:list", "read:item", "create", "update", "delete", // Standard self-perms
-					"read:list:all", "read:item:all", "create:all", "update:all", "delete:all", // Admin perms
+					"read:list",     // List own API tokens
+					"read:item",     // Get own specific API token
+					"create",        // Create own API token
+					"update",        // Update own API token
+					"delete",        // Delete own API token
+					"read:list:all", // List ANY user's API tokens
+					"read:item:all", // Get ANY user's specific API token
+					"create:all",    // Create API token for ANY user
+					"update:all",    // Update ANY user's API token
+					"delete:all",    // Delete ANY user's API token
 				},
-				"settings": {"read", "update"},
+				"settings": {"read", "update"},           // Manage global settings
+				"account":  {"read", "update", "delete"}, // Manage own account (read, update via PATCH, delete)
 			},
 		},
 	}

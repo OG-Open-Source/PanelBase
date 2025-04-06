@@ -14,7 +14,7 @@ import (
 	"github.com/OG-Open-Source/PanelBase/internal/middleware"
 	"github.com/OG-Open-Source/PanelBase/internal/models"
 	"github.com/OG-Open-Source/PanelBase/internal/server"
-	"github.com/OG-Open-Source/PanelBase/internal/uisettings"
+	"github.com/OG-Open-Source/PanelBase/internal/ui_settings"
 	"github.com/gin-gonic/gin"
 )
 
@@ -115,9 +115,11 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 				})
 
 				// PUT /users - Update user (Action: update, requires {"id": ...} in body)
-				userGroup.PUT("", middleware.RequirePermission("users", "update"), func(c *gin.Context) {
+				// PATCH /users - Update user (Action: update)
+				userGroup.PATCH("", middleware.RequirePermission("users", "update"), func(c *gin.Context) {
 					// Handler needs to perform ownership check before updating.
-					server.SuccessResponse(c, "PUT Users (Update) endpoint needs ownership check and implementation", nil)
+					// Note: Using PATCH on collection is non-standard. Consider PATCH /users/{id}
+					server.SuccessResponse(c, "PATCH Users (Update) endpoint needs ownership check and implementation", nil)
 				})
 
 				// DELETE /users - Delete user (Action: delete, requires {"id": ...} in body)
@@ -140,7 +142,9 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 
 					// PUT /api/v1/users/token - Update token (self or admin)
 					// Permission check (api:update or api:update:all) is inside UpdateTokenHandler
-					selfTokenGroup.PUT("", api_token.UpdateTokenHandler)
+					// PATCH /api/v1/users/token - Update token (self or admin)
+					// Permission check (api:update or api:update:all) is inside UpdateTokenHandler
+					selfTokenGroup.PATCH("", api_token.UpdateTokenHandler)
 
 					// DELETE /api/v1/users/token - Delete token (self or admin)
 					// Permission check (api:delete or api:delete:all) is inside DeleteTokenHandler
@@ -152,8 +156,9 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 			settingsGroup := protectedGroup.Group("/settings")
 			{
 				// UI Settings
-				settingsGroup.GET("/ui", middleware.RequirePermission("settings", "read"), uisettings.GetSettingsHandler)
-				settingsGroup.PUT("/ui", middleware.RequirePermission("settings", "update"), uisettings.UpdateSettingsHandler)
+				settingsGroup.GET("/ui", middleware.RequirePermission("settings", "read"), ui_settings.GetSettingsHandler)
+				// settingsGroup.PUT("/ui", middleware.RequirePermission("settings", "update"), uisettings.UpdateSettingsHandler) // Old PUT
+				settingsGroup.PATCH("/ui", middleware.RequirePermission("settings", "update"), ui_settings.UpdateSettingsHandler)
 			}
 		}
 	}
@@ -212,7 +217,7 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 // serveHTMLTemplate loads UI settings, parses and executes an HTML template
 func serveHTMLTemplate(c *gin.Context, templatePath string) {
 	// Load UI settings
-	settings, err := uisettings.GetUISettings()
+	settings, err := ui_settings.GetUISettings()
 	if err != nil {
 		log.Printf("Error getting UI settings for template %s: %v", templatePath, err)
 		// Fallback to default settings or render a basic error page
