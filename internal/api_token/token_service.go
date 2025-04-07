@@ -30,73 +30,6 @@ func generateSecureRandomHex(byteLength int) (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-func parseISODurationSimple(durationStr string) (time.Time, error) {
-	if durationStr == "" || !strings.HasPrefix(durationStr, "P") {
-		return time.Time{}, fmt.Errorf("invalid duration format: must start with P")
-	}
-	durationStr = strings.TrimPrefix(durationStr, "P")
-
-	var years, months, days int
-	currentNumStr := ""
-
-	for _, r := range durationStr {
-		switch r {
-		case 'Y':
-			val, err := parseInt(&currentNumStr)
-			if err != nil {
-				return time.Time{}, fmt.Errorf("invalid year value: %w", err)
-			}
-			years = val
-		case 'M':
-			val, err := parseInt(&currentNumStr)
-			if err != nil {
-				return time.Time{}, fmt.Errorf("invalid month value: %w", err)
-			}
-			months = val
-		case 'D':
-			val, err := parseInt(&currentNumStr)
-			if err != nil {
-				return time.Time{}, fmt.Errorf("invalid day value: %w", err)
-			}
-			days = val
-		case 'W': // Weeks not commonly used with Y/M, handle separately or ignore
-			// For simplicity, we can treat W as 7D if needed, but standard allows P1Y1W etc.
-			// Let's return an error for now to keep it simple.
-			return time.Time{}, fmt.Errorf("week designator (W) is not supported in this simple parser")
-		case 'T': // Time component not supported
-			return time.Time{}, fmt.Errorf("time component (T...) is not supported")
-		default:
-			if r >= '0' && r <= '9' {
-				currentNumStr += string(r)
-			} else {
-				return time.Time{}, fmt.Errorf("invalid character in duration: %c", r)
-			}
-		}
-	}
-
-	// If the string ended with numbers without a designator
-	if currentNumStr != "" {
-		return time.Time{}, fmt.Errorf("duration string ended with unassigned number: %s", currentNumStr)
-	}
-
-	// Use AddDate which handles month/year rollovers correctly
-	calculatedTime := time.Now().AddDate(years, months, days)
-	return calculatedTime, nil
-}
-
-func parseInt(numStr *string) (int, error) {
-	if *numStr == "" {
-		return 0, fmt.Errorf("missing number before designator")
-	}
-	// Use strconv.Atoi which is cleaner
-	val, err := strconv.Atoi(*numStr)
-	if err != nil {
-		return 0, fmt.Errorf("invalid integer value: %s", *numStr)
-	}
-	*numStr = "" // Reset for the next number
-	return val, nil
-}
-
 // --- Service Function ---
 
 // generateTokenJWT generates and signs a JWT for a given token metadata.
@@ -148,7 +81,8 @@ func validateScopes(requested models.UserPermissions, userScopes models.UserPerm
 func CreateAPIToken(user models.User, payload models.CreateAPITokenPayload) (string, models.APIToken, string, error) {
 	// 2. Determine and Validate Scopes
 	var finalScopes models.UserPermissions
-	if payload.Scopes == nil || len(payload.Scopes) == 0 {
+	// Check if scopes were provided (len() handles nil maps)
+	if len(payload.Scopes) == 0 {
 		// If no scopes requested, inherit all user scopes
 		finalScopes = user.Scopes
 	} else {

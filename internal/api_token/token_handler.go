@@ -77,34 +77,6 @@ type GetTokensRequest struct {
 	TokenID string `json:"token_id"` // Optional: To get a specific token by ID
 }
 
-// Helper to get target user ID and check admin permission if needed
-func getTargetUserID(c *gin.Context, requestedUsername *string) (targetUserID string, isAdminAction bool, err error) {
-	currentUserID, exists := c.Get(middleware.ContextKeyUserID)
-	if !exists {
-		return "", false, fmt.Errorf("current user ID not found in context")
-	}
-	currentUserIDStr := currentUserID.(string)
-
-	if requestedUsername != nil && *requestedUsername != "" {
-		// Admin action requested
-		targetUser, userExists, userErr := user.GetUserByUsername(*requestedUsername)
-		if userErr != nil {
-			return "", true, fmt.Errorf("failed to lookup target user '%s': %w", *requestedUsername, userErr)
-		}
-		if !userExists {
-			return "", true, fmt.Errorf("target user '%s' not found", *requestedUsername)
-		}
-		// If target is self, treat as non-admin action for permission check later
-		if targetUser.ID == currentUserIDStr {
-			return currentUserIDStr, false, nil
-		}
-		return targetUser.ID, true, nil
-	} else {
-		// Action is for the current user
-		return currentUserIDStr, false, nil
-	}
-}
-
 // CreateTokenHandler handles creating an API token, potentially for another user if admin.
 func CreateTokenHandler(c *gin.Context) {
 	var req CreateTokenRequest

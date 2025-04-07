@@ -2,8 +2,8 @@ package ui_settings
 
 import (
 	"net/http"
+	"strings"
 
-	"github.com/OG-Open-Source/PanelBase/internal/models"
 	"github.com/OG-Open-Source/PanelBase/internal/server"
 	"github.com/gin-gonic/gin"
 )
@@ -21,20 +21,34 @@ func GetSettingsHandler(c *gin.Context) {
 	server.SuccessResponse(c, "UI settings retrieved successfully", settings)
 }
 
-// UpdateSettingsHandler updates the UI settings.
+// UpdateSettingsHandler handles updating UI settings.
 // PUT /api/v1/settings/ui
 func UpdateSettingsHandler(c *gin.Context) {
 	// Permission check is handled by middleware RequirePermission("settings", "update")
 
-	var updates models.UISettings
-	if err := c.ShouldBindJSON(&updates); err != nil {
+	// Bind request body to a map for partial updates
+	var updateData map[string]interface{}
+	if err := c.ShouldBindJSON(&updateData); err != nil {
 		server.ErrorResponse(c, http.StatusBadRequest, "Invalid request payload: "+err.Error())
 		return
 	}
 
-	updatedSettings, err := UpdateUISettings(updates)
+	if len(updateData) == 0 {
+		server.ErrorResponse(c, http.StatusBadRequest, "Request payload cannot be empty for update")
+		return
+	}
+
+	// Call the service function with the map
+	updatedSettings, err := UpdateUISettings(updateData)
 	if err != nil {
-		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to update UI settings: "+err.Error())
+		// Handle potential errors like "not loaded" or save failure
+		if strings.Contains(err.Error(), "not loaded") {
+			server.ErrorResponse(c, http.StatusInternalServerError, "UI settings not loaded on server")
+		} else if strings.Contains(err.Error(), "failed to save") {
+			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to save updated UI settings")
+		} else {
+			server.ErrorResponse(c, http.StatusInternalServerError, "Error updating UI settings: "+err.Error())
+		}
 		return
 	}
 

@@ -11,6 +11,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - (Future changes will go here)
 
+## [0.7.2] - 2025-04-07 Refinements and Centralization
+
+### Changed
+
+- **Bootstrap**: Centralized all default configuration file creation (`config.toml`, `users.json`, `ui_settings.json`, `themes.json`, etc.) entirely within `internal/bootstrap/bootstrap.go`. Other packages now solely rely on bootstrap for initial file presence.
+- **Logging**: Simplified bootstrap logging. Removed individual file/directory creation logs from bootstrap helpers. Added a single summary log message in `main.go` listing all items created during bootstrap.
+- **Logging**: Unified server startup log message format.
+- **API**: Modified `PUT /api/v1/settings/ui` handler (`internal/ui_settings/handler.go`) to accept partial updates using `map[string]interface{}`, aligning with the service layer.
+
+### Fixed
+
+- Resolved various compile-time errors related to `unused function`, `unused parameter`, `missing return`, and incorrect type usage in handlers/services (`internal/api_token`, `internal/ui_settings`, `internal/bootstrap`).
+- Fixed a static analysis warning (`S1009`: redundant nil check) in `internal/api_token/token_service.go`.
+- Ensured all bootstrap-related log messages have the standard timestamp prefix.
+
+### Removed
+
+- Removed unused helper functions (`EnsureUISettingsFile`, `getTargetUserID`, `parseISODurationSimple`, `parseInt`, `saveUISettings`) from various packages.
+
 ## [0.7.1] - 2025-04-06 Minor Adjustments
 
 ### Changed

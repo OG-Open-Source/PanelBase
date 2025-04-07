@@ -16,7 +16,6 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/OG-Open-Source/PanelBase/internal/models"
-	"github.com/OG-Open-Source/PanelBase/internal/ui_settings"
 	"github.com/OG-Open-Source/PanelBase/internal/user" // Import the user service
 	"golang.org/x/crypto/bcrypt"
 )
@@ -26,11 +25,12 @@ const logsDir = "logs"
 
 // Configs defines the default content for all configuration files.
 type Configs struct {
-	Themes   map[string]interface{}
-	Commands map[string]interface{}
-	Plugins  map[string]interface{}
-	Users    map[string]interface{}
-	Config   map[string]interface{}
+	Themes     map[string]interface{}
+	Commands   map[string]interface{}
+	Plugins    map[string]interface{}
+	Users      map[string]interface{}
+	Config     map[string]interface{}
+	UISettings map[string]interface{}
 }
 
 // NewConfigs creates the default configuration structure.
@@ -56,103 +56,158 @@ func NewConfigs() *Configs {
 				"cookie_name":    "panelbase_jwt",
 			},
 		},
+		UISettings: map[string]interface{}{ // Initialize UISettings with defaults
+			"title":       "PanelBase",
+			"logo_url":    "",
+			"favicon_url": "",
+			"custom_css":  "",
+			"custom_js":   "",
+		},
 	}
 }
 
 // Bootstrap checks and creates necessary configuration files and directories.
-func Bootstrap() error {
+// It now returns a list of items created for summary logging.
+func Bootstrap() ([]string, error) {
+	createdItems := []string{}
+	var itemCreated string
+	var err error
+
 	// Ensure the configs directory exists
-	if err := ensureDirExists(configsDir); err != nil {
-		return fmt.Errorf("failed to ensure configs directory: %w", err)
+	itemCreated, err = ensureDirExists(configsDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to ensure configs directory: %w", err)
+	}
+	if itemCreated != "" {
+		createdItems = append(createdItems, itemCreated)
 	}
 
 	// Ensure the logs directory exists
-	if err := ensureDirExists(logsDir); err != nil {
-		return fmt.Errorf("failed to ensure logs directory: %w", err)
+	itemCreated, err = ensureDirExists(logsDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to ensure logs directory: %w", err)
 	}
-
-	// Check/Create users.json
-	if err := ensureUsersFile(); err != nil {
-		return err
-	}
-
-	// Check/Create config.toml
-	if err := ensureConfigFile(); err != nil {
-		return err
-	}
-
-	// Check/Create ui_settings.json
-	if err := ui_settings.EnsureUISettingsFile(); err != nil {
-		return err
+	if itemCreated != "" {
+		createdItems = append(createdItems, itemCreated)
 	}
 
 	// Create default config structure (used if files need creation)
 	configs := NewConfigs()
 
-	// Check/Create other simple JSON files (themes, commands, plugins)
+	// Check/Create users.json
+	itemCreated, err = ensureUsersFile()
+	if err != nil {
+		return createdItems, err // Return already created items and the error
+	}
+	if itemCreated != "" {
+		createdItems = append(createdItems, itemCreated)
+	}
+
+	// Check/Create config.toml
+	itemCreated, err = ensureConfigFile(configs)
+	if err != nil {
+		return createdItems, err
+	}
+	if itemCreated != "" {
+		createdItems = append(createdItems, itemCreated)
+	}
+
+	// Check/Create simple JSON files (themes, commands, plugins, ui_settings)
 	simpleJsonConfigs := map[string]interface{}{
-		filepath.Join(configsDir, "themes.json"):   configs.Themes,
-		filepath.Join(configsDir, "commands.json"): configs.Commands,
-		filepath.Join(configsDir, "plugins.json"):  configs.Plugins,
+		filepath.Join(configsDir, "themes.json"):      configs.Themes,
+		filepath.Join(configsDir, "commands.json"):    configs.Commands,
+		filepath.Join(configsDir, "plugins.json"):     configs.Plugins,
+		filepath.Join(configsDir, "ui_settings.json"): configs.UISettings, // Add ui_settings here
 	}
 	for path, data := range simpleJsonConfigs {
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			log.Printf("File '%s' not found, creating with defaults...", path)
-			if err := writeJsonFile(path, data); err != nil {
-				return err // Return error if writing fails
-			}
-		} else if err != nil {
-			return fmt.Errorf("failed to check config file '%s': %w", path, err)
+		itemCreated, err = ensureSimpleJsonFile(path, data)
+		if err != nil {
+			return createdItems, err // Return error if checking/writing fails
+		}
+		if itemCreated != "" {
+			createdItems = append(createdItems, itemCreated)
 		}
 	}
 
-	return nil
+	return createdItems, nil
+}
+
+// ensureSimpleJsonFile checks and creates a simple JSON file if it doesn't exist.
+// Returns the path if created, or empty string, and an error.
+func ensureSimpleJsonFile(path string, defaultData interface{}) (string, error) {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		// log.Printf("File '%s' not found, creating with defaults...", path) // Keep log for creation start
+		if err := writeJsonFile(path, defaultData); err != nil {
+			return "", err // Return error if writing fails
+		}
+		return fmt.Sprintf("File '%s'", path), nil // Return created path
+	} else if err != nil {
+		return "", fmt.Errorf("failed to check config file '%s': %w", path, err)
+	}
+	return "", nil // File existed
 }
 
 // ensureUsersFile handles checking/creating users.json
-func ensureUsersFile() error {
+// Returns the path if created, or empty string, and an error.
+func ensureUsersFile() (string, error) {
 	usersPath := filepath.Join(configsDir, "users.json")
 	if _, err := os.Stat(usersPath); os.IsNotExist(err) {
-		log.Printf("File '%s' not found, creating with defaults...", usersPath)
+		// log.Printf("File '%s' not found, creating with defaults...", usersPath)
 		if err := initializeUsersFile(); err != nil {
-			return fmt.Errorf("failed to initialize users file: %w", err)
+			return "", fmt.Errorf("failed to initialize users file: %w", err)
 		}
+		return fmt.Sprintf("File '%s'", usersPath), nil // Return created path
 	} else if err != nil {
-		return fmt.Errorf("failed to check users file '%s': %w", usersPath, err)
+		return "", fmt.Errorf("failed to check users file '%s': %w", usersPath, err)
 	}
-	return nil
+	return "", nil // File existed
 }
 
 // ensureConfigFile handles checking/creating config.toml
-func ensureConfigFile() error {
+// Returns the path if created, or empty string, and an error.
+func ensureConfigFile(configs *Configs) (string, error) {
 	configTomlPath := filepath.Join(configsDir, "config.toml")
 	if _, err := os.Stat(configTomlPath); os.IsNotExist(err) {
-		log.Printf("File '%s' not found, creating with defaults...", configTomlPath)
-		// Generate dynamic port ONLY if creating the file
+		// log.Printf("File '%s' not found, creating with defaults...", configTomlPath) // Keep log for creation start
 		port, err := findAvailablePort(1024, 49151)
 		if err != nil {
-			return fmt.Errorf("failed to find available port for new config file: %w", err)
+			return "", fmt.Errorf("failed to find available port for new config file: %w", err)
 		}
 
-		// Start with the default static config structure
-		configs := NewConfigs()
-		defaultConfigData := configs.Config // Get map[string]interface{} from NewConfigs()
-
-		// Inject the dynamic port
+		defaultConfigData := configs.Config
 		if serverConf, ok := defaultConfigData["server"].(map[string]interface{}); ok {
 			serverConf["port"] = port
 		} else {
-			// This should not happen if NewConfigs is correct
-			return fmt.Errorf("internal error: invalid structure for default server config")
+			return "", fmt.Errorf("internal error: invalid structure for default server config")
 		}
 
 		if err := writeTomlFile(configTomlPath, defaultConfigData); err != nil {
-			return err
+			return "", err
 		}
+		return fmt.Sprintf("File '%s'", configTomlPath), nil // Return created path
 	} else if err != nil {
-		return fmt.Errorf("failed to check config file '%s': %w", configTomlPath, err)
+		return "", fmt.Errorf("failed to check config file '%s': %w", configTomlPath, err)
 	}
-	return nil
+	return "", nil // File existed
+}
+
+// ensureDirExists checks if a directory exists, and creates it if not.
+// Returns the path if created, or empty string, and an error.
+func ensureDirExists(dirPath string) (string, error) {
+	absPath, err := filepath.Abs(dirPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute path for %s: %w", dirPath, err)
+	}
+	if _, err := os.Stat(absPath); os.IsNotExist(err) {
+		// log.Printf("Directory '%s' not found, creating...", absPath) // Keep log for creation start
+		if err := os.MkdirAll(absPath, 0755); err != nil {
+			return "", fmt.Errorf("failed to create directory '%s': %w", absPath, err)
+		}
+		return fmt.Sprintf("Directory '%s'", absPath), nil // Return created path
+	} else if err != nil {
+		return "", fmt.Errorf("failed to check directory '%s': %w", absPath, err)
+	}
+	return "", nil // Directory existed
 }
 
 // initializeUsersFile creates the initial users.json file with a default admin user.
@@ -239,7 +294,6 @@ func initializeUsersFile() error {
 		return err
 	}
 
-	log.Println("users.json initialized successfully via service.")
 	return nil
 }
 
@@ -258,27 +312,6 @@ func generateRandomString(length int) (string, error) {
 	return string(ret), nil
 }
 
-// ensureDirExists checks if a directory exists, and creates it if not.
-func ensureDirExists(dirPath string) error {
-	absPath, err := filepath.Abs(dirPath)
-	if err != nil {
-		return fmt.Errorf("failed to get absolute path for %s: %w", dirPath, err)
-	}
-	if _, err := os.Stat(absPath); os.IsNotExist(err) {
-		log.Printf("Directory '%s' not found, creating...", absPath)
-		// Create the directory with permissions 0755
-		// 0755 means owner can read/write/execute, group and others can read/execute
-		if err := os.MkdirAll(absPath, 0755); err != nil {
-			return fmt.Errorf("failed to create directory '%s': %w", absPath, err)
-		}
-		log.Printf("Directory '%s' created successfully.", absPath)
-	} else if err != nil {
-		// Handle other potential errors from os.Stat (e.g., permission denied)
-		return fmt.Errorf("failed to check directory '%s': %w", absPath, err)
-	}
-	return nil
-}
-
 // writeJsonFile encodes data to JSON and writes it to the specified file path.
 func writeJsonFile(filePath string, data interface{}) error {
 	jsonData, err := json.MarshalIndent(data, "", "  ") // Use two spaces for indentation
@@ -288,7 +321,6 @@ func writeJsonFile(filePath string, data interface{}) error {
 	if err := os.WriteFile(filePath, jsonData, 0644); err != nil {
 		return fmt.Errorf("failed to write file %s: %w", filePath, err)
 	}
-	log.Printf("Successfully created default file: %s", filePath)
 	return nil
 }
 
@@ -301,7 +333,6 @@ func writeTomlFile(filePath string, data interface{}) error {
 	if err := os.WriteFile(filePath, buf.Bytes(), 0644); err != nil {
 		return fmt.Errorf("failed to write file %s: %w", filePath, err)
 	}
-	log.Printf("Successfully created default file: %s", filePath)
 	return nil
 }
 
