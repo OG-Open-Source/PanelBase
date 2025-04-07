@@ -1,5 +1,10 @@
 package models
 
+import (
+	"log"
+	"strings"
+)
+
 // UserPermissions defines the structure for user permissions (scopes).
 // It maps resource names (string) to a list of allowed actions (string slice).
 // Example: {"commands": ["list", "execute"], "users": ["read:self"]}
@@ -42,4 +47,28 @@ type User struct {
 type UsersConfig struct {
 	JwtSecret string          `json:"jwt_secret"` // Optional global JWT secret (fallback?)
 	Users     map[string]User `json:"users"`      // Map of users, keyed by username
+}
+
+// ScopeStringsToPermissions converts a slice of scope strings (e.g., "resource:action")
+// into the UserPermissions map format.
+func ScopeStringsToPermissions(scopeStrings []string) UserPermissions {
+	permissions := make(UserPermissions)
+	if scopeStrings == nil {
+		return permissions // Return empty map if input is nil
+	}
+	for _, scope := range scopeStrings {
+		parts := strings.SplitN(scope, ":", 2)
+		if len(parts) == 2 {
+			resource := strings.TrimSpace(parts[0])
+			action := strings.TrimSpace(parts[1])
+			if resource != "" && action != "" {
+				permissions[resource] = append(permissions[resource], action)
+			}
+		} else {
+			// Handle cases where scope might not have a colon (e.g., just "admin")?
+			// Or log a warning/ignore?
+			log.Printf("Warning: Invalid scope format encountered: '%s'. Skipping.", scope)
+		}
+	}
+	return permissions
 }

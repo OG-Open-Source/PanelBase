@@ -1,0 +1,69 @@
+{
+  "jwt_secret": "EuuxDtLrcVYTjaTxQDIfoShgbPycWHun",
+  "users": {
+    "usr_b25961743ea3c0db": {
+      "id": "usr_b25961743ea3c0db",
+      "username": "admin",
+      "password": "$2a$10$IWWTq4Va.vA9txNzu.QrruXzuxF/kps5oZqSlNqLkJ6ueApK1emOy",
+      "name": "Administrator",
+      "email": "admin@example.com",
+      "created_at": "2025-04-07T16:13:36Z",
+      "active": true,
+      "scopes": {
+        "account": [
+          "read",
+          "update",
+          "delete"
+        ],
+        "api": [
+          "read:list",
+          "read:item",
+          "create",
+          "update",
+          "delete",
+          "read:list:all",
+          "read:item:all",
+          "create:all",
+          "update:all",
+          "delete:all"
+        ],
+        "commands": [
+          "read:list",
+          "read:item",
+          "install",
+          "execute",
+          "update",
+          "delete"
+        ],
+        "plugins": [
+          "read:list",
+          "read:item",
+          "install",
+          "update",
+          "delete"
+        ],
+        "settings": [
+          "read",
+          "update"
+        ],
+        "themes": [
+          "read:list",
+          "read:item",
+          "install",
+          "update",
+          "delete"
+        ],
+        "users": [
+          "read:list",
+          "read:item",
+          "create",
+          "update",
+          "delete"
+        ]
+      },
+      "api": {
+        "jwt_secret": "J5CqVFJzxYU1q8TsD1bRUEUUZprJ3m7E"
+      }
+    }
+  }
+}

@@ -1,204 +1,246 @@
 #!/bin/bash
 
-[ -f ~/utilkit.sh ] && source ~/utilkit.sh || bash <(curl -sL utilkit.ogtt.tk) && source ~/utilkit.sh
-
 # --- Configuration ---
 CONFIG_FILE="configs/config.toml"
-# Use default admin credentials or change as needed for testing
 DEFAULT_USERNAME="admin"
 DEFAULT_PASSWORD="admin"
-# Credentials for registration test
-TEST_REG_USERNAME="testuser_$(date +%s)" # Add timestamp for uniqueness
+TEST_REG_USERNAME="testuser_$(date +%s)"
 TEST_REG_PASSWORD="testpassword123"
 TEST_REG_EMAIL="${TEST_REG_USERNAME}@example.com"
 
+# --- State Variables ---
+ADMIN_SESSION_TOKEN=""
+ADMIN_USER_ID=""
+CREATED_API_TOKEN=""
+CREATED_API_TOKEN_ID="" # Changed from tkn_ to tok_ prefix internally now
+TOKEN_TYPE="None"       # Track current token type for logging
+
 # --- Helper Functions ---
 
-# Function to extract port from config.toml
-get_api_port() {
-	if [[ ! -f "$CONFIG_FILE" ]]; then
-		echo "Error: Config file '$CONFIG_FILE' not found."
+check_command() {
+	if ! command -v "$1" &>/dev/null; then
+		echo "Error: Required command '$1' not found. Please install it." >&2
 		exit 1
 	fi
-	# Attempt to parse port= line, handling spaces around '='
+}
+
+get_api_port() {
+	if [[ ! -f "$CONFIG_FILE" ]]; then
+		echo "Error: Config file '$CONFIG_FILE' not found." >&2
+		exit 1
+	fi
 	PORT=$(grep -E '^\s*port\s*=' "$CONFIG_FILE" | head -n 1 | awk -F '=' '{gsub(/ /,"",$2); print $2}')
 	if [[ -z "$PORT" ]]; then
-		echo "Error: Could not extract port from '$CONFIG_FILE'."
+		echo "Error: Could not extract port from '$CONFIG_FILE'." >&2
 		exit 1
 	fi
 	echo "$PORT"
 }
 
-# Function to decode JWT Payload (does not verify signature)
 decode_jwt_payload() {
 	local jwt=$1
 	if [[ -z "$jwt" ]]; then
-		echo "JWT is empty."
-		return
+		echo "JWT is empty." >&2
+		return "" # Return empty string on failure
 	fi
-	local payload=$(echo "$jwt" | cut -d '.' -f 2)
-	# Replace URL-safe base64 chars
-	payload=${payload//-/+}
-	payload=${payload//_//}
-	# Add padding if necessary
-	case $((${#payload} % 4)) in
-	1) payload="${payload}===" ;;
-	2) payload="${payload}==" ;;
-	3) payload="${payload}=" ;;
+	local payload_base64=$(echo "$jwt" | cut -d '.' -f 2)
+	payload_base64=${payload_base64//-/+}
+	payload_base64=${payload_base64//_//}
+	case $((${#payload_base64} % 4)) in
+	1) payload_base64="${payload_base64}===" ;;
+	2) payload_base64="${payload_base64}==" ;;
+	3) payload_base64="${payload_base64}=" ;;
 	esac
-	echo "--- Decoded JWT Payload ---"
-	echo "$payload" | base64 --decode 2>/dev/null | jq '.' || echo "Error decoding Base64 or invalid JSON in payload."
-	echo "--------------------------"
+	decoded_payload=$(echo "$payload_base64" | base64 --decode 2>/dev/null | jq -c '.' 2>/dev/null)
+	if [[ $? -ne 0 ]]; then
+		echo "Error decoding Base64 or invalid JSON in payload for JWT: $jwt" >&2
+		return "" # Return empty string on failure
+	fi
+	echo "--- Decoded JWT Payload ---" >&2 # Log to stderr
+	echo "$decoded_payload" | jq '.' >&2   # Pretty print to stderr
+	echo "--------------------------" >&2  # Log to stderr
+	echo "$decoded_payload"                # Return the compact JSON string to stdout
 }
 
 # Function to make API requests
-# Usage: make_request METHOD PATH [DATA] [TOKEN]
+# Usage: make_request METHOD PATH [DATA] [TOKEN] [DESCRIPTION]
+# Prints informational logs to stderr, prints raw response body to stdout
 make_request() {
 	local method=$1
 	local path=$2
 	local data=$3
 	local token=$4
+	local description=$5
 	local url="${BASE_URL}${path}"
-	local headers=(-H "Content-Type: application/json")
+	local headers=("-H" "Content-Type: application/json") # Use array for headers
+	local curl_opts=("-s" "-X" "${method}")               # Basic curl options
 
-	echo "-----------------------------------------------------"
-	echo ">> Request: ${method} ${path}"
-	[[ -n "$data" ]] && echo ">> Data: ${data}"
-	[[ -n "$token" ]] && echo ">> Using Token: YES" || echo ">> Using Token: NO"
+	# Print info logs to stderr
+	echo "-----------------------------------------------------" >&2
+	echo ">> Test: ${description}" >&2
+	echo ">> Request: ${method} ${path}" >&2
+	[[ -n "$data" ]] && echo ">> Data: ${data}" >&2
+	[[ -n "$token" ]] && echo ">> Using Token: YES (type: ${TOKEN_TYPE})" >&2 || echo ">> Using Token: NO" >&2
 
 	if [[ -n "$token" ]]; then
-		headers+=(-H "Authorization: Bearer ${token}")
+		headers+=("-H" "Authorization: Bearer ${token}")
 	fi
 
-	local curl_cmd="curl -s -X ${method} \"${url}\" ${headers[*]}"
-	[[ -n "$data" ]] && curl_cmd+=" -d '${data}'"
+	curl_opts+=("${headers[@]}") # Add headers to curl options
 
-	echo ">> Curl Command:"
-	echo "   ${curl_cmd}" # Show the command being run
+	# Construct the command string for display only
+	local display_cmd="curl ${curl_opts[*]} \"${url}\""
+	if [[ -n "$data" ]]; then
+		curl_opts+=("-d" "${data}") # Add data option
+		display_cmd+=" -d '${data}'"
+	fi
 
-	echo ">> Response:"
-	# Use process substitution to capture body and headers/status if needed later
-	response=$(eval "${curl_cmd}")
-	# response_code=$(curl -s -o /dev/null -w "%{http_code}" -X ${method} \"${url}\" ${headers[*]} ${data_arg})
+	echo ">> Curl Command:" >&2
+	echo "   ${display_cmd}" >&2 # Show the command being run
 
-	# Pretty print if valid JSON, otherwise print raw
-	if jq -e . >/dev/null 2>&1 <<<"$response"; then
-		echo "$response" | jq '.'
+	# Execute curl and capture response body to stdout
+	# Errors from curl itself (like connection refused) will go to stderr
+	response_body=$(curl "${curl_opts[@]}" "${url}")
+	local curl_exit_code=$?
+
+	echo ">> Response:" >&2
+	# Pretty print if valid JSON to stderr, otherwise print raw to stderr
+	if jq -e . >/dev/null 2>&1 <<<"$response_body"; then
+		echo "$response_body" | jq '.' >&2
 	else
-		echo "$response"
+		echo "$response_body" >&2
+		if [[ $curl_exit_code -ne 0 ]]; then
+			echo "[Curl Error: Exit code $curl_exit_code]" >&2
+		fi
 	fi
 
-	# Try to extract and decode token from response data if exists
-	local resp_token=$(echo "$response" | jq -r '.data.token // empty')
-	if [[ -n "$resp_token" ]]; then
-		echo ""
-		decode_jwt_payload "$resp_token"
-	fi
+	echo "-----------------------------------------------------" >&2
+	echo "" >&2
+	sleep 0.5 # Small delay
 
-	echo "-----------------------------------------------------"
-	echo ""
-	sleep 1 # Small delay between requests
+	# Output the raw response body to stdout for capture
+	echo "$response_body"
 }
 
 # --- Main Script ---
 
-# Check dependencies
-deps=(curl jq base64 grep awk)
-CHECK_DEPS -a
+check_command curl
+check_command jq
+check_command base64
+check_command grep
+check_command awk
 
-# Get Port and Set Base URL
 API_PORT=$(get_api_port)
 BASE_URL="http://localhost:${API_PORT}/api/v1"
-echo "Testing API at: ${BASE_URL}"
-echo ""
+echo "Testing API at: ${BASE_URL}" >&2 # Log setup info to stderr
+echo "" >&2
 
-# --- Test Cases ---
+echo "=== Running API Tests ===" >&2 # Log section header to stderr
 
-echo "=== Running API Tests ==="
+# --- Auth Tests ---
+TOKEN_TYPE="None"
+# Use make_request and ignore its stdout (response body) for simple calls
+make_request POST "/auth/register" "{\"username\":\"${TEST_REG_USERNAME}\",\"password\":\"${TEST_REG_PASSWORD}\",\"email\":\"${TEST_REG_EMAIL}\"}" "" "Registration - Success" >/dev/null
+make_request POST "/auth/register" "{\"username\":\"${TEST_REG_USERNAME}\",\"password\":\"${TEST_REG_PASSWORD}\",\"email\":\"${TEST_REG_EMAIL}\"}" "" "Registration - Failure (Username Exists)" >/dev/null
+make_request POST "/auth/register" "{\"username\":\"another_${TEST_REG_USERNAME}\",\"email\":\"another@example.com\"}" "" "Registration - Failure (Missing Password)" >/dev/null
+make_request POST "/auth/login" "{\"username\":\"${DEFAULT_USERNAME}\",\"password\":\"wrongpassword\"}" "" "Login - Failure (Wrong Password)" >/dev/null
 
-# 1. Registration - Success
-echo "** Test Case: Registration (Success) **"
-reg_data="{\"username\":\"${TEST_REG_USERNAME}\",\"password\":\"${TEST_REG_PASSWORD}\",\"email\":\"${TEST_REG_EMAIL}\"}"
-make_request POST "/auth/register" "${reg_data}"
+# Login Admin and capture token/user ID - Capture stdout here
+echo ">> Test: Login - Success (Default Admin)" >&2
+login_response_body=$(make_request POST "/auth/login" "{\"username\":\"${DEFAULT_USERNAME}\",\"password\":\"${DEFAULT_PASSWORD}\"}" "" "Login - Success (Default Admin)")
 
-# 2. Registration - Failure (Username already exists)
-echo "** Test Case: Registration (Failure - Username Exists) **"
-make_request POST "/auth/register" "${reg_data}" # Use the same data
-
-# 3. Registration - Failure (Missing required field - password)
-echo "** Test Case: Registration (Failure - Missing Password) **"
-reg_fail_data="{\"username\":\"anotheruser_${TEST_REG_USERNAME}\",\"email\":\"another@example.com\"}"
-make_request POST "/auth/register" "${reg_fail_data}"
-
-# 4. Login - Failure (Wrong Password)
-echo "** Test Case: Login (Failure - Wrong Password) **"
-login_fail_data="{\"username\":\"${DEFAULT_USERNAME}\",\"password\":\"wrongpassword\"}"
-make_request POST "/auth/login" "${login_fail_data}"
-
-# 5. Login - Success (Default Admin)
-echo "** Test Case: Login (Success - Default Admin) **"
-login_data="{\"username\":\"${DEFAULT_USERNAME}\",\"password\":\"${DEFAULT_PASSWORD}\"}"
-# Capture the response to extract the token
-login_response=$(curl -s -X POST "${BASE_URL}/auth/login" -H "Content-Type: application/json" -d "${login_data}")
-echo ">> Response:"
-echo "$login_response" | jq '.'
-ADMIN_SESSION_TOKEN=$(echo "$login_response" | jq -r '.data.token // empty')
+# Now jq operates only on the response body captured in login_response_body
+ADMIN_SESSION_TOKEN=$(echo "$login_response_body" | jq -r '.data.token // empty')
 if [[ -z "$ADMIN_SESSION_TOKEN" ]]; then
-	echo "Error: Could not extract admin session token from login response."
-	# exit 1 # Decide if you want to stop tests here
-else
-	echo ""
-	decode_jwt_payload "$ADMIN_SESSION_TOKEN"
+	echo "FATAL: Could not extract admin session token. Stopping tests." >&2
+	exit 1
 fi
-echo "-----------------------------------------------------"
-echo ""
-sleep 1
-
-# 6. Get Settings - Failure (No Token)
-echo "** Test Case: Get Settings (Failure - No Token) **"
-make_request GET "/settings/ui"
-
-# 7. Get Settings - Success (Using Admin Session Token)
-# Note: Technically API endpoints should prefer API tokens, but let's see if this works/fails
-echo "** Test Case: Get Settings (Success? - Using Admin Session Token) **"
-make_request GET "/settings/ui" "" "${ADMIN_SESSION_TOKEN}"
-
-# 8. Create API Token - Success (For Admin Self)
-echo "** Test Case: Create API Token (Success - Admin Self) **"
-create_token_data="{\"name\":\"Test Script API Token\",\"duration\":\"P1D\"}"
-# Capture response to get the new API token
-create_response=$(curl -s -X POST "${BASE_URL}/users/token" -H "Content-Type: application/json" -H "Authorization: Bearer ${ADMIN_SESSION_TOKEN}" -d "${create_token_data}")
-echo ">> Response:"
-echo "$create_response" | jq '.'
-NEW_API_TOKEN=$(echo "$create_response" | jq -r '.data.token // empty')
-NEW_API_TOKEN_ID=$(echo "$create_response" | jq -r '.data.id // empty')
-if [[ -z "$NEW_API_TOKEN" || -z "$NEW_API_TOKEN_ID" ]]; then
-	echo "Error: Could not extract new API token or ID from creation response."
-	# exit 1
+echo "Admin Session Token captured." >&2
+TOKEN_TYPE="Web Session"
+# Decode payload and extract User ID (sub)
+decoded_payload=$(decode_jwt_payload "$ADMIN_SESSION_TOKEN")
+if [[ -n "$decoded_payload" ]]; then
+	ADMIN_USER_ID=$(echo "$decoded_payload" | jq -r '.sub // empty')
+	if [[ -n "$ADMIN_USER_ID" ]]; then
+		echo "Admin User ID captured: ${ADMIN_USER_ID}" >&2
+	else
+		echo "Error: Could not extract User ID (sub) from admin token payload." >&2
+	fi
 else
-	echo ""
-	decode_jwt_payload "$NEW_API_TOKEN"
-	echo "   New Token ID: ${NEW_API_TOKEN_ID}"
+	echo "Error: Could not decode admin token payload." >&2
 fi
-echo "-----------------------------------------------------"
-echo ""
-sleep 1
+echo "-----------------------------------------------------" >&2 # Add separator manually after capture step
+echo "" >&2
 
-# 9. List API Tokens - Success (Using the New API Token)
-echo "** Test Case: List API Tokens (Success - Using New API Token) **"
-if [[ -n "$NEW_API_TOKEN" ]]; then
-	make_request GET "/users/token" "" "${NEW_API_TOKEN}"
+# --- Account/Token Tests (Self Actions using Session Token) ---
+make_request GET "/settings/ui" "" "" "Get Settings - Failure (No Token)" >/dev/null
+make_request GET "/settings/ui" "" "${ADMIN_SESSION_TOKEN}" "Get Settings - Success (Using Admin Session Token)" >/dev/null
+
+# Create API Token for Admin Self
+create_token_data="{\"name\":\"Admin API Token 1\",\"duration\":\"P7D\"}"
+create_response_body=$(make_request POST "/account/token" "${create_token_data}" "${ADMIN_SESSION_TOKEN}" "Create API Token - Success (Admin Self)")
+CREATED_API_TOKEN=$(echo "$create_response_body" | jq -r '.data.token // empty')
+CREATED_API_TOKEN_ID=$(echo "$create_response_body" | jq -r '.data.id // empty')
+if [[ -z "$CREATED_API_TOKEN" || -z "$CREATED_API_TOKEN_ID" ]]; then
+	echo "Error: Could not extract API token or ID from creation response. Token tests may fail." >&2
 else
-	echo "Skipping test - Failed to create API token earlier."
+	echo "API Token created. ID: ${CREATED_API_TOKEN_ID}" >&2
+	decoded_api_payload=$(decode_jwt_payload "$CREATED_API_TOKEN") # Decode API token
+	if [[ -z "$decoded_api_payload" ]]; then
+		echo "Error: Could not decode created API token payload." >&2
+	fi
 fi
+echo "-----------------------------------------------------" >&2 # Add separator manually after capture step
+echo "" >&2
 
-# 10. Delete API Token - Success (Using Admin Session Token)
-echo "** Test Case: Delete API Token (Success - Using Admin Session Token) **"
-if [[ -n "$ADMIN_SESSION_TOKEN" && -n "$NEW_API_TOKEN_ID" ]]; then
-	delete_token_data="{\"token_id\":\"${NEW_API_TOKEN_ID}\"}" # Delete the one we just created
-	make_request DELETE "/users/token" "${delete_token_data}" "${ADMIN_SESSION_TOKEN}"
+# List API Tokens for Admin Self (using Session Token)
+make_request GET "/account/token" "" "${ADMIN_SESSION_TOKEN}" "List API Tokens - Success (Admin Self, using Session Token)" >/dev/null
+
+# Get Specific API Token for Admin Self (using Session Token)
+if [[ -n "$CREATED_API_TOKEN_ID" ]]; then
+	# OLD: path_with_query="/account/token?token_id=${CREATED_API_TOKEN_ID}"
+	# OLD: make_request GET "${path_with_query}" "" ...
+	# NEW: Construct path with token ID as part of it
+	specific_token_path="/account/token/${CREATED_API_TOKEN_ID}"
+	make_request GET "${specific_token_path}" "" "${ADMIN_SESSION_TOKEN}" "Get Specific API Token - Success (Admin Self, using Session Token)" >/dev/null
 else
-	echo "Skipping test - Missing Admin Token or New Token ID."
+	echo "Skipping Get Specific Token test - Token ID not captured." >&2
 fi
 
-echo "=== API Tests Completed ==="
+# Update API Token for Admin Self (using Session Token)
+if [[ -n "$CREATED_API_TOKEN_ID" ]]; then
+	update_token_data="{\"token_id\":\"${CREATED_API_TOKEN_ID}\", \"name\":\"Admin API Token UPDATED\"}"
+	make_request PATCH "/account/token" "${update_token_data}" "${ADMIN_SESSION_TOKEN}" "Update API Token - Success (Admin Self, using Session Token)" >/dev/null
+else
+	echo "Skipping Update Token test - Token ID not captured." >&2
+fi
+
+# List API Tokens again to see update (using Session Token)
+make_request GET "/account/token" "" "${ADMIN_SESSION_TOKEN}" "List API Tokens After Update - Success (Admin Self, using Session Token)" >/dev/null
+
+# Delete API Token for Admin Self (using Session Token)
+if [[ -n "$CREATED_API_TOKEN_ID" ]]; then
+	delete_token_data="{\"token_id\":\"${CREATED_API_TOKEN_ID}\"}" # Delete the one we created
+	make_request DELETE "/account/token" "${delete_token_data}" "${ADMIN_SESSION_TOKEN}" "Delete API Token - Success (Admin Self, using Session Token)" >/dev/null
+else
+	echo "Skipping Delete Token test - Token ID not captured." >&2
+fi
+
+# List API Tokens one last time to confirm deletion (using Session Token)
+make_request GET "/account/token" "" "${ADMIN_SESSION_TOKEN}" "List API Tokens After Delete - Success (Admin Self, using Session Token)" >/dev/null
+
+# --- Optional: Test using the created API Token ---
+if [[ -n "$CREATED_API_TOKEN" ]]; then
+	echo "" >&2
+	echo "=== Testing using the created API Token ===" >&2
+	TOKEN_TYPE="API Token"
+	# Example: Try getting settings using the API token
+	# Note: The token might have been deleted already if tests run sequentially
+	make_request GET "/settings/ui" "" "${CREATED_API_TOKEN}" "Get Settings - Attempt using API Token" >/dev/null
+	# Example: Try listing tokens using the API token
+	make_request GET "/account/token" "" "${CREATED_API_TOKEN}" "List API Tokens - Attempt using API Token" >/dev/null
+else
+	echo "Skipping tests using the created API token as it wasn't captured." >&2
+fi
+
+echo "=== API Tests Completed ===" >&2

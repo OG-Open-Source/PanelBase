@@ -8,7 +8,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const ContextKeyRequestBody = "requestBodyBytes"
+// Remove potentially duplicate constant definition here
+/*
+const ContextKeyRequestBody ContextKey = "requestBody"
+*/
 
 // CacheRequestBody reads the request body, stores it in the context,
 // and replaces the original body reader so it can be read again later.
@@ -25,15 +28,14 @@ func CacheRequestBody() gin.HandlerFunc {
 				c.Request.Body = io.NopCloser(bytes.NewBuffer(nil)) // Set empty body
 			} else {
 				// Store the read bytes in the context
-				c.Set(ContextKeyRequestBody, bodyBytes)
+				c.Set(string(ContextKeyRequestBody), bodyBytes)
 				// Replace the request body with a new reader based on the read bytes
 				c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 			}
 		} else {
 			// For other methods (GET, etc.), set an empty byte slice or nil
-			c.Set(ContextKeyRequestBody, []byte{})
+			c.Set(string(ContextKeyRequestBody), []byte{})
 		}
 		c.Next()
 	}
 }
- 

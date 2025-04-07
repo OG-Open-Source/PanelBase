@@ -12,6 +12,10 @@ _(Add key features here as they are developed)_
 - Persistent Token Storage (BoltDB)
 - Customizable Logging
 
+## Version
+
+Current version: 0.9.0 (2025-04-08)
+
 ## Getting Started
 
 _(Add instructions on how to build and run the project)_
@@ -26,5 +30,13 @@ go run cmd/panelbase/main.go
 Configuration is managed via `configs/config.toml` and `configs/users.json`.
 
 ## Changelog
+
+### [0.9.0] - 2025-04-08 Logging Overhaul and Refinements
+
+- Centralized and structured logging (`logger.Printf`, etc. with module/action).
+- Log output detail now depends on `server.mode` (`debug` vs `release`).
+- Standardized log timestamps to RFC3339.
+- Fixed startup order issue (`bootstrap` now runs before config load).
+- Centralized middleware context keys.
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed history.

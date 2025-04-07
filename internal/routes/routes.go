@@ -13,7 +13,6 @@ import (
 	"github.com/OG-Open-Source/PanelBase/internal/config"
 	"github.com/OG-Open-Source/PanelBase/internal/middleware"
 	"github.com/OG-Open-Source/PanelBase/internal/models"
-	"github.com/OG-Open-Source/PanelBase/internal/server"
 	"github.com/OG-Open-Source/PanelBase/internal/ui_settings"
 	"github.com/gin-gonic/gin"
 )
@@ -37,129 +36,50 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 			// Token Refresh Route
 			protectedGroup.POST("/auth/token", auth.RefreshTokenHandler(cfg))
 
-			// Commands (only if enabled)
-			if cfg.Features.Commands {
-				cmdGroup := protectedGroup.Group("/commands")
-				{
-					cmdGroup.GET("", func(c *gin.Context) {
-						server.SuccessResponse(c, "GET Commands (List) endpoint not implemented yet", nil)
-					})
-					cmdGroup.POST("", func(c *gin.Context) {
-						server.SuccessResponse(c, "POST Commands (Create) endpoint not implemented yet", nil)
-					})
-					cmdGroup.PUT("", func(c *gin.Context) {
-						server.SuccessResponse(c, "PUT Commands (Update - requires {'id': ...} in body) endpoint not implemented yet", nil)
-					})
-					cmdGroup.DELETE("", func(c *gin.Context) {
-						server.SuccessResponse(c, "DELETE Commands (Delete - requires {'id': ...} in body) endpoint not implemented yet", nil)
-					})
-				}
-			}
-
-			// Plugins (only if enabled)
-			if cfg.Features.Plugins {
-				pluginGroup := protectedGroup.Group("/plugins")
-				{
-					pluginGroup.GET("", func(c *gin.Context) {
-						server.SuccessResponse(c, "GET Plugins (List) endpoint not implemented yet", nil)
-					})
-					// POST might use {"url": "..."} in body to install from URL
-					pluginGroup.POST("", func(c *gin.Context) {
-						server.SuccessResponse(c, "POST Plugins (Install/Create - may use {'url': ...} in body) endpoint not implemented yet", nil)
-					})
-					// PUT requires {"id": "..."} in body
-					pluginGroup.PUT("", func(c *gin.Context) {
-						server.SuccessResponse(c, "PUT Plugins (Update - requires {'id': ...} in body) endpoint not implemented yet", nil)
-					})
-					// DELETE requires {"id": "..."} in body
-					pluginGroup.DELETE("", func(c *gin.Context) {
-						server.SuccessResponse(c, "DELETE Plugins (Uninstall - requires {'id': ...} in body) endpoint not implemented yet", nil)
-					})
-				}
-			}
-
-			// Themes
-			themeGroup := protectedGroup.Group("/themes")
+			// Account Management (Self)
+			account := protectedGroup.Group("/account")
 			{
-				themeGroup.GET("", func(c *gin.Context) { server.SuccessResponse(c, "GET Themes (List) endpoint not implemented yet", nil) })
-				// POST might use {"url": "..."} in body to install from URL
-				themeGroup.POST("", func(c *gin.Context) {
-					server.SuccessResponse(c, "POST Themes (Install/Create - may use {'url': ...} in body) endpoint not implemented yet", nil)
-				})
-				// PUT requires {"id": "..."} in body
-				themeGroup.PUT("", func(c *gin.Context) {
-					server.SuccessResponse(c, "PUT Themes (Update - requires {'id': ...} in body) endpoint not implemented yet", nil)
-				})
-				// DELETE requires {"id": "..."} in body
-				themeGroup.DELETE("", func(c *gin.Context) {
-					server.SuccessResponse(c, "DELETE Themes (Uninstall - requires {'id': ...} in body) endpoint not implemented yet", nil)
-				})
-			}
+				// Placeholder for GET /account, PATCH /account, DELETE /account
+				// account.GET("", middleware.RequirePermission("account", "read"), ...)
+				// account.PATCH("", middleware.RequirePermission("account", "update"), ...)
+				// account.DELETE("", middleware.RequirePermission("account", "delete"), ...)
 
-			// General User Management (/api/v1/users)
-			userGroup := protectedGroup.Group("/users")
-			{
-				// GET /users - List users OR Get specific user by ID in body
-				userGroup.GET("", func(c *gin.Context) {
-					// Permission check (read:list or read:item) and ownership check
-					// should be implemented INSIDE the handler logic, using middleware.CheckPermission
-					// and comparing target ID with context user ID.
-					// Removed: if !middleware.CheckReadPermission(c, "users") { return }
-					server.SuccessResponse(c, "GET Users (List/Item) endpoint needs permission checks and implementation", nil)
-				})
-
-				// POST /users - Create user (Action: create)
-				userGroup.POST("", middleware.RequirePermission("users", "create"), func(c *gin.Context) {
-					// Handler needs implementation
-					server.SuccessResponse(c, "POST Users (Create) endpoint needs implementation", nil)
-				})
-
-				// PUT /users - Update user (Action: update, requires {"id": ...} in body)
-				// PATCH /users - Update user (Action: update)
-				userGroup.PATCH("", middleware.RequirePermission("users", "update"), func(c *gin.Context) {
-					// Handler needs to perform ownership check before updating.
-					// Note: Using PATCH on collection is non-standard. Consider PATCH /users/{id}
-					server.SuccessResponse(c, "PATCH Users (Update) endpoint needs ownership check and implementation", nil)
-				})
-
-				// DELETE /users - Delete user (Action: delete, requires {"id": ...} in body)
-				userGroup.DELETE("", middleware.RequirePermission("users", "delete"), func(c *gin.Context) {
-					// Handler needs to perform ownership check before deleting.
-					server.SuccessResponse(c, "DELETE Users (Delete) endpoint needs ownership check and implementation", nil)
-				})
-
-				// --- User's Own API Token Management (and Admin) ---
-				// Mounted under /api/v1/users/token
-				selfTokenGroup := userGroup.Group("/token")
+				// API Token Management Routes (under /account)
+				token := account.Group("/token") // Define token group under account
 				{
-					// GET /api/v1/users/token - List/Get tokens (self or admin)
-					// Permission checks are handled inside GetTokensHandler.
-					selfTokenGroup.GET("", api_token.GetTokensHandler)
-
-					// POST /api/v1/users/token - Create token (self or admin)
-					// Permission check (api:create or api:create:all) is inside CreateTokenHandler
-					selfTokenGroup.POST("", api_token.CreateTokenHandler)
-
-					// PUT /api/v1/users/token - Update token (self or admin)
-					// Permission check (api:update or api:update:all) is inside UpdateTokenHandler
-					// PATCH /api/v1/users/token - Update token (self or admin)
-					// Permission check (api:update or api:update:all) is inside UpdateTokenHandler
-					selfTokenGroup.PATCH("", api_token.UpdateTokenHandler)
-
-					// DELETE /api/v1/users/token - Delete token (self or admin)
-					// Permission check (api:delete or api:delete:all) is inside DeleteTokenHandler
-					selfTokenGroup.DELETE("", api_token.DeleteTokenHandler)
+					// Note: Permissions are checked inside handlers now for api tokens
+					token.POST("", api_token.CreateTokenHandler)
+					token.GET("", api_token.GetTokensHandler)           // Route for Listing tokens (uses query param user_id for admin)
+					token.GET("/:token_id", api_token.GetTokensHandler) // Route for Getting specific token by path param
+					token.PATCH("", api_token.UpdateTokenHandler)
+					token.DELETE("", api_token.DeleteTokenHandler)
 				}
 			}
 
-			// Settings Routes
+			// User Management (Admin) - Routes are placeholders
+			/* // Comment out until handlers are implemented
+			users := protectedGroup.Group("/users")
+			{
+				// Placeholder for admin user management
+				// users.GET("", middleware.RequirePermission("users", "read:list"), ...)
+				// users.POST("", middleware.RequirePermission("users", "create"), ...)
+				// users.PATCH("/:id", middleware.RequirePermission("users", "update"), ...)
+				// users.DELETE("/:id", middleware.RequirePermission("users", "delete"), ...)
+			}
+			*/
+
+			// Settings
 			settingsGroup := protectedGroup.Group("/settings")
 			{
 				// UI Settings
 				settingsGroup.GET("/ui", middleware.RequirePermission("settings", "read"), ui_settings.GetSettingsHandler)
-				// settingsGroup.PUT("/ui", middleware.RequirePermission("settings", "update"), uisettings.UpdateSettingsHandler) // Old PUT
 				settingsGroup.PATCH("/ui", middleware.RequirePermission("settings", "update"), ui_settings.UpdateSettingsHandler)
 			}
+
+			// Commands, Plugins, Themes (Placeholders)
+			// commands := protectedGroup.Group("/commands") { ... }
+			// plugins := protectedGroup.Group("/plugins") { ... }
+			// themes := protectedGroup.Group("/themes") { ... }
 		}
 	}
 

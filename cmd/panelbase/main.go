@@ -17,12 +17,15 @@ import (
 
 	// Import the config package
 	"github.com/OG-Open-Source/PanelBase/internal/bootstrap"
-	"github.com/OG-Open-Source/PanelBase/internal/config"      // Use the correct module path
-	"github.com/OG-Open-Source/PanelBase/internal/middleware"  // Import middleware
-	"github.com/OG-Open-Source/PanelBase/internal/routes"      // Import the routes package
-	"github.com/OG-Open-Source/PanelBase/internal/token_store" // Import token store
-	"github.com/OG-Open-Source/PanelBase/internal/ui_settings" // Import ui_settings package
-	"github.com/OG-Open-Source/PanelBase/internal/user"        // Import user package
+	"github.com/OG-Open-Source/PanelBase/internal/config" // Use the correct module path
+
+	// Import the new logging package
+	logger "github.com/OG-Open-Source/PanelBase/internal/logging" // Import with logger alias
+	"github.com/OG-Open-Source/PanelBase/internal/middleware"     // Import middleware
+	"github.com/OG-Open-Source/PanelBase/internal/routes"         // Import the routes package
+	"github.com/OG-Open-Source/PanelBase/internal/token_store"    // Import token store
+	"github.com/OG-Open-Source/PanelBase/internal/ui_settings"    // Import ui_settings package
+	"github.com/OG-Open-Source/PanelBase/internal/user"           // Import user package
 
 	// Remove cors import: "github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -31,113 +34,128 @@ import (
 const logsDir = "logs" // Consistent with bootstrap
 
 func main() {
-	// Bootstrap: Ensure config/logs directories exist first
-	// Bootstrap now returns a list of created items.
-	createdItems, err := bootstrap.Bootstrap()
-	if err != nil {
-		log.Fatalf("Failed to bootstrap application: %v", err)
+	// --- Early Logging Setup ---
+	// Ensure logs directory exists BEFORE trying to open log file
+	if _, err := os.Stat(logsDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(logsDir, 0755); err != nil {
+			log.Fatalf("FATAL: Failed to create logs directory '%s': %v", logsDir, err)
+		}
 	}
-	// Log created items if any
-	if len(createdItems) > 0 {
-		log.Printf("Bootstrap created items: %v", createdItems)
-	}
-
-	// Initialize the token store database
-	if err := token_store.InitStore(); err != nil {
-		log.Fatalf("Failed to initialize token store: %v", err)
-	}
-	defer token_store.CloseStore()
-
-	// Load user configuration AFTER bootstrap and token store init
-	if err := user.LoadUsersConfig(); err != nil {
-		log.Fatalf("Failed to load user configuration: %v", err)
-	}
-
-	// Load UI settings configuration AFTER bootstrap
-	if err := ui_settings.LoadUISettings(); err != nil {
-		log.Fatalf("Failed to load UI settings configuration: %v", err)
-	}
-
-	// --- Setup Logging (Reduced Output) ---
-	// Generate timestamped log filename
-	timestamp := time.Now().UTC().Format("2006-01-02T15_04_05Z") // Use underscores for filename compatibility
+	timestamp := time.Now().UTC().Format("2006-01-02T15_04_05Z")
 	logFileName := fmt.Sprintf("%s.log", timestamp)
 	logFilePath := filepath.Join(logsDir, logFileName)
 	logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		log.Fatalf("Failed to open log file %s: %v", logFilePath, err)
+		// Use standard log here as logging package might not be fully ready
+		log.Fatalf("FATAL: Failed to open log file %s: %v", logFilePath, err)
 	}
 	defer logFile.Close()
 
 	multiWriter := io.MultiWriter(os.Stdout, logFile)
 	log.SetOutput(multiWriter)
-	log.SetFlags(log.LstdFlags) // Keep date and time
+	log.SetFlags(0) // IMPORTANT: Set flags to 0 BEFORE any logging calls
 	gin.DefaultWriter = multiWriter
+	// --- End Early Logging Setup ---
 
-	// Remove verbose logging setup message
-	// log.Println("Logging configured to output to console and", logFilePath)
-	// --- End Logging Setup ---
+	logger.Printf("MAIN", "START", "Starting PanelBase...")
 
-	// Load configuration
+	// --- Bootstrap FIRST ---
+	// Run bootstrap early to ensure config files and directories exist before loading.
+	logger.Printf("MAIN", "BOOTSTRAP", "Running bootstrap process...")
+	createdItems, err := bootstrap.Bootstrap()
+	if err != nil {
+		// Use standard log for critical bootstrap failure before full logging is configured
+		log.Printf("FATAL: Failed to bootstrap application: %v", err)
+		os.Exit(1)
+	}
+	if len(createdItems) > 0 {
+		// Log created items *after* setting debug mode potentially
+		// We'll log this later, after config load and debug mode set.
+		// logger.Printf("MAIN", "BOOTSTRAP", "Bootstrap created items: %v", createdItems)
+	}
+	logger.Printf("MAIN", "BOOTSTRAP", "Bootstrap completed.")
+
+	// --- Configuration Loading ---
+	logger.Printf("MAIN", "CONFIG", "Loading configuration...")
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		logger.ErrorPrintf("MAIN", "CONFIG", "Failed to load configuration: %v", err)
+		os.Exit(1)
+	}
+	logger.Printf("MAIN", "CONFIG", "Configuration loaded: %+v", cfg.Server)
+
+	// --- Initialize Logging Level (After config is loaded) ---
+	logger.SetDebugMode(cfg.Server.Mode == "debug") // Set debug mode based on server mode
+
+	// Log created bootstrap items *now* that logging level is set
+	if len(createdItems) > 0 {
+		logger.Printf("MAIN", "BOOTSTRAP", "Bootstrap created items: %v", createdItems)
 	}
 
-	// Remove logging of loaded mode
-	// log.Printf("[Config] Loaded server mode from config.toml: '%s'", cfg.Server.Mode)
+	// Initialize the token store database
+	logger.Printf("MAIN", "TOKEN_STORE", "Initializing token store...")
+	if err := token_store.InitStore(); err != nil {
+		logger.ErrorPrintf("MAIN", "TOKEN_STORE", "Failed to initialize token store: %v", err)
+		os.Exit(1)
+	}
+	defer token_store.CloseStore()
+	logger.Printf("MAIN", "TOKEN_STORE", "Token store initialized.")
 
-	// Set Gin mode directly, without extra logging.
+	// Load user configuration AFTER bootstrap and token store init
+	logger.Printf("MAIN", "USER_SVC", "Loading user configuration...")
+	if err := user.LoadUsersConfig(); err != nil {
+		logger.ErrorPrintf("MAIN", "USER_SVC", "Failed to load user configuration: %v", err)
+		os.Exit(1)
+	}
+	logger.Printf("MAIN", "USER_SVC", "User configuration loaded.")
+
+	// Load UI settings configuration AFTER bootstrap
+	logger.Printf("MAIN", "UI_SVC", "Loading UI settings...")
+	if err := ui_settings.LoadUISettings(); err != nil {
+		logger.ErrorPrintf("MAIN", "UI_SVC", "Failed to load UI settings configuration: %v", err)
+		os.Exit(1)
+	}
+	logger.Printf("MAIN", "UI_SVC", "UI settings loaded.")
+
+	// --- Gin Setup ---
+	logger.Printf("MAIN", "GIN", "Setting up Gin router...")
 	gin.SetMode(cfg.Server.Mode)
-	// Remove logging of mode setting
-	// log.Printf("[Main] Set Gin mode based on config: '%s'", cfg.Server.Mode)
-
-	// Initialize Gin engine
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(middleware.CacheRequestBody())
-	router.Use(middleware.CustomLogger())
-
-	// Remove CORS middleware usage
-	// router.Use(cors.Default())
-
-	// Setup routes
+	router.Use(middleware.CustomLogger()) // CustomLogger already uses RFC3339
 	routes.SetupRoutes(router, cfg)
+	logger.Printf("MAIN", "GIN", "Gin router setup complete.")
 
-	// Create the HTTP server instance
+	// --- Start Server ---
 	serverAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	srv := &http.Server{
 		Addr:    serverAddr,
 		Handler: router,
 	}
 
-	// Start server in a goroutine
 	go func() {
-		// Keep the essential starting server message
-		// log.Printf("Starting server on %s in %s mode...", serverAddr, gin.Mode())
-		log.Printf("Starting server in %s mode on %s...", strings.ToUpper(gin.Mode()), serverAddr)
+		logger.Printf("MAIN", "HTTP_SERVER", "Starting server in %s mode on %s...", strings.ToUpper(gin.Mode()), serverAddr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Listen and serve error: %s\n", err)
+			logger.ErrorPrintf("MAIN", "HTTP_SERVER", "Listen and serve error: %s", err)
+			os.Exit(1)
 		}
-		// Keep the server stopped message
-		log.Println("HTTP server shut down gracefully.")
+		logger.Printf("MAIN", "HTTP_SERVER", "HTTP server shut down gracefully.")
 	}()
 
-	// Wait for interrupt signal
+	// --- Shutdown Handling ---
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	receivedSignal := <-quit
-	// Keep shutdown messages
-	log.Printf("Received signal: %v. Shutting down server...", receivedSignal)
+	logger.Printf("MAIN", "SHUTDOWN", "Received signal: %v. Shutting down server...", receivedSignal)
 
-	// Graceful shutdown context
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatal("Server forced to shutdown uncleanly: ", err)
+		logger.ErrorPrintf("MAIN", "SHUTDOWN", "Server forced to shutdown uncleanly: %v", err)
+		os.Exit(1)
 	}
 
-	// Keep the final exiting message
-	log.Println("Server exiting.")
+	logger.Printf("MAIN", "SHUTDOWN", "Server exiting.")
 }

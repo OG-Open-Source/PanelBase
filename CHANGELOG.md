@@ -11,6 +11,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - (Future changes will go here)
 
+## [0.9.0] - 2025-04-08 Logging Overhaul and Refinements
+
+### Added
+
+- Centralized logging functions in `internal/logging` package (`logger.Printf`, `logger.ErrorPrintf`, `logger.DebugPrintf`).
+- Logging functions now accept `module` and `action` parameters for structured logging.
+- Centralized middleware context key definitions into `internal/middleware/context_keys.go`.
+
+### Changed
+
+- **Logging Format**: Standardized all log timestamps to UTC RFC3339.
+- **Logging Detail**: Log output detail now depends on `server.mode`:
+  - `debug`: `TIMESTAMP [LEVEL] | MODULE | ACTION | MESSAGE`
+  - `release`/`test`: `TIMESTAMP [LEVEL] | MODULE | MESSAGE` (Action is omitted)
+- Renamed logging functions (e.g., `Infof` -> `Printf`).
+- Refactored all codebase logging calls to use the new structured logging functions and `logger` import alias.
+- Removed non-leveled logging functions (`Println`) from the `logging` package.
+
+### Fixed
+
+- **Startup Order**: Moved `bootstrap.Bootstrap()` before `config.LoadConfig()` in `main.go` to ensure configuration files exist before loading, resolving startup errors when config is missing.
+- Corrected various compilation errors resulting from logging and context key refactoring.
+
+## [0.8.0] - 2025-04-07 Token Store and Logging Improvements
+
+### Added
+
+- Added `CreatedAt` field to `TokenInfo` struct in token store for better token metadata tracking.
+
+### Changed
+
+- Removed dedicated `log_level` configuration in favor of `server.mode` based debugging.
+- Debug logs are now controlled by `server.mode` in `config.toml`:
+  - `debug` mode: Shows all logs including DEBUG level
+  - `release` and `test` modes: Show only INFO and ERROR logs
+- Updated internal logging functions to use centralized `logging` package.
+- Improved debug log format to `[DEBUG] | MODULE | ACTION | RESULT` for better readability.
+
+### Fixed
+
+- Fixed compilation errors in auth and API token services related to missing `CreatedAt` field.
+- Resolved token metadata tracking issues by adding proper creation timestamp support.
+
 ## [0.7.2] - 2025-04-07 Refinements and Centralization
 
 ### Changed

@@ -1,8 +1,6 @@
 package middleware
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -89,45 +87,23 @@ func CustomLogger() gin.HandlerFunc {
 
 		// Get cached request body and format it
 		var requestBodyStr string
-		bodyVal, bodyExists := param.Keys[ContextKeyRequestBody]
-		isBodyEmpty := true
-		if bodyExists {
-			if bodyBytes, ok := bodyVal.([]byte); ok {
-				if len(bodyBytes) > 0 {
-					// Try to compact JSON into a single line
-					compactBodyBuffer := new(bytes.Buffer)
-					if err := json.Compact(compactBodyBuffer, bodyBytes); err == nil {
-						// Compaction successful, use the compact JSON string
-						requestBodyStr = compactBodyBuffer.String()
-						isBodyEmpty = false // Consider it non-empty if compaction worked
-					} else {
-						// Compaction failed (not valid JSON?), log the original bytes
-						requestBodyStr = "[Non-JSON Body]: " + string(bodyBytes)
-						isBodyEmpty = false // Still log the non-JSON content
-					}
-
-					// Truncate if necessary AFTER compaction/conversion
-					const maxBodyLogLength = 1024 // Adjust as needed
-					if len(requestBodyStr) > maxBodyLogLength {
-						requestBodyStr = requestBodyStr[:maxBodyLogLength] + "... (truncated)"
-					}
+		if cachedBody, exists := param.Keys[string(ContextKeyRequestBody)]; exists {
+			if bodyBytes, ok := cachedBody.([]byte); ok && len(bodyBytes) > 0 {
+				// Limit body length to prevent excessively long logs
+				maxLogBodySize := 1024
+				if len(bodyBytes) > maxLogBodySize {
+					requestBodyStr = string(bodyBytes[:maxLogBodySize]) + "... (truncated)"
 				} else {
-					// Body exists but is empty
-					requestBodyStr = "[Empty Body Data]"
-					// isBodyEmpty remains true
+					requestBodyStr = string(bodyBytes)
 				}
-			} else {
-				requestBodyStr = "[Invalid Body Cache Format]"
-				isBodyEmpty = false // Treat format error as non-empty for logging
 			}
 		} else {
 			requestBodyStr = "[No Body Cache]"
-			// isBodyEmpty remains true
 		}
 
 		// Get User ID (sub) from context if available, default to "-"
 		var userIDStr string = "-"
-		userIDVal, userExists := param.Keys[ContextKeyUserID]
+		userIDVal, userExists := param.Keys[string(ContextKeyUserID)]
 		if userExists {
 			if uid, ok := userIDVal.(string); ok {
 				userIDStr = uid
@@ -149,7 +125,7 @@ func CustomLogger() gin.HandlerFunc {
 		)
 
 		// Append second line IF body exists, regardless of method or auth status
-		if !isBodyEmpty {
+		if requestBodyStr != "" {
 			// userIDStr will correctly be "-" if user wasn't authenticated
 			logLine += fmt.Sprintf("\n      %s: %s", userIDStr, requestBodyStr)
 		}

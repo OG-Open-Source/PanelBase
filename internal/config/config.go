@@ -85,4 +85,12 @@ func LoadConfig() (*Config, error) {
 
 	return cfg, nil
 }
- 
+
+// ServerConfig holds server-related settings
+type ServerConfig struct {
+	Address string `toml:"address"`
+	Mode    string `toml:"mode"`
+	// LogLevel string `toml:"log_level"` // Remove LogLevel field
+}
+
+// JWTConfig holds JWT-related settings

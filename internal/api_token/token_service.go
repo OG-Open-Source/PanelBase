@@ -115,7 +115,7 @@ func CreateAPIToken(user models.User, payload models.CreateAPITokenPayload) (str
 	if err != nil {
 		return "", models.APIToken{}, "", fmt.Errorf("failed to generate token ID: %w", err)
 	}
-	tokenID := "tok_" + randomPart // This ID will be the map key and JWT jti
+	tokenID := "tok_" + randomPart // Changed prefix to tok_ // This ID will be the map key and JWT jti
 
 	// 5. Create API Token Metadata using finalScopes
 	apiTokenMeta := models.APIToken{
