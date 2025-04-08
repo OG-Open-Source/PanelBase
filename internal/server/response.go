@@ -1,7 +1,9 @@
 package server
 
 import (
+	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -58,3 +60,28 @@ func ExampleHandler(c *gin.Context) {
 	SuccessResponse(c, "Data retrieved successfully.", data)
 }
 */
+
+// Get data
+func getData() (interface{}, error) {
+	// Implementation of getData function
+	return nil, nil // Placeholder return, actual implementation needed
+}
+
+func ExampleHandler(c *gin.Context) {
+	// Get data
+	data, err := getData()
+	if err != nil {
+		log.Printf("%s Error getting data: %v", time.Now().UTC().Format(time.RFC3339), err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	// Simulate validation error
+	if someValue := c.Query("value"); someValue == "" {
+		ErrorResponse(c, http.StatusBadRequest, "Missing required query parameter 'value'.")
+		return
+	}
+
+	// Send success response
+	SuccessResponse(c, "Data retrieved successfully.", data)
+}

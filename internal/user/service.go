@@ -6,8 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
-	logger "github.com/OG-Open-Source/PanelBase/internal/logging" // Import logging
+	"log" // Added for logging potential errors during save
+
 	"github.com/OG-Open-Source/PanelBase/internal/models"
 )
 
@@ -31,39 +33,32 @@ func LoadUsersConfig() error {
 	}
 
 	filePath := filepath.Join(configsDir, usersFileName)
-	logger.Printf("USER_SVC", "LOAD", "Reading users config from: %s", filePath)
-
+	// Check if file exists
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		logger.Printf("USER_SVC", "LOAD", "File '%s' not found. Will be created by bootstrap if needed.", filePath)
-		// File doesn't exist, return empty config and let bootstrap handle creation
-		usersConfig = &models.UsersConfig{Users: make(map[string]models.User)}
+		log.Printf("File '%s' not found. Will be created by bootstrap if needed.", filePath)
+		usersConfig = &models.UsersConfig{
+			JwtSecret: "",
+			Users:     make(map[string]models.User),
+		}
 		return nil
 	}
 
+	// Read file
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		logger.ErrorPrintf("USER_SVC", "LOAD", "Failed to read file '%s': %v", filePath, err)
-		return fmt.Errorf("failed to read users config file '%s': %w", filePath, err)
+		return fmt.Errorf("failed to read users config file: %w", err)
 	}
 
-	// If the file is empty, initialize with an empty map
-	if len(data) == 0 {
-		usersConfig = &models.UsersConfig{Users: make(map[string]models.User)}
-		logger.Printf("USER_SVC", "LOAD", "File '%s' was empty. Initialized empty map.", filePath)
-		return nil
-	}
-
+	// Parse JSON
 	if err := json.Unmarshal(data, &usersConfig); err != nil {
-		logger.ErrorPrintf("USER_SVC", "LOAD", "Failed to unmarshal '%s': %v", filePath, err)
-		return fmt.Errorf("failed to unmarshal users config '%s': %w", filePath, err)
+		return fmt.Errorf("failed to parse users config file: %w", err)
 	}
 
-	// Ensure Users map is initialized if file contained `null` or was empty object
 	if usersConfig.Users == nil {
 		usersConfig.Users = make(map[string]models.User)
 	}
 
-	logger.Printf("USER_SVC", "LOAD", "Loaded config with %d users.", len(usersConfig.Users))
+	log.Printf("Loaded users config with %d users.", len(usersConfig.Users))
 	return nil
 }
 
@@ -126,106 +121,72 @@ func GetUserByUsername(username string) (models.User, bool, error) {
 	return models.User{}, false, nil // Not found
 }
 
-// AddUser adds a new user (using UserID as key).
-func AddUser(newUser models.User) error {
-	mu.Lock()
-	defer mu.Unlock()
-
-	if usersConfig == nil {
-		return fmt.Errorf("users config not loaded")
-	}
-	if usersConfig.Users == nil {
-		usersConfig.Users = make(map[string]models.User)
+// AddUser adds a new user to the configuration
+func AddUser(user models.User) error {
+	// Check if user already exists
+	if _, exists := usersConfig.Users[user.ID]; exists {
+		return fmt.Errorf("user with ID %s already exists", user.ID)
 	}
 
-	if _, exists := usersConfig.Users[newUser.ID]; exists {
-		return fmt.Errorf("user with ID '%s' already exists", newUser.ID)
-	}
+	// Add user to config
+	usersConfig.Users[user.ID] = user
 
-	for _, existingUser := range usersConfig.Users {
-		if existingUser.Username == newUser.Username {
-			return fmt.Errorf("username '%s' already exists", newUser.Username)
-		}
-	}
-
-	usersConfig.Users[newUser.ID] = newUser
-
-	// filePath := filepath.Join(configsDir, usersFileName)
-	// Attempt to save the updated config
+	// Save config
 	if err := saveUsersConfig(); err != nil {
-		// Rollback the in-memory addition if save fails
-		delete(usersConfig.Users, newUser.ID)
-		logger.ErrorPrintf("USER_SVC", "ADD", "Failed to save users config after adding user %s: %v", newUser.ID, err)
-		return fmt.Errorf("user added in memory but failed to save config: %w", err)
+		// Rollback in memory
+		delete(usersConfig.Users, user.ID)
+		log.Printf("%s ERROR: User added in memory but failed to save config. Rolled back addition. Err: %v", time.Now().UTC().Format(time.RFC3339), err)
+		return fmt.Errorf("failed to save users config: %w", err)
 	}
 
 	return nil
 }
 
-// UpdateUser updates an existing user's data (using UserID as key).
-func UpdateUser(updatedUser models.User) error {
-	mu.Lock()
-	defer mu.Unlock()
-
-	if usersConfig == nil {
-		return fmt.Errorf("users config not loaded")
-	}
-	if usersConfig.Users == nil {
-		return fmt.Errorf("users map is nil, cannot update")
+// UpdateUser updates an existing user in the configuration
+func UpdateUser(user models.User) error {
+	// Check if user exists
+	if _, exists := usersConfig.Users[user.ID]; !exists {
+		return fmt.Errorf("user with ID %s does not exist", user.ID)
 	}
 
-	originalUser, exists := usersConfig.Users[updatedUser.ID]
-	if !exists {
-		return fmt.Errorf("user with ID '%s' not found for update", updatedUser.ID)
-	}
+	// Store old user data for rollback
+	oldUser := usersConfig.Users[user.ID]
 
-	for userID, existingUser := range usersConfig.Users {
-		if userID != updatedUser.ID && existingUser.Username == updatedUser.Username {
-			return fmt.Errorf("cannot update user: username '%s' is already taken by another user", updatedUser.Username)
-		}
-	}
+	// Update user in config
+	usersConfig.Users[user.ID] = user
 
-	usersConfig.Users[updatedUser.ID] = updatedUser
-
-	// filePath := filepath.Join(configsDir, usersFileName)
-	// Attempt to save the updated config
+	// Save config
 	if err := saveUsersConfig(); err != nil {
-		// Rollback the in-memory update if save fails
-		usersConfig.Users[updatedUser.ID] = originalUser // Restore original
-		logger.ErrorPrintf("USER_SVC", "UPDATE", "Failed to save users config after updating user %s: %v", updatedUser.ID, err)
-		return fmt.Errorf("user updated in memory but failed to save config: %w", err)
+		// Rollback in memory
+		usersConfig.Users[user.ID] = oldUser
+		log.Printf("%s ERROR: User updated in memory but failed to save config. Rolled back update for user %s. Err: %v", time.Now().UTC().Format(time.RFC3339), user.ID, err)
+		return fmt.Errorf("failed to save users config: %w", err)
 	}
 
 	return nil
 }
 
-// DeleteUser removes a user by ID (using UserID as key).
+// DeleteUser deletes a user from the configuration
 func DeleteUser(id string) error {
-	mu.Lock()
-	defer mu.Unlock()
-
-	if usersConfig == nil {
-		return fmt.Errorf("users config not loaded")
-	}
-	if usersConfig.Users == nil {
-		return fmt.Errorf("users map is nil, cannot delete")
+	// Check if user exists
+	if _, exists := usersConfig.Users[id]; !exists {
+		return fmt.Errorf("user with ID %s does not exist", id)
 	}
 
-	userToDelete, exists := usersConfig.Users[id]
-	if !exists {
-		return fmt.Errorf("user with ID '%s' not found for deletion", id)
-	}
+	// Store old user data for rollback
+	oldUser := usersConfig.Users[id]
 
+	// Delete user from config
 	delete(usersConfig.Users, id)
 
-	// filePath := filepath.Join(configsDir, usersFileName)
-	// Attempt to save the updated config
+	// Save config
 	if err := saveUsersConfig(); err != nil {
-		// Rollback the in-memory deletion if save fails
-		usersConfig.Users[id] = userToDelete // Put it back
-		logger.ErrorPrintf("USER_SVC", "DELETE", "Failed to save users config after deleting user %s: %v", id, err)
-		return fmt.Errorf("user deleted in memory but failed to save config: %w", err)
+		// Rollback in memory
+		usersConfig.Users[id] = oldUser
+		log.Printf("%s ERROR: User deleted in memory but failed to save config. Rolled back deletion for user %s. Err: %v", time.Now().UTC().Format(time.RFC3339), id, err)
+		return fmt.Errorf("failed to save users config: %w", err)
 	}
+
 	return nil
 }
 

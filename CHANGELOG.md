@@ -7,52 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Configuration**: Changed configuration format from JSON to TOML, moved config file from `config/config.json` to `configs/config.toml`.
+- **Configuration**: Changed token expiration time format from `time.Duration` to seconds (integer).
+- **User Management**: Improved user creation logic with creation time and random password generation.
+- **Logging**: Standardized to RFC3339 time format, removed inconsistent time formats.
+- **Bootstrap**: Changed port range from 35960-35970 to 1024-49151 for better port availability.
+
+### Fixed
+
+- Resolved a build error (`too many arguments`) in `cmd/panelbase/main.go` caused by an incorrect call to `routes.SetupRoutes`.
+- Fixed a compilation error (`undefined: store`) in `internal/token_store/store.go` by removing a redundant variable assignment.
+
 ### Added
 
 - (Future changes will go here)
 
-## [0.9.0] - 2025-04-08 Logging Overhaul and Refinements
-
-### Added
-
-- Centralized logging functions in `internal/logging` package (`logger.Printf`, `logger.ErrorPrintf`, `logger.DebugPrintf`).
-- Logging functions now accept `module` and `action` parameters for structured logging.
-- Centralized middleware context key definitions into `internal/middleware/context_keys.go`.
+## [0.8.1] - 2025-04-08 Logger and API ID Refinements
 
 ### Changed
 
-- **Logging Format**: Standardized all log timestamps to UTC RFC3339.
-- **Logging Detail**: Log output detail now depends on `server.mode`:
-  - `debug`: `TIMESTAMP [LEVEL] | MODULE | ACTION | MESSAGE`
-  - `release`/`test`: `TIMESTAMP [LEVEL] | MODULE | MESSAGE` (Action is omitted)
-- Renamed logging functions (e.g., `Infof` -> `Printf`).
-- Refactored all codebase logging calls to use the new structured logging functions and `logger` import alias.
-- Removed non-leveled logging functions (`Println`) from the `logging` package.
-
-### Fixed
-
-- **Startup Order**: Moved `bootstrap.Bootstrap()` before `config.LoadConfig()` in `main.go` to ensure configuration files exist before loading, resolving startup errors when config is missing.
-- Corrected various compilation errors resulting from logging and context key refactoring.
-
-## [0.8.0] - 2025-04-07 Token Store and Logging Improvements
-
-### Added
-
-- Added `CreatedAt` field to `TokenInfo` struct in token store for better token metadata tracking.
-
-### Changed
-
-- Removed dedicated `log_level` configuration in favor of `server.mode` based debugging.
-- Debug logs are now controlled by `server.mode` in `config.toml`:
-  - `debug` mode: Shows all logs including DEBUG level
-  - `release` and `test` modes: Show only INFO and ERROR logs
-- Updated internal logging functions to use centralized `logging` package.
-- Improved debug log format to `[DEBUG] | MODULE | ACTION | RESULT` for better readability.
-
-### Fixed
-
-- Fixed compilation errors in auth and API token services related to missing `CreatedAt` field.
-- Resolved token metadata tracking issues by adding proper creation timestamp support.
+- **Logging**: Replaced `zerolog` with a custom Gin middleware logger using the standard `log` package.
+    - Format: `[API/WEB] RFC3339_Timestamp | Status | Latency | ClientIP | Method Path Errors`.
+    - Added request body logging on a new line, prefixed by UserID (from context) or '-' with 6 spaces indentation: `      userID: {body}`.
+    - Removed default flags from standard logger to allow full custom formatting.
+- **API Token Handling**: Standardized the identifier for API tokens in API requests and routes.
+    - Changed JSON field in request bodies (Update/Delete) from `token_id` to `id`.
+    - Changed URL path parameter for getting a specific token from `:token_id` to `:id` (`GET /api/v1/account/token/:id`).
+    - Updated handlers (`internal/api_token/token_handler.go`), routes (`internal/routes/routes.go`), documentation (`COMMANDS.md`), and test script (`example/test/test_api.sh`) accordingly.
 
 ## [0.7.2] - 2025-04-07 Refinements and Centralization
 

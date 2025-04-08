@@ -8,11 +8,12 @@ import (
 	"net/http"
 	"strings"
 
-	logger "github.com/OG-Open-Source/PanelBase/internal/logging"
 	"github.com/OG-Open-Source/PanelBase/internal/models"
 	"github.com/OG-Open-Source/PanelBase/internal/server"
 	"github.com/gin-gonic/gin"
 )
+
+// Constants for context keys are now defined in context_keys.go
 
 // Helper function to extract ID from request body (Potentially problematic, consider alternatives)
 func extractIDFromRequestBody(c *gin.Context) (string, bool) {
@@ -34,62 +35,53 @@ func extractIDFromRequestBody(c *gin.Context) (string, bool) {
 	return "", false
 }
 
-// CheckPermission checks if the user has the required permission for a resource and action.
-// It retrieves user permissions from the Gin context (set by AuthMiddleware).
-// requiredPermission format: "resource:action" or "resource:action:scope" (e.g., "users:read:all")
-func CheckPermission(c *gin.Context, resource string, requiredPermission string) bool {
-	permissionsVal, exists := c.Get(string(ContextKeyPermissions))
+// CheckPermission is a helper function to check if the user has the required permission.
+// It returns true if allowed, false otherwise.
+// It also handles sending the 403 response if permission is denied.
+func CheckPermission(c *gin.Context, resource string, requiredAction string) bool {
+	// Use string(Constant) to get the key for context lookup
+	permissions, exists := c.Get(string(ContextKeyPermissions))
 	if !exists {
-		logger.ErrorPrintf("PERMISSIONS", "CHECK_NO_CTX", "Permissions not found in context for user trying to access %s with %s", resource, requiredPermission)
-		server.ErrorResponse(c, http.StatusInternalServerError, "Permissions context missing")
+		server.ErrorResponse(c, http.StatusInternalServerError, "User permissions not found in context")
 		return false
 	}
 
-	userPermissions, ok := permissionsVal.(models.UserPermissions)
+	userPermissions, ok := permissions.(models.UserPermissions)
 	if !ok {
-		logger.ErrorPrintf("PERMISSIONS", "CHECK_INVALID_CTX", "Invalid permissions format in context for user trying to access %s with %s", resource, requiredPermission)
-		server.ErrorResponse(c, http.StatusInternalServerError, "Invalid permissions context format")
+		server.ErrorResponse(c, http.StatusInternalServerError, "Invalid user permissions format")
 		return false
 	}
 
-	// Extract user ID for logging purposes
-	userIDVal, _ := c.Get(string(ContextKeyUserID))
-	userID := "[unknown]"
-	if uidStr, okUid := userIDVal.(string); okUid {
-		userID = uidStr
-	}
-
-	// Split required permission into parts (e.g., "api:read:list:all" -> ["api", "read", "list", "all"])
-	// We primarily care about the resource (first part) and the full permission string
-	requiredParts := strings.Split(requiredPermission, ":")
-	if len(requiredParts) < 2 {
-		logger.ErrorPrintf("PERMISSIONS", "CHECK_INVALID_REQ", "Invalid required permission format: %s (must be resource:action[:scope])", requiredPermission)
-		server.ErrorResponse(c, http.StatusInternalServerError, "Internal permission format error")
-		return false
-	}
-	// Note: We use the *full* requiredPermission string for matching, not just the first two parts
-
-	logger.DebugPrintf("PERMISSIONS", "CHECK", "User: %s, Resource: %s, Required: %s (Checking: %s), User Perms: %+v", userID, resource, requiredPermission, requiredPermission, userPermissions)
-
-	// Get the list of actions allowed for the specific resource
-	allowedActions, resourceFound := userPermissions[resource]
-	if !resourceFound {
-		logger.DebugPrintf("PERMISSIONS", "CHECK", "Result: DENIED - Resource '%s' not found in user permissions.", resource)
-		server.ErrorResponse(c, http.StatusForbidden, fmt.Sprintf("Access denied to resource: %s", resource))
+	// Use string(Constant) for user ID lookup as well
+	_, userExists := c.Get(string(ContextKeyUserID))
+	if !userExists {
+		server.ErrorResponse(c, http.StatusInternalServerError, "Authenticated User ID not found in context")
 		return false
 	}
 
-	// Check if the required action (full string) exists in the allowed actions
+	// Extract the actual action from the requiredAction string (e.g., "create" from "api:create")
+	actionParts := strings.Split(requiredAction, ":")
+	actualAction := requiredAction // Default to the full string if no colon
+	if len(actionParts) > 1 {
+		actualAction = strings.Join(actionParts[1:], ":") // Handle actions like "read:list:all"
+	}
+
+	allowedActions, resourceExists := userPermissions[resource]
+
+	if !resourceExists {
+		server.ErrorResponse(c, http.StatusForbidden, fmt.Sprintf("Permission denied: Resource '%s' access not configured", resource))
+		return false
+	}
+
+	// Check if the actual action is in the allowed list for the resource
 	for _, allowedAction := range allowedActions {
-		if allowedAction == requiredPermission {
-			logger.DebugPrintf("PERMISSIONS", "CHECK", "Result: ALLOWED - Action '%s' found for '%s'.", requiredPermission, resource)
+		if allowedAction == actualAction {
 			return true // Permission granted
 		}
 	}
 
-	// If the loop finishes without finding the permission
-	logger.DebugPrintf("PERMISSIONS", "CHECK", "Result: DENIED - Required action '%s' not found in allowed actions for '%s'.", requiredPermission, resource)
-	server.ErrorResponse(c, http.StatusForbidden, fmt.Sprintf("Permission denied for action: %s", requiredPermission))
+	// If loop finishes, the action was not found
+	server.ErrorResponse(c, http.StatusForbidden, fmt.Sprintf("Permission denied: Action '%s' not allowed for resource '%s'", requiredAction, resource))
 	return false
 }
 

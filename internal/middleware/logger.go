@@ -1,11 +1,11 @@
 package middleware
 
 import (
-	"fmt"
-	"strings"
+	"log"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	// "github.com/rs/zerolog/log" // No longer needed for audience check
 	// "github.com/golang-jwt/jwt/v5" // No longer needed for audience check
 )
 
@@ -72,64 +72,86 @@ func ColorForMethod(method string) string {
 
 // CustomLogger returns a gin.HandlerFunc (middleware) that logs requests.
 func CustomLogger() gin.HandlerFunc {
-	return gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
-		var statusBgColor, methodColor, resetColor, blackColor string
-		statusBgColor = BgColorForStatus(param.StatusCode)
-		methodColor = ColorForMethod(param.Method)
-		resetColor = Reset
-		blackColor = Black
+	return func(c *gin.Context) {
+		// Start timer
+		start := time.Now()
 
-		// Determine log prefix based on path
-		logPrefix := "[WEB]"
-		if strings.HasPrefix(param.Path, "/api/") {
-			logPrefix = "[API]"
+		// Process request
+		c.Next()
+
+		// Stop timer
+		duration := time.Since(start)
+
+		// Get status code
+		statusCode := c.Writer.Status()
+
+		// Get client IP
+		clientIP := c.ClientIP()
+
+		// Get request method and path
+		method := c.Request.Method
+		path := c.Request.URL.Path
+
+		// Get user agent
+		userAgent := c.Request.UserAgent()
+
+		// Get request ID from context
+		requestID := c.GetString("request_id")
+		if requestID == "" {
+			requestID = "unknown"
 		}
 
-		// Get cached request body and format it
-		var requestBodyStr string
-		if cachedBody, exists := param.Keys[string(ContextKeyRequestBody)]; exists {
-			if bodyBytes, ok := cachedBody.([]byte); ok && len(bodyBytes) > 0 {
-				// Limit body length to prevent excessively long logs
-				maxLogBodySize := 1024
-				if len(bodyBytes) > maxLogBodySize {
-					requestBodyStr = string(bodyBytes[:maxLogBodySize]) + "... (truncated)"
-				} else {
-					requestBodyStr = string(bodyBytes)
-				}
-			}
-		} else {
-			requestBodyStr = "[No Body Cache]"
+		// Get user ID from context
+		userID := c.GetString("user_id")
+		if userID == "" {
+			userID = "anonymous"
 		}
 
-		// Get User ID (sub) from context if available, default to "-"
-		var userIDStr string = "-"
-		userIDVal, userExists := param.Keys[string(ContextKeyUserID)]
-		if userExists {
-			if uid, ok := userIDVal.(string); ok {
-				userIDStr = uid
-			} else {
-				userIDStr = "[Invalid Sub Format]"
-			}
-		}
-
-		// Main log line format
-		logLine := fmt.Sprintf("%s %s | %s%s %3d %s | %13v | %15s |%s %-7s %s %s%s",
-			logPrefix,
-			param.TimeStamp.UTC().Format(time.RFC3339),
-			statusBgColor, blackColor, param.StatusCode, resetColor,
-			param.Latency,
-			param.ClientIP,
-			methodColor, param.Method, resetColor,
-			param.Path,
-			param.ErrorMessage,
+		// Log the request details
+		log.Printf("%s %s %s %s %s %s %d %v %s",
+			time.Now().UTC().Format(time.RFC3339),
+			requestID,
+			clientIP,
+			method,
+			path,
+			userID,
+			statusCode,
+			duration,
+			userAgent,
 		)
+	}
+}
 
-		// Append second line IF body exists, regardless of method or auth status
-		if requestBodyStr != "" {
-			// userIDStr will correctly be "-" if user wasn't authenticated
-			logLine += fmt.Sprintf("\n      %s: %s", userIDStr, requestBodyStr)
-		}
+// getStatusBgColor 根据状态码返回背景颜色
+func getStatusBgColor(status int) string {
+	switch {
+	case status >= 500:
+		return "\033[41m" // 红色背景
+	case status >= 400:
+		return "\033[43m" // 黄色背景
+	case status >= 300:
+		return "\033[46m" // 青色背景
+	case status >= 200:
+		return "\033[42m" // 绿色背景
+	default:
+		return "\033[47m" // 白色背景
+	}
+}
 
-		return logLine + "\n" // Ensure final newline
-	})
+// getMethodColor 根据请求方法返回颜色
+func getMethodColor(method string) string {
+	switch method {
+	case "GET":
+		return "\033[36m" // 青色
+	case "POST":
+		return "\033[32m" // 绿色
+	case "PUT":
+		return "\033[33m" // 黄色
+	case "DELETE":
+		return "\033[31m" // 红色
+	case "PATCH":
+		return "\033[35m" // 紫色
+	default:
+		return "\033[37m" // 白色
+	}
 }

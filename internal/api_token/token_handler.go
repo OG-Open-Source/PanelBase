@@ -2,10 +2,11 @@ package api_token
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
+	"time"
 
-	logger "github.com/OG-Open-Source/PanelBase/internal/logging"
 	"github.com/OG-Open-Source/PanelBase/internal/middleware"
 	"github.com/OG-Open-Source/PanelBase/internal/models"
 	"github.com/OG-Open-Source/PanelBase/internal/server"
@@ -43,8 +44,8 @@ type DeleteTokenPayload struct {
 
 // Common request structure for identifying a token, potentially for a specific user (admin)
 type targetTokenRequest struct {
-	TokenID string `json:"token_id" binding:"required"`
-	UserID  string `json:"user_id"` // Optional: For admin actions targeting a specific user
+	ID     string `json:"id" binding:"required"`
+	UserID string `json:"user_id"` // Optional: For admin actions targeting a specific user
 }
 
 // CreateTokenRequest defines the expected JSON body for creating a token.
@@ -101,28 +102,14 @@ func CreateTokenHandler(c *gin.Context) {
 		return
 	}
 
-	// Validate target user exists if admin action
-	if targetUserID != requestingUserID {
-		_, userExists, err := user.GetUserByID(targetUserID)
-		if err != nil {
-			logger.ErrorPrintf("API_TOKEN", "CREATE_VALIDATE", "Error checking target user %s existence: %v", targetUserID, err)
-			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to validate target user")
-			return
-		}
-		if !userExists {
-			server.ErrorResponse(c, http.StatusNotFound, fmt.Sprintf("Target user with ID '%s' not found", targetUserID))
-			return
-		}
-		logger.DebugPrintf("API_TOKEN", "CREATE_VALIDATE", "Admin action target user %s validated.", targetUserID)
-	} else {
-		logger.DebugPrintf("API_TOKEN", "CREATE", "Action is for requesting user %s.", targetUserID)
+	// Fetch the target user data
+	targetUserInstance, userExists, err := user.GetUserByID(targetUserID)
+	if err != nil {
+		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to load target user data: "+err.Error())
+		return
 	}
-
-	// Load user data for JWT secret and permission validation
-	userInfo, userFound, err := user.GetUserByID(targetUserID)
-	if err != nil || !userFound {
-		logger.ErrorPrintf("API_TOKEN", "CREATE_LOAD_USER", "Failed to load user data for %s (found: %v): %v", targetUserID, userFound, err)
-		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to load user data")
+	if !userExists {
+		server.ErrorResponse(c, http.StatusNotFound, fmt.Sprintf("Target user with ID '%s' not found", targetUserID))
 		return
 	}
 
@@ -136,7 +123,7 @@ func CreateTokenHandler(c *gin.Context) {
 	}
 
 	// Call the service function to create the token
-	tokenID, _, signedToken, err := CreateAPIToken(userInfo, createPayload)
+	tokenID, _, signedToken, err := CreateAPIToken(targetUserInstance, createPayload)
 	if err != nil {
 		// Handle specific errors from the service
 		if strings.Contains(err.Error(), "exceed user permissions") {
@@ -146,7 +133,7 @@ func CreateTokenHandler(c *gin.Context) {
 		} else if strings.Contains(err.Error(), "invalid duration format") {
 			server.ErrorResponse(c, http.StatusBadRequest, "Invalid duration format: "+err.Error())
 		} else {
-			logger.ErrorPrintf("API_TOKEN", "CREATE_SVC_CALL", "Error creating API token for user %s: %v", targetUserID, err)
+			log.Printf("%s Error creating API token for user %s: %v", time.Now().UTC().Format(time.RFC3339), targetUserID, err)
 			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to create API token: "+err.Error())
 		}
 		return
@@ -167,26 +154,22 @@ func GetTokensHandler(c *gin.Context) {
 	requestingUserID := authUserID.(string)
 
 	// --- Differentiate between Get Specific (path param) and List (query param) ---
-	tokenID := c.Param("token_id") // Try reading from path parameter first
+	tokenIDFromPath := c.Param("id") // Changed parameter name from token_id to id
 	var targetUserID string
 
-	if tokenID != "" {
-		// Case 1: Get Specific Token (token_id from path parameter)
-		// For admin actions on specific token, user_id might be needed from query (optional)
-		targetUserID = c.Query("user_id") // Still check query for optional user_id for admin override
-		logger.DebugPrintf("API_TOKEN", "GET_SPECIFIC", "Path Param token_id: '%s', Query Param user_id: '%s'", tokenID, targetUserID)
-	} else {
-		// Case 2: List Tokens (token_id from path is empty)
-		// user_id comes from query parameter for potential admin action
+	if tokenIDFromPath != "" {
+		// Case 1: Get Specific Token (id from path parameter)
 		targetUserID = c.Query("user_id")
-		logger.DebugPrintf("API_TOKEN", "LIST", "Query Param user_id: '%s'", targetUserID)
+	} else {
+		// Case 2: List Tokens (id from path is empty)
+		targetUserID = c.Query("user_id")
 	}
 	var requiredPermission string
 	isAdminAction := false
 
 	if targetUserID != "" && targetUserID != requestingUserID {
 		isAdminAction = true
-		if tokenID != "" {
+		if tokenIDFromPath != "" {
 			requiredPermission = "api:read:item:all"
 		} else {
 			requiredPermission = "api:read:list:all"
@@ -194,7 +177,7 @@ func GetTokensHandler(c *gin.Context) {
 	} else {
 		isAdminAction = false
 		targetUserID = requestingUserID // Default to self if not specified or same
-		if tokenID != "" {
+		if tokenIDFromPath != "" {
 			requiredPermission = "api:read:item"
 		} else {
 			requiredPermission = "api:read:list"
@@ -208,61 +191,66 @@ func GetTokensHandler(c *gin.Context) {
 	if isAdminAction {
 		_, userExists, err := user.GetUserByID(targetUserID)
 		if err != nil {
-			logger.ErrorPrintf("API_TOKEN", "GET_VALIDATE", "Error checking target user %s existence: %v", targetUserID, err)
+			log.Printf("%s Error checking target user %s existence: %v", time.Now().UTC().Format(time.RFC3339), targetUserID, err)
 		}
 		if !userExists {
 			server.ErrorResponse(c, http.StatusNotFound, fmt.Sprintf("Target user with ID '%s' not found", targetUserID))
 			return
 		}
-		logger.DebugPrintf("API_TOKEN", "GET_VALIDATE", "Admin action target user %s validated.", targetUserID)
 	}
 
 	// --- Call token_store ---
-	if tokenID != "" {
-		// Get specific token info
-		tokenInfo, found, err := token_store.GetTokenInfo(tokenID)
+	if tokenIDFromPath != "" {
+		// Get specific token info using the ID from the path
+		tokenInfo, found, err := token_store.GetTokenInfo(tokenIDFromPath)
 		if err != nil {
-			logger.ErrorPrintf("API_TOKEN", "GET_INFO", "Error getting token info for %s: %v", tokenID, err)
+			log.Printf("%s Error getting token info for %s: %v", time.Now().UTC().Format(time.RFC3339), tokenIDFromPath, err)
 			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to retrieve token details")
 			return
 		}
 		if !found {
-			server.ErrorResponse(c, http.StatusNotFound, fmt.Sprintf("Token with ID '%s' not found", tokenID))
+			server.ErrorResponse(c, http.StatusNotFound, fmt.Sprintf("Token with ID '%s' not found", tokenIDFromPath))
 			return
 		}
 
 		// Verify ownership or admin permission
-		if tokenInfo.UserID != targetUserID {
+		// IMPORTANT: targetUserID here is the USER we are allowed to look at,
+		// either self or the one specified in admin action.
+		if tokenInfo.UserID != targetUserID && !isAdminAction {
+			// If not admin action, token's user must match requesting user (who is targetUserID here)
 			server.ErrorResponse(c, http.StatusForbidden, "Permission denied to access this specific token")
+			return
+		}
+		if isAdminAction && tokenInfo.UserID != targetUserID {
+			// If admin action, token's user must match the target user specified
+			server.ErrorResponse(c, http.StatusForbidden, fmt.Sprintf("Token '%s' does not belong to target user '%s'", tokenIDFromPath, targetUserID))
 			return
 		}
 
 		// Ensure it's an API token
 		if tokenInfo.Audience != AudienceAPI {
-			server.ErrorResponse(c, http.StatusNotFound, fmt.Sprintf("Token with ID '%s' is not an API token", tokenID))
+			server.ErrorResponse(c, http.StatusNotFound, fmt.Sprintf("Token with ID '%s' is not an API token", tokenIDFromPath))
 			return
 		}
 
-		// Add the ID back into the response structure (since TokenInfo doesn't store it)
+		// Add the ID back into the response structure
 		response := struct {
 			token_store.TokenInfo
 			ID string `json:"id"`
 		}{
 			TokenInfo: tokenInfo,
-			ID:        tokenID,
+			ID:        tokenIDFromPath, // Use the ID from the path
 		}
 		server.SuccessResponse(c, "API token details retrieved", response)
 
 	} else {
-		// List tokens for the target user using the dedicated store function
+		// List tokens for the target user
 		tokensInfo, _, err := token_store.GetUserTokens(targetUserID)
 		if err != nil {
-			logger.ErrorPrintf("API_TOKEN", "LIST_STORE_CALL", "Error listing tokens for user %s: %v", targetUserID, err)
+			log.Printf("%s Error listing tokens for user %s: %v", time.Now().UTC().Format(time.RFC3339), targetUserID, err)
 			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to list API tokens")
 			return
 		}
-
-		// Note: GetUserTokens already filters for non-revoked API tokens
 		server.SuccessResponse(c, "API tokens listed successfully", tokensInfo)
 	}
 }
@@ -276,105 +264,102 @@ func UpdateTokenHandler(c *gin.Context) {
 	}
 	authUserID, _ := c.Get(string(middleware.ContextKeyUserID))
 	requestingUserID := authUserID.(string)
-	targetUserID := req.UserID
-	tokenID := req.TokenID
+	// req.UserID is the target user for admin actions
+	// req.ID is the token ID to update
+	targetUserIDForAction := req.UserID
+	tokenIDToUpdate := req.ID
 	var requiredPermission string
 	isAdminAction := false
 
-	if targetUserID != "" && targetUserID != requestingUserID {
+	if targetUserIDForAction != "" && targetUserIDForAction != requestingUserID {
 		isAdminAction = true
 		requiredPermission = "api:update:all"
 	} else {
 		isAdminAction = false
-		targetUserID = requestingUserID // Default to self if not specified or same
+		// If not admin action, or admin targeting self, the effective target user is the requester
+		targetUserIDForAction = requestingUserID
 		requiredPermission = "api:update"
 	}
 	if !middleware.CheckPermission(c, "api", requiredPermission) {
 		return
 	}
 
-	// Validate target user exists if admin action
+	// Validate target user exists if admin action specifies a different user
 	if isAdminAction {
-		_, userExists, err := user.GetUserByID(targetUserID)
+		_, userExists, err := user.GetUserByID(targetUserIDForAction)
 		if err != nil {
-			logger.ErrorPrintf("API_TOKEN", "UPDATE_VALIDATE", "Error checking target user %s existence: %v", targetUserID, err)
-			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to load target user data: "+err.Error())
+			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to check target user data: "+err.Error())
 			return
 		}
 		if !userExists {
-			server.ErrorResponse(c, http.StatusNotFound, fmt.Sprintf("Target user with ID '%s' not found", targetUserID))
+			server.ErrorResponse(c, http.StatusNotFound, fmt.Sprintf("Target user with ID '%s' not found", targetUserIDForAction))
 			return
 		}
-		logger.DebugPrintf("API_TOKEN", "UPDATE_VALIDATE", "Admin action target user %s validated.", targetUserID)
 	}
 
-	// Get the current token info
-	tokenInfo, found, err := token_store.GetTokenInfo(tokenID)
+	// Get the current token info using the token ID from the request
+	tokenInfo, found, err := token_store.GetTokenInfo(tokenIDToUpdate)
 	if err != nil {
-		logger.ErrorPrintf("API_TOKEN", "UPDATE_GET_INFO", "Error getting token info for update %s: %v", tokenID, err)
+		log.Printf("%s Error getting token info for update %s: %v", time.Now().UTC().Format(time.RFC3339), tokenIDToUpdate, err)
 		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to retrieve token details for update")
 		return
 	}
 	if !found {
-		server.ErrorResponse(c, http.StatusNotFound, fmt.Sprintf("Token with ID '%s' not found for update", tokenID))
+		server.ErrorResponse(c, http.StatusNotFound, fmt.Sprintf("Token with ID '%s' not found for update", tokenIDToUpdate))
 		return
 	}
 
 	// Verify ownership or admin permission for the specific token
-	if tokenInfo.UserID != targetUserID {
+	// The token's UserID must match the user we are allowed to act upon (targetUserIDForAction)
+	if tokenInfo.UserID != targetUserIDForAction {
 		server.ErrorResponse(c, http.StatusForbidden, "Permission denied to update this specific token")
 		return
 	}
 
 	// Ensure it's an API token
 	if tokenInfo.Audience != AudienceAPI {
-		server.ErrorResponse(c, http.StatusNotFound, fmt.Sprintf("Token with ID '%s' is not an API token", tokenID))
+		server.ErrorResponse(c, http.StatusNotFound, fmt.Sprintf("Token with ID '%s' is not an API token", tokenIDToUpdate))
 		return
 	}
 
 	// Apply updates from the request (only Name supported currently)
-	updated := false
-	if req.Name != nil && *req.Name != tokenInfo.Name {
-		tokenInfo.Name = *req.Name
-		updated = true
+	if req.Name == nil {
+		server.ErrorResponse(c, http.StatusBadRequest, "Name field is required for token update")
+		return
 	}
-	/* // Description is not part of TokenInfo in store
-	if req.Description != nil { // && *req.Description != tokenInfo.Description {
-		// tokenInfo.Description = *req.Description // Cannot update description here
-		// updated = true
-		log.Printf("Warning: Token description update requested but not supported by current TokenInfo structure.")
-	}
-	*/
 
-	if !updated {
-		// Add the ID back into the response structure even if no changes
+	if *req.Name == tokenInfo.Name {
+		// No changes detected
 		response := struct {
 			token_store.TokenInfo
 			ID string `json:"id"`
 		}{
 			TokenInfo: tokenInfo,
-			ID:        tokenID,
+			ID:        tokenIDToUpdate, // Use the token ID from the request
 		}
-		server.SuccessResponse(c, "No changes detected in token metadata", response)
+		server.SuccessResponse(c, "No changes detected in token name", response)
 		return
 	}
+
+	// Update the token name
+	tokenInfo.Name = *req.Name
 
 	// Store the updated token info
-	if err := token_store.StoreToken(tokenID, tokenInfo); err != nil {
-		logger.ErrorPrintf("API_TOKEN", "UPDATE_STORE", "Error storing updated token info for %s: %v", tokenID, err)
-		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to save updated token metadata")
+	if err := token_store.StoreToken(tokenIDToUpdate, tokenInfo); err != nil {
+		log.Printf("%s Error storing updated token info for %s: %v", time.Now().UTC().Format(time.RFC3339), tokenIDToUpdate, err)
+		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to save updated token name")
 		return
 	}
 
-	// Add the ID back into the response structure
+	// Return the updated info
 	response := struct {
 		token_store.TokenInfo
 		ID string `json:"id"`
 	}{
 		TokenInfo: tokenInfo,
-		ID:        tokenID,
+		ID:        tokenIDToUpdate, // Use the token ID from the request
 	}
-	server.SuccessResponse(c, "API token updated successfully", response)
+	server.SuccessResponse(c, "API token name updated successfully", response)
 }
 
 // DeleteTokenHandler handles deleting/revoking an API token.
@@ -388,82 +373,78 @@ func DeleteTokenHandler(c *gin.Context) {
 		return
 	}
 
-	if req.TokenID == "" {
-		server.ErrorResponse(c, http.StatusBadRequest, "token_id is required")
+	// req.UserID is the target user for admin actions
+	// req.ID is the token ID to delete
+	targetUserIDForAction := req.UserID
+	tokenIDToDelete := req.ID
+
+	if tokenIDToDelete == "" {
+		server.ErrorResponse(c, http.StatusBadRequest, "id field (token ID) is required")
 		return
 	}
 
-	targetUserID := req.UserID
-	tokenID := req.TokenID
 	var requiredPermission string
 	isAdminAction := false
 
-	if targetUserID != "" {
+	if targetUserIDForAction != "" && targetUserIDForAction != requestingUserID {
 		isAdminAction = true
 		requiredPermission = "api:delete:all"
 	} else {
-		targetUserID = requestingUserID // Default to self if not admin action
+		isAdminAction = false
+		// If not admin action, or admin targeting self, the effective target user is the requester
+		targetUserIDForAction = requestingUserID
 		requiredPermission = "api:delete"
 	}
 
 	if !middleware.CheckPermission(c, "api", requiredPermission) {
-		// CheckPermission sends the response, so just return
 		return
 	}
 
-	// If admin action, validate the target user exists
+	// If admin action specifies a different user, validate the target user exists
 	if isAdminAction {
-		_, userExists, err := user.GetUserByID(targetUserID)
+		_, userExists, err := user.GetUserByID(targetUserIDForAction)
 		if err != nil {
-			logger.ErrorPrintf("API_TOKEN", "DELETE_VALIDATE", "Error checking target user %s existence: %v", targetUserID, err)
-			// Don't necessarily fail here, maybe user was just deleted?
+			log.Printf("%s Error checking target user %s existence: %v", time.Now().UTC().Format(time.RFC3339), targetUserIDForAction, err)
+			// Don't expose internal error, just proceed to token check
 		}
 		if !userExists {
-			server.ErrorResponse(c, http.StatusNotFound, "Target user not found")
+			server.ErrorResponse(c, http.StatusNotFound, fmt.Sprintf("Target user with ID '%s' not found", targetUserIDForAction))
 			return
 		}
-		logger.DebugPrintf("API_TOKEN", "DELETE_VALIDATE", "Admin action target user %s validated/checked.", targetUserID)
 	}
 
-	// Get current token info to verify ownership and type
-	tokenInfo, found, err := token_store.GetTokenInfo(tokenID)
+	// Get token info to verify ownership before deleting
+	tokenInfo, found, err := token_store.GetTokenInfo(tokenIDToDelete)
 	if err != nil {
-		logger.ErrorPrintf("API_TOKEN", "DELETE_GET_INFO", "Failed to retrieve token info for delete: %s: %v", tokenID, err)
-		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to retrieve token info: "+err.Error())
+		log.Printf("%s Error getting token info for delete %s: %v", time.Now().UTC().Format(time.RFC3339), tokenIDToDelete, err)
+		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to retrieve token details for deletion")
 		return
 	}
 	if !found {
-		server.ErrorResponse(c, http.StatusNotFound, "Token not found")
+		server.ErrorResponse(c, http.StatusNotFound, fmt.Sprintf("Token with ID '%s' not found for deletion", tokenIDToDelete))
 		return
 	}
 
-	// Verify ownership if not admin action
-	if !isAdminAction && tokenInfo.UserID != requestingUserID {
-		server.ErrorResponse(c, http.StatusForbidden, "You do not own this token")
+	// Verify ownership or admin permission for the specific token
+	// The token's UserID must match the user we are allowed to act upon (targetUserIDForAction)
+	if tokenInfo.UserID != targetUserIDForAction {
+		server.ErrorResponse(c, http.StatusForbidden, "Permission denied to delete this specific token")
 		return
 	}
 
-	// Ensure it's an API token we are deleting, not a web session
+	// Ensure it's an API token (though Revoke works on any JTI, this adds context)
 	if tokenInfo.Audience != AudienceAPI {
-		server.ErrorResponse(c, http.StatusBadRequest, "Cannot delete non-API tokens via this endpoint")
+		log.Printf("%s Warning: Attempting to delete token '%s' which is not marked as an API token (Audience: %s)", time.Now().UTC().Format(time.RFC3339), tokenIDToDelete, tokenInfo.Audience)
+		// Proceed with deletion anyway, as revocation is by JTI
+	}
+
+	// Call the service function to revoke the token
+	if err := token_store.RevokeToken(tokenIDToDelete); err != nil {
+		log.Printf("%s Error revoking token %s: %v", time.Now().UTC().Format(time.RFC3339), tokenIDToDelete, err)
+		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to delete API token")
 		return
 	}
 
-	// If it's an admin action targeting another user, verify the token belongs to the target user
-	if isAdminAction && tokenInfo.UserID != targetUserID {
-		server.ErrorResponse(c, http.StatusForbidden, "Token does not belong to the specified target user")
-		return
-	}
-
-	// Revoke the token in the store
-	err = token_store.RevokeToken(tokenID)
-	if err != nil {
-		logger.ErrorPrintf("API_TOKEN", "DELETE_REVOKE", "Failed to revoke token %s: %v", tokenID, err)
-		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to revoke token")
-		return
-	}
-
-	logger.Printf("API_TOKEN", "DELETE", "Successfully revoked token ID: %s for user: %s", tokenID, targetUserID)
 	server.SuccessResponse(c, "API token deleted successfully", nil)
 }
 

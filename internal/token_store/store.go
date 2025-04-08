@@ -6,96 +6,75 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
-	logger "github.com/OG-Open-Source/PanelBase/internal/logging"
-	"github.com/OG-Open-Source/PanelBase/internal/models"
+	"github.com/OG-Open-Source/PanelBase/internal/models" // For UserPermissions
 	bolt "go.etcd.io/bbolt"
 )
 
-// Constants for database file and bucket names.
+// Constants for database file and bucket names
 const (
-	dbFileName = "configs/tokens.db"
+	dbFileName        = "configs/tokens.db"
+	tokensBucketName  = "tokens"
+	revokedBucketName = "revoked_tokens"
 )
 
-// Variables for database instance and bucket names (as byte slices).
+// Bucket names
 var (
-	db                *bolt.DB // Database instance
-	dbPath            string   // Full path to the database file
-	dbMutex           sync.Mutex
-	tokensBucketName  = []byte("tokens")         // Bucket for storing token details
-	revokedBucketName = []byte("revoked_tokens") // Bucket for storing revoked token JTIs
+	tokenInfoBucket    = []byte("TokenInfo")
+	revokedTokenBucket = []byte("RevokedTokens")
+	// TODO: Add user index bucket if needed: userTokensBucket = []byte("UserTokensIndex")
 )
 
-// TokenInfo defines the structure for storing token metadata in the database.
-// Moved assumption here for clarity, ASSUMING this matches models/token.go if it exists
+var db *bolt.DB // Global database connection variable
+
+// TokenInfo holds the metadata associated with a JTI.
+// This is stored as the value in the TokenInfoBucket.
 type TokenInfo struct {
-	UserID      string                 `json:"user_id"`
-	Audience    string                 `json:"audience"` // e.g., "api", "session"
-	Name        string                 `json:"name,omitempty"`
-	Description string                 `json:"description,omitempty"`
-	Scopes      models.UserPermissions `json:"scopes,omitempty"`
-	IssuedAt    models.RFC3339Time     `json:"issued_at"`
-	ExpiresAt   models.RFC3339Time     `json:"expires_at"`
-	LastUsed    models.RFC3339Time     `json:"last_used,omitempty"`
-	Revoked     bool                   `json:"revoked,omitempty"` // Used internally, not directly stored in tokens bucket
-	CreatedAt   models.RFC3339Time     `json:"created_at"`        // Added CreatedAt field
+	UserID    string                 `json:"user_id"`
+	Name      string                 `json:"name"`
+	Audience  string                 `json:"audience"` // "web" or "api"
+	Scopes    models.UserPermissions `json:"scopes"`
+	CreatedAt models.RFC3339Time     `json:"created_at"`
+	ExpiresAt models.RFC3339Time     `json:"expires_at"`
 }
 
-// InitStore initializes the token store database.
-// It ensures the database file exists and the required buckets are created.
-// func InitStore(configPath string) error { // configPath removed, using dbFileName constant
+// InitStore initializes the BoltDB database and creates necessary buckets.
 func InitStore() error {
-	dbMutex.Lock()
-	defer dbMutex.Unlock()
-
-	if db != nil {
-		return nil // Already initialized
-	}
-
-	// Determine absolute path for the database file
-	wd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get working directory: %w", err)
-	}
-	dbPath = filepath.Join(wd, dbFileName)
-
+	var err error
 	// Ensure the directory exists
-	dbDir := filepath.Dir(dbPath)
-	if err := os.MkdirAll(dbDir, 0750); err != nil {
-		return fmt.Errorf("failed to create token store directory '%s': %w", dbDir, err)
+	dbDirResolved := filepath.Dir(dbFileName) // Use filepath.Dir
+	if err := os.MkdirAll(dbDirResolved, 0750); err != nil {
+		return fmt.Errorf("failed to create token store directory '%s': %w", dbDirResolved, err)
 	}
 
-	// Open the database file.
-	dbInstance, err := bolt.Open(dbPath, 0600, &bolt.Options{Timeout: 1 * time.Second})
+	dbPath := dbFileName // Use the constant directly
+	db, err = bolt.Open(dbPath, 0600, nil)
 	if err != nil {
-		log.Printf("FATAL: Failed to open token store database '%s': %v", dbPath, err)
-		return fmt.Errorf("failed to open token store database '%s': %w", dbPath, err)
+		return fmt.Errorf("failed to open token store database: %w", err)
 	}
-	db = dbInstance
-
-	logger.Printf("TOKEN_STORE", "INIT", "Database opened at: %s", dbPath)
+	log.Printf("Token store database opened at: %s", dbPath)
 
 	// Ensure buckets exist
 	err = db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists(tokensBucketName)
+		// Create tokens bucket if it doesn't exist
+		_, err := tx.CreateBucketIfNotExists([]byte(tokensBucketName))
 		if err != nil {
-			return fmt.Errorf("failed to create token bucket: %w", err)
+			return fmt.Errorf("failed to create tokens bucket: %w", err)
 		}
-		_, err = tx.CreateBucketIfNotExists(revokedBucketName)
+
+		// Create revoked_tokens bucket if it doesn't exist
+		_, err = tx.CreateBucketIfNotExists([]byte(revokedBucketName))
 		if err != nil {
-			return fmt.Errorf("failed to create revoked bucket: %w", err)
+			return fmt.Errorf("failed to create revoked_tokens bucket: %w", err)
 		}
+
 		return nil
 	})
 	if err != nil {
-		log.Printf("FATAL: Failed to ensure buckets in token store: %v", err)
-		CloseStore() // Ensure DB is closed on error
-		return err
+		return fmt.Errorf("failed to ensure buckets: %w", err)
 	}
-	logger.Printf("TOKEN_STORE", "INIT", "Required buckets ensured: %s, %s", string(tokensBucketName), string(revokedBucketName))
-
+	log.Printf("Required token store buckets ensured: %s, %s", tokensBucketName, revokedBucketName)
 	return nil
 }
 
@@ -115,9 +94,9 @@ func StoreToken(jti string, info TokenInfo) error {
 		return fmt.Errorf("token store not initialized")
 	}
 	return db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(tokensBucketName)
+		b := tx.Bucket([]byte(tokensBucketName))
 		if b == nil {
-			return fmt.Errorf("bucket %s not found", string(tokensBucketName))
+			return fmt.Errorf("bucket %s not found", tokensBucketName)
 		}
 
 		// Marshal the TokenInfo struct to JSON
@@ -134,54 +113,35 @@ func StoreToken(jti string, info TokenInfo) error {
 	})
 }
 
-// GetTokenInfo retrieves the metadata for a specific token JTI.
-// It returns the TokenInfo, a boolean indicating if found, and an error.
-func GetTokenInfo(jti string) (info TokenInfo, found bool, err error) {
-	dbMutex.Lock()
-	defer dbMutex.Unlock()
-
+// GetTokenInfo retrieves token metadata by JTI.
+func GetTokenInfo(jti string) (TokenInfo, bool, error) {
 	if db == nil {
 		return TokenInfo{}, false, fmt.Errorf("token store not initialized")
 	}
-
-	err = db.View(func(tx *bolt.Tx) error { // Use the named return variables
-		tokensBucket := tx.Bucket(tokensBucketName)
-		if tokensBucket == nil {
-			return fmt.Errorf("bucket %s not found", string(tokensBucketName))
-		}
-		revokedBucket := tx.Bucket(revokedBucketName)
-		if revokedBucket == nil {
-			logger.ErrorPrintf("TOKEN_STORE", "GET", "Revoked token bucket not found during GetTokenInfo!")
-			return fmt.Errorf("internal error: revoked bucket missing")
+	var info TokenInfo
+	found := false
+	err := db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(tokensBucketName))
+		if b == nil {
+			return fmt.Errorf("bucket %s not found", tokensBucketName)
 		}
 
-		jsonData := tokensBucket.Get([]byte(jti))
+		jsonData := b.Get([]byte(jti))
 		if jsonData == nil {
-			found = false
-			return nil // Not found is not an error for View transaction
+			return nil // Not found
 		}
 
-		if errUnmarshal := json.Unmarshal(jsonData, &info); errUnmarshal != nil {
-			logger.ErrorPrintf("TOKEN_STORE", "GET", "Failed to unmarshal token info for %s: %v", jti, errUnmarshal)
-			// Return the unmarshal error specifically
-			return fmt.Errorf("failed to unmarshal token info for %s: %w", jti, errUnmarshal)
+		if err := json.Unmarshal(jsonData, &info); err != nil {
+			return fmt.Errorf("failed to unmarshal token info for jti %s: %w", jti, err)
 		}
 		found = true
-		logger.DebugPrintf("TOKEN_STORE", "GET", "JTI: %s, Retrieved Info: %+v", jti, info)
-
-		// Check if token is revoked using the already fetched revokedBucket
-		revokedData := revokedBucket.Get([]byte(jti))
-		if revokedData != nil {
-			info.Revoked = true // Set the Revoked field on the retrieved info
-		}
-
-		logger.DebugPrintf("TOKEN_STORE", "GET_RETURN", "JTI: %s, Returning Info: %+v", jti, info)
-		return nil // View transaction successful
+		return nil
 	})
 
-	// Error from db.View() is returned automatically via named return `err`
-	// Info and found are also set correctly within the transaction
-	return info, found, err
+	if err != nil {
+		return TokenInfo{}, false, err
+	}
+	return info, found, nil
 }
 
 // RevokeToken marks a JTI as revoked by adding it to the revoked bucket with the current timestamp.
@@ -190,9 +150,9 @@ func RevokeToken(jti string) error {
 		return fmt.Errorf("token store not initialized")
 	}
 	return db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(revokedBucketName)
+		b := tx.Bucket([]byte(revokedBucketName))
 		if b == nil {
-			return fmt.Errorf("bucket %s not found", string(revokedBucketName))
+			return fmt.Errorf("bucket %s not found", revokedBucketName)
 		}
 
 		// Store the revocation time (or just a marker)
@@ -209,11 +169,11 @@ func IsTokenRevoked(jti string) (bool, error) {
 	}
 	revoked := false
 	err := db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(revokedBucketName)
+		b := tx.Bucket([]byte(revokedBucketName))
 		if b == nil {
 			// If bucket doesn't exist, token cannot be revoked (treat as error or false?)
 			// Let's assume bucket should exist from InitStore
-			return fmt.Errorf("bucket %s not found", string(revokedBucketName))
+			return fmt.Errorf("bucket %s not found", revokedBucketName)
 		}
 
 		val := b.Get([]byte(jti))
@@ -230,14 +190,18 @@ func IsTokenRevoked(jti string) (bool, error) {
 	return revoked, nil
 }
 
-// GetUserTokens retrieves all non-revoked API tokens for a given user ID.
-func GetUserTokens(userID string) (tokens []TokenInfo, count int, err error) {
+// GetUserTokens retrieves all non-revoked API tokens for a specific user.
+// It filters by UserID and ensures the Audience is "api".
+// Returns slices of TokenInfo, corresponding JTIs, and an error.
+func GetUserTokens(userID string) ([]TokenInfo, []string, error) {
 	if db == nil {
-		return nil, 0, fmt.Errorf("token store not initialized")
+		return nil, nil, fmt.Errorf("token store not initialized")
 	}
-	err = db.View(func(tx *bolt.Tx) error {
-		tokensBucket := tx.Bucket(tokensBucketName)
-		revokedBucket := tx.Bucket(revokedBucketName)
+	var tokensInfo []TokenInfo
+	var tokenIDs []string
+	err := db.View(func(tx *bolt.Tx) error {
+		tokensBucket := tx.Bucket([]byte(tokensBucketName))
+		revokedBucket := tx.Bucket([]byte(revokedBucketName))
 		if tokensBucket == nil || revokedBucket == nil {
 			return fmt.Errorf("required buckets not found")
 		}
@@ -250,14 +214,14 @@ func GetUserTokens(userID string) (tokens []TokenInfo, count int, err error) {
 
 			var info TokenInfo
 			if err := json.Unmarshal(v, &info); err != nil {
-				logger.ErrorPrintf("TOKEN_STORE", "LIST", "Error unmarshaling token info for JTI %s: %v. Skipping.", tokenID, err)
+				log.Printf("%s Error unmarshaling token info for JTI %s: %v. Skipping.", time.Now().UTC().Format(time.RFC3339), tokenID, err)
 				return nil
 			}
 
 			// Check if it belongs to the user AND is an API token
 			if info.UserID == userID && info.Audience == "api" {
-				tokens = append(tokens, info)
-				count++
+				tokensInfo = append(tokensInfo, info)
+				tokenIDs = append(tokenIDs, tokenID)
 			}
 
 			return nil
@@ -265,13 +229,17 @@ func GetUserTokens(userID string) (tokens []TokenInfo, count int, err error) {
 	})
 
 	if err != nil {
-		return nil, 0, fmt.Errorf("error retrieving user tokens: %w", err)
+		return nil, nil, fmt.Errorf("error retrieving user tokens: %w", err)
 	}
-	if tokens == nil {
-		tokens = []TokenInfo{}
+	if tokensInfo == nil {
+		tokensInfo = []TokenInfo{}
 	}
-	return tokens, count, nil
+	if tokenIDs == nil {
+		tokenIDs = []string{}
+	}
+	return tokensInfo, tokenIDs, nil
 }
 
+// TODO: Implement GetUserTokens (requires index)
 // TODO: Implement CleanupExpiredTokens (important!)
 // TODO: Implement Replay Protection methods if needed (MarkJTIUsed, IsJTIUsed)

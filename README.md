@@ -11,10 +11,7 @@ _(Add key features here as they are developed)_
 - Basic Permission System
 - Persistent Token Storage (BoltDB)
 - Customizable Logging
-
-## Version
-
-Current version: 0.9.0 (2025-04-08)
+- Configuration Management (JSON-based)
 
 ## Getting Started
 
@@ -27,16 +24,35 @@ go run cmd/panelbase/main.go
 
 ## Configuration
 
-Configuration is managed via `configs/config.toml` and `configs/users.json`.
+Configuration is managed via JSON files in the `config` directory:
+
+- `config/config.json`: Main application configuration
+  - Server settings (host, port, mode)
+  - Authentication settings (JWT secret, token expiry, cookie name)
+
+Example configuration:
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 35960,
+    "mode": "release"
+  },
+  "auth": {
+    "jwt_secret": "your-secret-key",
+    "token_expiry": "24h",
+    "cookie_name": "panelbase_jwt"
+  }
+}
+```
+
+If the configuration file doesn't exist, a default configuration will be created automatically.
 
 ## Changelog
 
-### [0.9.0] - 2025-04-08 Logging Overhaul and Refinements
-
-- Centralized and structured logging (`logger.Printf`, etc. with module/action).
-- Log output detail now depends on `server.mode` (`debug` vs `release`).
-- Standardized log timestamps to RFC3339.
-- Fixed startup order issue (`bootstrap` now runs before config load).
-- Centralized middleware context keys.
-
-See [CHANGELOG.md](CHANGELOG.md) for detailed history.
+### [Unreleased]
+- Added JSON-based configuration management
+- Added automatic default configuration creation
+- Added configuration validation and loading
+- Added configuration saving functionality
+- 优化日志格式：服务器启动前的 bootstrap 相关日志使用 Go 标准日志格式，服务器启动后的日志使用 RFC3339 时间格式

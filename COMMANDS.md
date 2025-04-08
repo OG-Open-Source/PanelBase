@@ -120,22 +120,20 @@ _(Note: These endpoints manage the logged-in user's own account)_
 - **Permissions:** `api:read:list` (for self) or `api:read:list:all` (for admin)
 
 **Query Parameters (Admin Only):**
-
-- `user_id=usr_...`: Specify for admin action (`api:read:list:all`) to list another user's tokens.
+   - `user_id=usr_...`: Specify for admin action (`api:read:list:all`) to list another user's tokens.
 
 **Success Response:** `200 OK` with an array of token metadata objects.
 
-### `GET /api/v1/account/token/:token_id` (Get Specific)
+### `GET /api/v1/account/token/:id` (Get Specific)
 
 - **Description:** Retrieves metadata for a specific API token by its ID.
 - **Requires Auth:** Yes
 - **Permissions:** `api:read:item` (for self) or `api:read:item:all` (for admin)
 - **Path Parameters:**
-  - `:token_id`: The ID (JTI starting with `tok_`) of the token to retrieve.
+  - `:id`: The ID (JTI starting with `tok_`) of the token to retrieve.
 
 **Query Parameters (Admin Only):**
-
-- `user_id=usr_...`: Specify for admin action (`api:read:item:all`) to get a token belonging to another user.
+  - `user_id=usr_...`: Specify for admin action (`api:read:item:all`) to get a token belonging to another user.
 
 **Success Response:** `200 OK` with a single token metadata object.
 
@@ -164,14 +162,13 @@ _(Note: These endpoints manage the logged-in user's own account)_
 - **Path:** `/api/v1/account/token`
 - **Requires Auth:** Yes
 - **Permissions:** `api:update` (for self) or `api:update:all` (for admin, requires `user_id`)
-- **Description:** Partially updates an API token's metadata (currently only `name`). Requires `token_id`.
-- **Request Body (Only `name` update supported):**
+- **Description:** Updates an API token's name. Requires `id`.
+- **Request Body:**
   ```json
   {
-    "token_id": "tok_...", // Required
+    "id": "tok_...", // Required: Token ID to update
     "user_id": "usr_...", // Required only for admin action (api:update:all)
-    "name": "Updated Token Name" // Optional field to update
-    // Description, scopes, and duration updates are not supported via PATCH currently
+    "name": "Updated Token Name" // Required: Only field that can be updated
   }
   ```
 
@@ -181,11 +178,11 @@ _(Note: These endpoints manage the logged-in user's own account)_
 - **Path:** `/api/v1/account/token`
 - **Requires Auth:** Yes
 - **Permissions:** `api:delete` (for self) or `api:delete:all` (for admin, requires `user_id`)
-- **Description:** Deletes (revokes) an API token. Requires `token_id`.
+- **Description:** Deletes (revokes) an API token. Requires `id`.
 - **Request Body:**
   ```json
   {
-    "token_id": "tok_...", // Required, Changed tkn_ to tok_
+    "id": "tok_...", // Required: Token ID to delete
     "user_id": "usr_..." // Required only for admin action (api:delete:all)
   }
   ```

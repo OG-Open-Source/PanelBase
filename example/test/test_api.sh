@@ -198,9 +198,7 @@ make_request GET "/account/token" "" "${ADMIN_SESSION_TOKEN}" "List API Tokens -
 
 # Get Specific API Token for Admin Self (using Session Token)
 if [[ -n "$CREATED_API_TOKEN_ID" ]]; then
-	# OLD: path_with_query="/account/token?token_id=${CREATED_API_TOKEN_ID}"
-	# OLD: make_request GET "${path_with_query}" "" ...
-	# NEW: Construct path with token ID as part of it
+	# Use the ID in the path
 	specific_token_path="/account/token/${CREATED_API_TOKEN_ID}"
 	make_request GET "${specific_token_path}" "" "${ADMIN_SESSION_TOKEN}" "Get Specific API Token - Success (Admin Self, using Session Token)" >/dev/null
 else
@@ -209,8 +207,9 @@ fi
 
 # Update API Token for Admin Self (using Session Token)
 if [[ -n "$CREATED_API_TOKEN_ID" ]]; then
-	update_token_data="{\"token_id\":\"${CREATED_API_TOKEN_ID}\", \"name\":\"Admin API Token UPDATED\"}"
-	make_request PATCH "/account/token" "${update_token_data}" "${ADMIN_SESSION_TOKEN}" "Update API Token - Success (Admin Self, using Session Token)" >/dev/null
+	# Use 'id' in the JSON payload
+	update_token_data="{\"id\":\"${CREATED_API_TOKEN_ID}\",\"name\":\"Admin API Token UPDATED\"}"
+	make_request PATCH "/account/token" "${update_token_data}" "${ADMIN_SESSION_TOKEN}" "Update API Token Name - Success (Admin Self, using Session Token)" >/dev/null
 else
 	echo "Skipping Update Token test - Token ID not captured." >&2
 fi
@@ -220,7 +219,8 @@ make_request GET "/account/token" "" "${ADMIN_SESSION_TOKEN}" "List API Tokens A
 
 # Delete API Token for Admin Self (using Session Token)
 if [[ -n "$CREATED_API_TOKEN_ID" ]]; then
-	delete_token_data="{\"token_id\":\"${CREATED_API_TOKEN_ID}\"}" # Delete the one we created
+	# Use 'id' in the JSON payload
+	delete_token_data="{\"id\":\"${CREATED_API_TOKEN_ID}\"}" # Delete the one we created
 	make_request DELETE "/account/token" "${delete_token_data}" "${ADMIN_SESSION_TOKEN}" "Delete API Token - Success (Admin Self, using Session Token)" >/dev/null
 else
 	echo "Skipping Delete Token test - Token ID not captured." >&2

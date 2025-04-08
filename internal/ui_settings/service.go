@@ -3,11 +3,11 @@ package ui_settings
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
 
-	logger "github.com/OG-Open-Source/PanelBase/internal/logging"
 	"github.com/OG-Open-Source/PanelBase/internal/models"
 )
 
@@ -21,47 +21,28 @@ var (
 	mu sync.RWMutex
 )
 
-// DefaultUISettings returns the default UI configuration.
-func DefaultUISettings() *models.UISettings {
-	return &models.UISettings{
-		Title:      "PanelBase",
-		LogoURL:    "/assets/logo.png", // Example path
-		FaviconURL: "/assets/favicon.ico",
-		CustomCSS:  "",
-		CustomJS:   "",
-	}
-}
-
 // loadUISettings reads and parses the ui_settings.json file.
-// Returns the loaded settings or default settings if the file is missing/empty.
 func loadUISettings() (*models.UISettings, error) {
 	filePath := filepath.Join(configsDir, uiSettingsFileName)
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			logger.Printf("UI_SVC", "LOAD", "Settings file '%s' not found. Using defaults.", filePath)
-			return DefaultUISettings(), nil
+			// Return empty settings if file doesn't exist
+			return &models.UISettings{Title: "PanelBase"}, nil
 		}
-		// Use ErrorPrintf for actual file read errors
-		logger.ErrorPrintf("UI_SVC", "LOAD", "Failed to read ui settings file '%s': %v", filePath, err)
 		return nil, fmt.Errorf("failed to read ui settings file '%s': %w", filePath, err)
 	}
 
-	// If the file is empty, use defaults
-	if len(data) == 0 {
-		logger.Printf("UI_SVC", "LOAD", "Settings file '%s' was empty. Using defaults.", filePath)
-		return DefaultUISettings(), nil
+	settings := &models.UISettings{}
+	if len(data) > 0 {
+		if err := json.Unmarshal(data, settings); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal ui settings file '%s': %w", filePath, err)
+		}
+	} else {
+		settings.Title = "PanelBase" // Default title if file is empty
 	}
 
-	// Unmarshal the settings into a temporary variable first
-	loadedSettings := &models.UISettings{}
-	if err := json.Unmarshal(data, loadedSettings); err != nil {
-		logger.ErrorPrintf("UI_SVC", "LOAD", "Failed to unmarshal UI settings '%s': %v", filePath, err)
-		return nil, fmt.Errorf("failed to unmarshal ui settings file '%s': %w", filePath, err)
-	}
-
-	logger.Printf("UI_SVC", "LOAD", "Loaded UI settings (Title: %s)", loadedSettings.Title)
-	return loadedSettings, nil
+	return settings, nil
 }
 
 // GetUISettings retrieves the current UI settings.
@@ -161,14 +142,11 @@ func LoadUISettings() error {
 	}
 
 	var err error
-	// Load settings using the helper, which handles defaults
-	loadedSettings, err := loadUISettings()
+	uiSettings, err = loadUISettings() // Call internal load helper
 	if err != nil {
-		// If loading fails (e.g., read error, unmarshal error), return the error
 		return fmt.Errorf("failed to load initial ui settings: %w", err)
 	}
-	// Assign the successfully loaded (or default) settings to the global variable
-	uiSettings = loadedSettings
+	log.Printf("Loaded UI settings (Title: %s)", uiSettings.Title)
 	return nil
 }
 
@@ -182,21 +160,5 @@ func saveUISettingsToFile(filePath string, settings *models.UISettings) error {
 	if err := os.WriteFile(filePath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write ui settings file '%s': %w", filePath, err)
 	}
-	return nil
-}
-
-// InitUISettings initializes the UI settings service.
-func InitUISettings() error {
-	mu.Lock()
-	defer mu.Unlock()
-	if uiSettings != nil {
-		return nil // Already initialized
-	}
-
-	loaded, err := loadUISettings() // Call internal loader
-	if err != nil {
-		return err // Error already logged by loadUISettings
-	}
-	uiSettings = loaded // Assign the successfully loaded (or default) settings
 	return nil
 }

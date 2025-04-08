@@ -3,6 +3,7 @@ package models
 import (
 	"log"
 	"strings"
+	"time"
 )
 
 // UserPermissions defines the structure for user permissions (scopes).
@@ -67,7 +68,7 @@ func ScopeStringsToPermissions(scopeStrings []string) UserPermissions {
 		} else {
 			// Handle cases where scope might not have a colon (e.g., just "admin")?
 			// Or log a warning/ignore?
-			log.Printf("Warning: Invalid scope format encountered: '%s'. Skipping.", scope)
+			log.Printf("%s Warning: Invalid scope format encountered: '%s'. Skipping.", time.Now().UTC().Format(time.RFC3339), scope)
 		}
 	}
 	return permissions

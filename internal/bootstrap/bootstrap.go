@@ -1,24 +1,27 @@
 package bootstrap
 
 import (
-	"bytes"
 	crand "crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
 	"math/big" // Use crypto/rand for secure random numbers
+	"math/rand"
 	"net"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/OG-Open-Source/PanelBase/internal/models"
-	"github.com/OG-Open-Source/PanelBase/internal/user" // Import the user service
+	"github.com/OG-Open-Source/PanelBase/internal/models" // Import the user service
 	"golang.org/x/crypto/bcrypt"
 )
+
+func init() {
+	// Initialize the random number generator
+	rand.Seed(time.Now().UnixNano())
+}
 
 const configsDir = "configs"
 const logsDir = "logs"
@@ -79,7 +82,7 @@ func Bootstrap() ([]string, error) {
 		return nil, fmt.Errorf("failed to ensure configs directory: %w", err)
 	}
 	if itemCreated != "" {
-		createdItems = append(createdItems, itemCreated)
+		createdItems = append(createdItems, fmt.Sprintf("Directory '%s'", configsDir))
 	}
 
 	// Ensure the logs directory exists
@@ -88,7 +91,7 @@ func Bootstrap() ([]string, error) {
 		return nil, fmt.Errorf("failed to ensure logs directory: %w", err)
 	}
 	if itemCreated != "" {
-		createdItems = append(createdItems, itemCreated)
+		createdItems = append(createdItems, fmt.Sprintf("Directory '%s'", logsDir))
 	}
 
 	// Create default config structure (used if files need creation)
@@ -97,10 +100,10 @@ func Bootstrap() ([]string, error) {
 	// Check/Create users.json
 	itemCreated, err = ensureUsersFile()
 	if err != nil {
-		return createdItems, err // Return already created items and the error
+		return createdItems, err
 	}
 	if itemCreated != "" {
-		createdItems = append(createdItems, itemCreated)
+		createdItems = append(createdItems, fmt.Sprintf("File '%s'", filepath.Join(configsDir, "users.json")))
 	}
 
 	// Check/Create config.toml
@@ -109,7 +112,7 @@ func Bootstrap() ([]string, error) {
 		return createdItems, err
 	}
 	if itemCreated != "" {
-		createdItems = append(createdItems, itemCreated)
+		createdItems = append(createdItems, fmt.Sprintf("File '%s'", filepath.Join(configsDir, "config.toml")))
 	}
 
 	// Check/Create simple JSON files (themes, commands, plugins, ui_settings)
@@ -117,15 +120,15 @@ func Bootstrap() ([]string, error) {
 		filepath.Join(configsDir, "themes.json"):      configs.Themes,
 		filepath.Join(configsDir, "commands.json"):    configs.Commands,
 		filepath.Join(configsDir, "plugins.json"):     configs.Plugins,
-		filepath.Join(configsDir, "ui_settings.json"): configs.UISettings, // Add ui_settings here
+		filepath.Join(configsDir, "ui_settings.json"): configs.UISettings,
 	}
 	for path, data := range simpleJsonConfigs {
 		itemCreated, err = ensureSimpleJsonFile(path, data)
 		if err != nil {
-			return createdItems, err // Return error if checking/writing fails
+			return createdItems, err
 		}
 		if itemCreated != "" {
-			createdItems = append(createdItems, itemCreated)
+			createdItems = append(createdItems, fmt.Sprintf("File '%s'", path))
 		}
 	}
 
@@ -136,15 +139,14 @@ func Bootstrap() ([]string, error) {
 // Returns the path if created, or empty string, and an error.
 func ensureSimpleJsonFile(path string, defaultData interface{}) (string, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		// log.Printf("File '%s' not found, creating with defaults...", path) // Keep log for creation start
 		if err := writeJsonFile(path, defaultData); err != nil {
-			return "", err // Return error if writing fails
+			return "", err
 		}
-		return fmt.Sprintf("File '%s'", path), nil // Return created path
+		return path, nil
 	} else if err != nil {
 		return "", fmt.Errorf("failed to check config file '%s': %w", path, err)
 	}
-	return "", nil // File existed
+	return "", nil
 }
 
 // ensureUsersFile handles checking/creating users.json
@@ -152,15 +154,14 @@ func ensureSimpleJsonFile(path string, defaultData interface{}) (string, error) 
 func ensureUsersFile() (string, error) {
 	usersPath := filepath.Join(configsDir, "users.json")
 	if _, err := os.Stat(usersPath); os.IsNotExist(err) {
-		// log.Printf("File '%s' not found, creating with defaults...", usersPath)
 		if err := initializeUsersFile(); err != nil {
 			return "", fmt.Errorf("failed to initialize users file: %w", err)
 		}
-		return fmt.Sprintf("File '%s'", usersPath), nil // Return created path
+		return usersPath, nil
 	} else if err != nil {
 		return "", fmt.Errorf("failed to check users file '%s': %w", usersPath, err)
 	}
-	return "", nil // File existed
+	return "", nil
 }
 
 // ensureConfigFile handles checking/creating config.toml
@@ -168,7 +169,6 @@ func ensureUsersFile() (string, error) {
 func ensureConfigFile(configs *Configs) (string, error) {
 	configTomlPath := filepath.Join(configsDir, "config.toml")
 	if _, err := os.Stat(configTomlPath); os.IsNotExist(err) {
-		// log.Printf("File '%s' not found, creating with defaults...", configTomlPath) // Keep log for creation start
 		port, err := findAvailablePort(1024, 49151)
 		if err != nil {
 			return "", fmt.Errorf("failed to find available port for new config file: %w", err)
@@ -184,11 +184,11 @@ func ensureConfigFile(configs *Configs) (string, error) {
 		if err := writeTomlFile(configTomlPath, defaultConfigData); err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("File '%s'", configTomlPath), nil // Return created path
+		return configTomlPath, nil
 	} else if err != nil {
 		return "", fmt.Errorf("failed to check config file '%s': %w", configTomlPath, err)
 	}
-	return "", nil // File existed
+	return "", nil
 }
 
 // ensureDirExists checks if a directory exists, and creates it if not.
@@ -199,15 +199,14 @@ func ensureDirExists(dirPath string) (string, error) {
 		return "", fmt.Errorf("failed to get absolute path for %s: %w", dirPath, err)
 	}
 	if _, err := os.Stat(absPath); os.IsNotExist(err) {
-		// log.Printf("Directory '%s' not found, creating...", absPath) // Keep log for creation start
 		if err := os.MkdirAll(absPath, 0755); err != nil {
 			return "", fmt.Errorf("failed to create directory '%s': %w", absPath, err)
 		}
-		return fmt.Sprintf("Directory '%s'", absPath), nil // Return created path
+		return dirPath, nil
 	} else if err != nil {
 		return "", fmt.Errorf("failed to check directory '%s': %w", absPath, err)
 	}
-	return "", nil // Directory existed
+	return "", nil
 }
 
 // initializeUsersFile creates the initial users.json file with a default admin user.
@@ -229,7 +228,7 @@ func initializeUsersFile() error {
 	}{
 		{
 			Username: "admin",
-			Password: "admin",
+			Password: "", // Will be generated
 			Name:     "Administrator",
 			Email:    "admin@example.com",
 			Scopes: models.UserPermissions{
@@ -252,146 +251,151 @@ func initializeUsersFile() error {
 
 	// Create user entries using the models.User struct
 	for _, u := range defaultUserDetails {
-		userID, err := generateUserID() // Generate ID for each user
+		// Generate user ID
+		userID, err := generateUserID(u.Username)
 		if err != nil {
-			log.Printf("Warning: Failed to generate unique user ID for %s: %v. Skipping user.", u.Username, err)
-			continue
-		}
-		// userID = "usr_" + userID // Prefix is now handled by generateUserID
-
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
-		if err != nil {
-			log.Printf("Warning: Failed to hash password for %s: %v. Skipping user.", u.Username, err)
-			continue
+			return fmt.Errorf("failed to generate user ID for %s: %w", u.Username, err)
 		}
 
-		userJwtSecret, err := generateRandomString(32) // Generate user-specific secret
-		if err != nil {
-			log.Printf("Warning: Failed to generate JWT secret for %s: %v. Using fallback.", u.Username, err)
-			userJwtSecret = "fallback_secret_" + userID // Less secure fallback
+		// Generate random password if not provided
+		password := u.Password
+		if password == "" {
+			password, err = generateRandomString(12)
+			if err != nil {
+				return fmt.Errorf("failed to generate random password for %s: %w", u.Username, err)
+			}
 		}
 
-		userData := models.User{
+		// Hash the password
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			return fmt.Errorf("failed to hash password for %s: %w", u.Username, err)
+		}
+
+		// Create user with creation time
+		now := time.Now().UTC()
+
+		// Generate user-specific API JWT secret
+		apiJwtSecret, err := generateRandomString(32)
+		if err != nil {
+			return fmt.Errorf("failed to generate API JWT secret for %s: %w", u.Username, err)
+		}
+
+		usersConfig.Users[userID] = models.User{
 			ID:        userID,
 			Username:  u.Username,
 			Password:  string(hashedPassword),
 			Name:      u.Name,
 			Email:     u.Email,
-			CreatedAt: models.RFC3339Time(time.Now().UTC()),
-			Active:    true,
 			Scopes:    u.Scopes,
+			CreatedAt: models.RFC3339Time(now),
+			Active:    true,
 			API: models.UserAPISettings{
-				JwtSecret: userJwtSecret,
+				JwtSecret: apiJwtSecret,
 			},
 		}
-		// usersConfig.Users[u.Username] = userData // Old way: Use username as key
-		usersConfig.Users[userData.ID] = userData // New way: Use UserID as the key
+
+		// Log the generated password for admin user
+		if u.Username == "admin" {
+			log.Printf("Generated admin password: %s", password)
+		}
 	}
 
-	// Save the initialized users config using the user service save function
-	if err := user.SaveUsersConfigForBootstrap(usersConfig); err != nil {
-		log.Printf("Error initializing users.json via service: %v", err)
-		return err
+	// Save the users configuration
+	if err := saveUsersConfig(usersConfig); err != nil {
+		return fmt.Errorf("failed to save users configuration: %w", err)
 	}
 
 	return nil
 }
 
-// generateRandomString remains here for bootstrap purposes
-// TODO: Consider moving to a shared utility package if used elsewhere.
+// generateRandomString generates a random string of specified length
 func generateRandomString(length int) (string, error) {
-	const letters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
-	ret := make([]byte, length)
-	for i := 0; i < length; i++ {
-		num, err := crand.Int(crand.Reader, big.NewInt(int64(len(letters))))
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	result := make([]byte, length)
+	for i := range result {
+		num, err := crand.Int(crand.Reader, big.NewInt(int64(len(charset))))
 		if err != nil {
 			return "", fmt.Errorf("failed to generate random number: %w", err)
 		}
-		ret[i] = letters[num.Int64()]
+		result[i] = charset[num.Int64()]
 	}
-	return string(ret), nil
+	return string(result), nil
 }
 
-// writeJsonFile encodes data to JSON and writes it to the specified file path.
-func writeJsonFile(filePath string, data interface{}) error {
-	jsonData, err := json.MarshalIndent(data, "", "  ") // Use two spaces for indentation
+// writeJsonFile writes a JSON file with pretty formatting
+func writeJsonFile(path string, data interface{}) error {
+	jsonData, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal data for %s: %w", filePath, err)
+		return fmt.Errorf("failed to marshal JSON data: %w", err)
 	}
-	if err := os.WriteFile(filePath, jsonData, 0644); err != nil {
-		return fmt.Errorf("failed to write file %s: %w", filePath, err)
+	return os.WriteFile(path, jsonData, 0644)
+}
+
+// writeTomlFile writes a TOML file
+func writeTomlFile(path string, data interface{}) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("failed to create TOML file: %w", err)
+	}
+	defer f.Close()
+
+	encoder := toml.NewEncoder(f)
+	if err := encoder.Encode(data); err != nil {
+		return fmt.Errorf("failed to encode TOML data: %w", err)
 	}
 	return nil
 }
 
-// writeTomlFile encodes data to TOML and writes it to the specified file path.
-func writeTomlFile(filePath string, data interface{}) error {
-	buf := new(bytes.Buffer)
-	if err := toml.NewEncoder(buf).Encode(data); err != nil {
-		return fmt.Errorf("failed to encode TOML for %s: %w", filePath, err)
-	}
-	if err := os.WriteFile(filePath, buf.Bytes(), 0644); err != nil {
-		return fmt.Errorf("failed to write file %s: %w", filePath, err)
-	}
-	return nil
-}
-
-// findAvailablePort searches for an available TCP port within the specified range.
+// findAvailablePort finds an available port in the specified range
 func findAvailablePort(start, end int) (int, error) {
-	if start > end {
-		return 0, fmt.Errorf("invalid port range: start (%d) > end (%d)", start, end)
-	}
-	// Try up to 100 times to find a random port
-	maxAttempts := 100
-	for i := 0; i < maxAttempts; i++ {
-		// Generate a random port within the range (inclusive)
-		port, err := crand.Int(crand.Reader, big.NewInt(int64(end-start+1)))
-		if err != nil {
-			return 0, fmt.Errorf("failed to generate random port number: %w", err)
-		}
-		testPort := start + int(port.Int64())
+	// Calculate the range size
+	rangeSize := end - start + 1
 
-		// Check if the port is available
-		address := fmt.Sprintf(":%d", testPort)
-		listener, err := net.Listen("tcp", address)
+	// Create a slice of all possible ports
+	ports := make([]int, rangeSize)
+	for i := range ports {
+		ports[i] = start + i
+	}
+
+	// Shuffle the ports
+	for i := range ports {
+		j := i + rand.Intn(rangeSize-i)
+		ports[i], ports[j] = ports[j], ports[i]
+	}
+
+	// Try each port in random order
+	for _, port := range ports {
+		addr := fmt.Sprintf(":%d", port)
+		listener, err := net.Listen("tcp", addr)
 		if err == nil {
-			// Port is available, close the listener and return the port
 			listener.Close()
-			return testPort, nil
+			return port, nil
 		}
-
-		// Check if the error indicates the port is already in use
-		if !isPortInUseError(err) {
-			// If it's another error (e.g., permission denied), log it but continue searching
-			// as another random port might work.
-			log.Printf("Warning: Unexpected error checking port %d: %v", testPort, err)
-		}
-		// Port is in use or had an unexpected (but possibly transient) error, try another random port
 	}
-
-	return 0, fmt.Errorf("failed to find available port in range %d-%d after %d attempts", start, end, maxAttempts)
+	return 0, fmt.Errorf("no available ports found in range %d-%d", start, end)
 }
 
-// isPortInUseError checks if the error indicates a port is already in use.
-func isPortInUseError(err error) bool {
-	if err == nil {
-		return false
+// generateUserID generates a unique user ID
+func generateUserID(username string) (string, error) {
+	// Generate a random hex string
+	randomBytes := make([]byte, 4)
+	if _, err := crand.Read(randomBytes); err != nil {
+		return "", fmt.Errorf("failed to generate random bytes: %w", err)
 	}
-	// Check for common error strings across different OS
-	errStr := err.Error()
-	return strings.Contains(errStr, "address already in use") ||
-		strings.Contains(errStr, "bind: address already in use") ||
-		// Add other potential OS-specific messages if needed
-		strings.Contains(errStr, "Only one usage of each socket address") // Windows
+	randomHex := hex.EncodeToString(randomBytes)
+
+	// Combine username and random hex
+	userID := fmt.Sprintf("usr_%s_%s", username, randomHex)
+	return userID, nil
 }
 
-// generateUserID creates a unique user identifier (e.g., usr_xxxxxxxxxxxxxxxx)
-func generateUserID() (string, error) {
-	bytesLength := 8 // 8 bytes = 16 hex chars
-	b := make([]byte, bytesLength)
-	_, err := crand.Read(b)
+// saveUsersConfig saves the provided user config to the file.
+func saveUsersConfig(config *models.UsersConfig) error {
+	filePath := filepath.Join(configsDir, "users.json")
+	data, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
-		return "", fmt.Errorf("failed to read random bytes for user ID: %w", err)
+		return fmt.Errorf("failed to marshal users config: %w", err)
 	}
-	return "usr_" + hex.EncodeToString(b), nil
+	return os.WriteFile(filePath, data, 0644)
 }

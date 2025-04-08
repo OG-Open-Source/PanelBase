@@ -7,34 +7,33 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/OG-Open-Source/PanelBase/internal/api_token"
 	"github.com/OG-Open-Source/PanelBase/internal/auth"
-	"github.com/OG-Open-Source/PanelBase/internal/config"
 	"github.com/OG-Open-Source/PanelBase/internal/middleware"
-	"github.com/OG-Open-Source/PanelBase/internal/models"
 	"github.com/OG-Open-Source/PanelBase/internal/ui_settings"
 	"github.com/gin-gonic/gin"
 )
 
 // SetupRoutes configures the main application routes.
-func SetupRoutes(router *gin.Engine, cfg *config.Config) {
+func SetupRoutes(router *gin.Engine) {
 	// API v1 routes
 	apiV1 := router.Group("/api/v1")
 	{
 		// Authentication routes (public)
 		authGroup := apiV1.Group("/auth")
 		{
-			authGroup.POST("/login", auth.LoginHandler(cfg))
+			authGroup.POST("/login", auth.LoginHandler())
 			authGroup.POST("/register", auth.RegisterHandler)
 		}
 
 		// Protected API routes
 		protectedGroup := apiV1.Group("")
-		protectedGroup.Use(middleware.AuthMiddleware(cfg))
+		protectedGroup.Use(middleware.AuthMiddleware())
 		{
 			// Token Refresh Route
-			protectedGroup.POST("/auth/token", auth.RefreshTokenHandler(cfg))
+			protectedGroup.POST("/auth/token", auth.RefreshTokenHandler())
 
 			// Account Management (Self)
 			account := protectedGroup.Group("/account")
@@ -49,10 +48,10 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 				{
 					// Note: Permissions are checked inside handlers now for api tokens
 					token.POST("", api_token.CreateTokenHandler)
-					token.GET("", api_token.GetTokensHandler)           // Route for Listing tokens (uses query param user_id for admin)
-					token.GET("/:token_id", api_token.GetTokensHandler) // Route for Getting specific token by path param
-					token.PATCH("", api_token.UpdateTokenHandler)
-					token.DELETE("", api_token.DeleteTokenHandler)
+					token.GET("", api_token.GetTokensHandler)      // List user's tokens (or admin targets another user via ?user_id=...)
+					token.GET("/:id", api_token.GetTokensHandler)  // Get specific token by ID (admin can target another user via ?user_id=...)
+					token.PATCH("", api_token.UpdateTokenHandler)  // Requires 'id' in body
+					token.DELETE("", api_token.DeleteTokenHandler) // Requires 'id' in body
 				}
 			}
 
@@ -136,45 +135,26 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 
 // serveHTMLTemplate loads UI settings, parses and executes an HTML template
 func serveHTMLTemplate(c *gin.Context, templatePath string) {
-	// Load UI settings
-	settings, err := ui_settings.GetUISettings()
+	// Get UI settings
+	uiSettings, err := ui_settings.GetUISettings()
 	if err != nil {
-		log.Printf("Error getting UI settings for template %s: %v", templatePath, err)
-		// Fallback to default settings or render a basic error page
-		settings = &models.UISettings{Title: "PanelBase Error"} // Basic fallback
-	}
-
-	// Parse the specified HTML template file
-	tmpl, err := template.ParseFiles(templatePath)
-	if err != nil {
-		log.Printf("Error parsing template %s: %v", templatePath, err)
-		c.String(http.StatusInternalServerError, "Error loading page template")
+		log.Printf("%s Error getting UI settings for template %s: %v", time.Now().UTC().Format(time.RFC3339), templatePath, err)
+		c.String(http.StatusInternalServerError, "Error loading UI settings")
 		return
 	}
 
-	// Prepare data for the template, explicitly marking CSS and JS
-	templateData := struct {
-		Title      string
-		LogoURL    string
-		FaviconURL string
-		CustomCSS  template.CSS // Mark as safe CSS
-		CustomJS   template.JS  // Mark as safe JS
-	}{
-		Title:      settings.Title,
-		LogoURL:    settings.LogoURL,
-		FaviconURL: settings.FaviconURL,
-		CustomCSS:  template.CSS(settings.CustomCSS),
-		CustomJS:   template.JS(settings.CustomJS),
+	// Parse template
+	tmpl, err := template.ParseFiles(templatePath)
+	if err != nil {
+		log.Printf("%s Error parsing template %s: %v", time.Now().UTC().Format(time.RFC3339), templatePath, err)
+		c.String(http.StatusInternalServerError, "Error parsing template")
+		return
 	}
 
-	// Explicitly set status code to 200 OK
-	c.Status(http.StatusOK)
-	// Set content type header
-	c.Header("Content-Type", "text/html; charset=utf-8")
-	// Execute the template with the UI settings data
-	err = tmpl.Execute(c.Writer, templateData)
-	if err != nil {
-		log.Printf("Error executing template %s: %v", templatePath, err)
-		// Avoid writing error string if headers already sent
+	// Execute template
+	if err := tmpl.Execute(c.Writer, uiSettings); err != nil {
+		log.Printf("%s Error executing template %s: %v", time.Now().UTC().Format(time.RFC3339), templatePath, err)
+		c.String(http.StatusInternalServerError, "Error executing template")
+		return
 	}
 }
