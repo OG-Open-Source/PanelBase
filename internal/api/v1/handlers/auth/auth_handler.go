@@ -3,68 +3,51 @@ package auth
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
 
-	"github.com/OG-Open-Source/PanelBase/internal/middleware"  // Import middleware
-	"github.com/OG-Open-Source/PanelBase/internal/models"      // For User structure
-	"github.com/OG-Open-Source/PanelBase/internal/server"      // For Response functions
-	"github.com/OG-Open-Source/PanelBase/internal/token_store" // Import token store
-	"github.com/OG-Open-Source/PanelBase/internal/user"        // Import the user service
+	"github.com/OG-Open-Source/PanelBase/internal/middleware"
+	"github.com/OG-Open-Source/PanelBase/pkg/authutils" // UPDATED PATH for generators
+	"github.com/OG-Open-Source/PanelBase/pkg/models"
+	"github.com/OG-Open-Source/PanelBase/pkg/serverutils"
+	"github.com/OG-Open-Source/PanelBase/pkg/tokenstore"
+	"github.com/OG-Open-Source/PanelBase/pkg/userservice"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// LoginPayload defines the structure for the login request body.
-type LoginPayload struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
-}
-
-// generateSessionID creates a unique session identifier.
-func generateSessionID() (string, error) {
-	bytesLength := 16 // 16 bytes = 32 hex chars
-	b := make([]byte, bytesLength)
-	_, err := rand.Read(b)
-	if err != nil {
-		return "", fmt.Errorf("failed to read random bytes for session ID: %w", err)
-	}
-	return "ses_" + hex.EncodeToString(b), nil
-}
-
 // LoginHandler handles user login requests.
 func LoginHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var payload LoginPayload
+		var payload models.LoginPayload // Use LoginPayload from pkg/models
 		if err := c.ShouldBindJSON(&payload); err != nil {
-			server.ErrorResponse(c, http.StatusBadRequest, "Invalid request payload")
+			serverutils.ErrorResponse(c, http.StatusBadRequest, "Invalid request payload")
 			return
 		}
 
 		// 1. Load user data using the user service
-		userInstance, userExists, err := user.GetUserByUsername(payload.Username)
+		userInstance, userExists, err := userservice.GetUserByUsername(payload.Username)
 		if err != nil {
-			server.ErrorResponse(c, http.StatusUnauthorized, "Invalid username or password")
+			serverutils.ErrorResponse(c, http.StatusUnauthorized, "Invalid username or password")
 			return
 		}
 		if !userExists {
-			server.ErrorResponse(c, http.StatusUnauthorized, "Invalid username or password")
+			serverutils.ErrorResponse(c, http.StatusUnauthorized, "Invalid username or password")
 			return
 		}
 
 		// 3. Check if user is active
 		if !userInstance.Active {
-			server.ErrorResponse(c, http.StatusUnauthorized, "User account is inactive")
+			serverutils.ErrorResponse(c, http.StatusUnauthorized, "User account is inactive")
 			return
 		}
 
 		// 4. Verify password
 		err = bcrypt.CompareHashAndPassword([]byte(userInstance.Password), []byte(payload.Password))
 		if err != nil {
-			server.ErrorResponse(c, http.StatusUnauthorized, "Invalid username or password")
+			serverutils.ErrorResponse(c, http.StatusUnauthorized, "Invalid username or password")
 			return
 		}
 
@@ -76,24 +59,24 @@ func LoginHandler() gin.HandlerFunc {
 		userInstance.LastLogin = &rfc3339Now     // Assign pointer to custom type
 
 		// Save the updated user data
-		if err := user.UpdateUser(userInstance); err != nil {
+		if err := userservice.UpdateUser(userInstance); err != nil {
 			log.Printf("%s Warning: Failed to update last_login for user %s: %v", nowUTC.Format(time.RFC3339), userInstance.Username, err)
 		}
 
 		// 6. Generate JWT token
 		if userInstance.API.JwtSecret == "" {
 			log.Printf("%s Error: JWT secret not configured for session token generation.", nowUTC.Format(time.RFC3339))
-			server.ErrorResponse(c, http.StatusInternalServerError, "Session token configuration error")
+			serverutils.ErrorResponse(c, http.StatusInternalServerError, "Session token configuration error")
 			return
 		}
 
 		expirationTime := nowUTC.Add(24 * time.Hour)
 		issuedAt := nowUTC
 
-		sessionID, err := generateSessionID()
+		sessionID, err := authutils.GenerateSessionID() // Use generator from pkg/authutils
 		if err != nil {
 			log.Printf("%s Error generating session ID for user %s: %v", nowUTC.Format(time.RFC3339), userInstance.Username, err)
-			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate session identifier")
+			serverutils.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate session identifier")
 			return
 		}
 
@@ -111,12 +94,12 @@ func LoginHandler() gin.HandlerFunc {
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 		tokenString, err := token.SignedString([]byte(userInstance.API.JwtSecret))
 		if err != nil {
-			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate token")
+			serverutils.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate token")
 			return
 		}
 
 		// 6b. Store session token info in token_store
-		sessionInfo := token_store.TokenInfo{
+		sessionInfo := tokenstore.TokenInfo{
 			UserID:    userInstance.ID,
 			Name:      "Web Session",
 			Audience:  middleware.AudienceWeb,
@@ -124,7 +107,7 @@ func LoginHandler() gin.HandlerFunc {
 			CreatedAt: models.RFC3339Time(issuedAt),       // Convert to custom type
 			ExpiresAt: models.RFC3339Time(expirationTime), // Convert to custom type
 		}
-		if err := token_store.StoreToken(sessionID, sessionInfo); err != nil {
+		if err := tokenstore.StoreToken(sessionID, sessionInfo); err != nil {
 			log.Printf("%s Warning: Failed to store session token metadata for user %s (jti: %s): %v", nowUTC.Format(time.RFC3339), userInstance.Username, sessionID, err)
 		}
 
@@ -132,7 +115,7 @@ func LoginHandler() gin.HandlerFunc {
 		cookieName := "panelbase_jwt"                            // Use fixed name or get from env/default
 		cookieDurationSeconds := int((24 * time.Hour).Seconds()) // Use fixed duration or get from env/default
 		c.SetCookie(cookieName, tokenString, cookieDurationSeconds, "/", "", false, true)
-		server.SuccessResponse(c, "Login successful", gin.H{
+		serverutils.SuccessResponse(c, "Login successful", gin.H{
 			"token": tokenString,
 		})
 	}
@@ -144,21 +127,21 @@ func RefreshTokenHandler() gin.HandlerFunc {
 		// 1. Extract user information, token audience, and OLD JTI from context
 		userIDVal, exists := c.Get(string(middleware.ContextKeyUserID))
 		if !exists {
-			server.ErrorResponse(c, http.StatusUnauthorized, "User ID missing from context")
+			serverutils.ErrorResponse(c, http.StatusUnauthorized, "User ID missing from context")
 			return
 		}
 		userID := userIDVal.(string)
 
 		permissionsVal, exists := c.Get(string(middleware.ContextKeyPermissions))
 		if !exists {
-			server.ErrorResponse(c, http.StatusUnauthorized, "Permissions missing from context")
+			serverutils.ErrorResponse(c, http.StatusUnauthorized, "Permissions missing from context")
 			return
 		}
 		userScopes := permissionsVal.(models.UserPermissions)
 
 		tokenAudienceVal, exists := c.Get(string(middleware.ContextKeyAudience))
 		if !exists {
-			server.ErrorResponse(c, http.StatusUnauthorized, "Token audience missing from context")
+			serverutils.ErrorResponse(c, http.StatusUnauthorized, "Token audience missing from context")
 			return
 		}
 		tokenAudience := tokenAudienceVal.(string)
@@ -169,41 +152,41 @@ func RefreshTokenHandler() gin.HandlerFunc {
 			// If JTI is missing from the context (shouldn't happen if AuthMiddleware worked),
 			// maybe log an error but potentially allow refresh? Or deny?
 			// Let's deny for now, as JTI is needed for revocation.
-			server.ErrorResponse(c, http.StatusUnauthorized, "Original token ID (jti) missing from context")
+			serverutils.ErrorResponse(c, http.StatusUnauthorized, "Original token ID (jti) missing from context")
 			return
 		}
 		oldTokenJTI := oldJTIVal.(string)
 
 		// 2. Check if the token audience is correct for refresh ('web')
 		if tokenAudience != middleware.AudienceWeb {
-			server.ErrorResponse(c, http.StatusForbidden, "Token refresh requires a token with 'web' audience")
+			serverutils.ErrorResponse(c, http.StatusForbidden, "Token refresh requires a token with 'web' audience")
 			return
 		}
 
 		// 3. Load user data to get Name
-		userInstance, userExists, err := user.GetUserByID(userID)
+		userInstance, userExists, err := userservice.GetUserByID(userID)
 		if err != nil {
-			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to load user data for refresh: "+err.Error())
+			serverutils.ErrorResponse(c, http.StatusInternalServerError, "Failed to load user data for refresh: "+err.Error())
 			return
 		}
 		if !userExists {
-			server.ErrorResponse(c, http.StatusNotFound, "User associated with token not found")
+			serverutils.ErrorResponse(c, http.StatusNotFound, "User associated with token not found")
 			return
 		}
 
 		// 4. Generate a new JWT
 		if userInstance.API.JwtSecret == "" {
 			log.Printf("%s Error: JWT secret not configured for session token refresh.", time.Now().UTC().Format(time.RFC3339))
-			server.ErrorResponse(c, http.StatusInternalServerError, "Session token configuration error")
+			serverutils.ErrorResponse(c, http.StatusInternalServerError, "Session token configuration error")
 			return
 		}
 
 		newExpirationTime := time.Now().UTC().Add(24 * time.Hour)
 		newIssuedAt := time.Now().UTC()
-		newSessionID, err := generateSessionID()
+		newSessionID, err := authutils.GenerateSessionID() // Use generator from pkg/authutils
 		if err != nil {
 			log.Printf("%s Error generating new session ID for user %s: %v", time.Now().UTC().Format(time.RFC3339), userInstance.Username, err)
-			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate new session identifier")
+			serverutils.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate new session identifier")
 			return
 		}
 
@@ -221,12 +204,12 @@ func RefreshTokenHandler() gin.HandlerFunc {
 		newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, newClaims)
 		newTokenString, err := newToken.SignedString([]byte(userInstance.API.JwtSecret))
 		if err != nil {
-			server.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate refreshed token")
+			serverutils.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate refreshed token")
 			return
 		}
 
 		// 5. Store new session token info in token_store
-		newSessionInfo := token_store.TokenInfo{
+		newSessionInfo := tokenstore.TokenInfo{
 			UserID:    userID,
 			Name:      "Web Session",
 			Audience:  middleware.AudienceWeb,
@@ -234,12 +217,12 @@ func RefreshTokenHandler() gin.HandlerFunc {
 			CreatedAt: models.RFC3339Time(newIssuedAt),
 			ExpiresAt: models.RFC3339Time(newExpirationTime),
 		}
-		if err := token_store.StoreToken(newSessionID, newSessionInfo); err != nil {
+		if err := tokenstore.StoreToken(newSessionID, newSessionInfo); err != nil {
 			log.Printf("%s Warning: Failed to store refreshed session token metadata for user %s (jti: %s): %v", time.Now().UTC().Format(time.RFC3339), userInstance.Username, newSessionID, err)
 		}
 
 		// 6. Revoke the OLD session token
-		if err := token_store.RevokeToken(oldTokenJTI); err != nil {
+		if err := tokenstore.RevokeToken(oldTokenJTI); err != nil {
 			log.Printf("%s Warning: Failed to revoke old session token (jti: %s) after refresh for user %s: %v", time.Now().UTC().Format(time.RFC3339), oldTokenJTI, userInstance.Username, err)
 		}
 
@@ -247,138 +230,90 @@ func RefreshTokenHandler() gin.HandlerFunc {
 		cookieName := "panelbase_jwt"                            // Use fixed name or get from env/default
 		cookieDurationSeconds := int((24 * time.Hour).Seconds()) // Use fixed duration or get from env/default
 		c.SetCookie(cookieName, newTokenString, cookieDurationSeconds, "/", "", false, true)
-		server.SuccessResponse(c, "Token refreshed successfully", gin.H{
+		serverutils.SuccessResponse(c, "Token refreshed successfully", gin.H{
 			"token": newTokenString,
 		})
 	}
 }
 
-// Add Audience constant if not already present
-const AudienceWeb = "web"
-
-// RegisterPayload defines the structure for the registration request body.
-// Assuming this is defined in models package, otherwise define here.
-type RegisterPayload struct { // If not in models, define here
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
-	Email    string `json:"email"` // Removed binding:"required"
-	Name     string `json:"name"`
-}
-
-// RegisterHandler handles new user registration.
+// RegisterHandler handles new user registration requests.
 func RegisterHandler(c *gin.Context) {
-	var payload RegisterPayload // Use local or models.RegisterPayload
+	var payload models.RegisterPayload // Use RegisterPayload from pkg/models
 	if err := c.ShouldBindJSON(&payload); err != nil {
-		server.ErrorResponse(c, http.StatusBadRequest, "Invalid request payload: "+err.Error())
+		serverutils.ErrorResponse(c, http.StatusBadRequest, "Invalid request payload: "+err.Error())
 		return
 	}
 
-	// Basic validation (Email is now optional)
-	if payload.Username == "" || payload.Password == "" {
-		server.ErrorResponse(c, http.StatusBadRequest, "Username and password are required")
-		return
-	}
+	// Validate input (e.g., password complexity if needed)
 
 	// Check if username already exists
-	_, exists, err := user.GetUserByUsername(payload.Username)
+	_, exists, err := userservice.GetUserByUsername(payload.Username)
 	if err != nil {
-		server.ErrorResponse(c, http.StatusInternalServerError, "Error checking username availability: "+err.Error())
+		serverutils.ErrorResponse(c, http.StatusInternalServerError, "Error checking username availability")
 		return
 	}
 	if exists {
-		server.ErrorResponse(c, http.StatusConflict, "Username already exists")
+		serverutils.ErrorResponse(c, http.StatusConflict, "Username already taken")
 		return
 	}
 
 	// Hash the password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(payload.Password), bcrypt.DefaultCost)
 	if err != nil {
-		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to hash password: "+err.Error())
+		serverutils.ErrorResponse(c, http.StatusInternalServerError, "Failed to hash password")
 		return
 	}
 
-	// Generate user ID
-	userID, err := generateUserID()
+	// Generate a unique user ID
+	userID, err := authutils.GenerateUserID() // Use generator from pkg/authutils
 	if err != nil {
-		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate user ID: "+err.Error())
+		serverutils.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate user ID")
 		return
 	}
 
-	// Generate user-specific JWT secret
-	userJwtSecret, err := generateRandomString(32)
-	if err != nil {
-		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate JWT secret: "+err.Error())
+	// Generate a secure random JWT secret for the user
+	jwtSecretBytes := make([]byte, 32) // 256 bits
+	if _, err := rand.Read(jwtSecretBytes); err != nil {
+		serverutils.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate JWT secret")
 		return
 	}
-
-	// Determine user's name
-	userName := payload.Name
-	if userName == "" {
-		userName = payload.Username
-	}
-
-	// Define default scopes for new users (MODIFIED HERE)
-	defaultScopes := models.UserPermissions{
-		"account": {"read", "update", "delete"},
-		"api":     {"read:list", "read:item", "create", "update", "delete"},
-		// No other scopes assigned by default
-	}
+	jwtSecret := hex.EncodeToString(jwtSecretBytes)
 
 	// Create the new user object
 	newUser := models.User{
 		ID:        userID,
 		Username:  payload.Username,
 		Password:  string(hashedPassword),
-		Name:      userName,
-		Email:     payload.Email,
+		Email:     payload.Email, // Now optional
+		Name:      payload.Name,
+		Active:    true,                                     // Activate user immediately
+		Scopes:    map[string][]string{"default": {"read"}}, // Assign default minimal scope
 		CreatedAt: models.RFC3339Time(time.Now().UTC()),
-		Active:    true,
-		Scopes:    defaultScopes, // Assign the restricted default scopes
+		LastLogin: nil,
 		API: models.UserAPISettings{
-			JwtSecret: userJwtSecret,
+			JwtSecret: jwtSecret, // Assign the generated secret
+			// Tokens map removed
 		},
 	}
 
-	// Save the new user
-	if err := user.AddUser(newUser); err != nil {
-		server.ErrorResponse(c, http.StatusInternalServerError, "Failed to register user: "+err.Error())
+	// Use the UserService to create the user (Corrected function name)
+	if err := userservice.AddUser(newUser); err != nil {
+		serverutils.ErrorResponse(c, http.StatusInternalServerError, "Failed to register user: "+err.Error())
 		return
 	}
 
-	// Create response map, explicitly omitting sensitive data like password and secrets
-	responseMap := map[string]interface{}{
+	// Return success response (excluding sensitive info)
+	responseUser := map[string]interface{}{
 		"id":         newUser.ID,
 		"username":   newUser.Username,
-		"name":       newUser.Name,
 		"email":      newUser.Email,
-		"created_at": newUser.CreatedAt, // Assuming RFC3339Time marshals correctly
+		"name":       newUser.Name,
 		"active":     newUser.Active,
 		"scopes":     newUser.Scopes,
-		// "password" key is omitted
-		// "api" key (containing jwt_secret) is omitted
+		"created_at": newUser.CreatedAt,
+		"last_login": newUser.LastLogin,
+		// Explicitly exclude password and api settings
 	}
 
-	server.SuccessResponse(c, "User registered successfully", responseMap)
-}
-
-// generateUserID creates a unique user identifier.
-func generateUserID() (string, error) {
-	bytesLength := 8
-	b := make([]byte, bytesLength)
-	_, err := rand.Read(b)
-	if err != nil {
-		return "", fmt.Errorf("failed to read random bytes for user ID: %w", err)
-	}
-	return "usr_" + hex.EncodeToString(b), nil
-}
-
-// generateRandomString generates a secure random hex string.
-// (Assuming this function exists or is added)
-func generateRandomString(length int) (string, error) {
-	b := make([]byte, length)
-	_, err := rand.Read(b)
-	if err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b), nil
+	serverutils.SuccessResponse(c, "User registered successfully", responseUser)
 }

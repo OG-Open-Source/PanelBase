@@ -18,12 +18,12 @@ import (
 	// Import the config package
 
 	"github.com/OG-Open-Source/PanelBase/internal/bootstrap"
-	"github.com/OG-Open-Source/PanelBase/internal/config"
 	"github.com/OG-Open-Source/PanelBase/internal/middleware"
 	"github.com/OG-Open-Source/PanelBase/internal/routes"
-	"github.com/OG-Open-Source/PanelBase/internal/token_store"
-	"github.com/OG-Open-Source/PanelBase/internal/ui_settings"
-	"github.com/OG-Open-Source/PanelBase/internal/user"
+	"github.com/OG-Open-Source/PanelBase/pkg/config"
+	"github.com/OG-Open-Source/PanelBase/pkg/tokenstore"
+	"github.com/OG-Open-Source/PanelBase/pkg/uisettings"
+	"github.com/OG-Open-Source/PanelBase/pkg/userservice"
 
 	// Remove cors import: "github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -43,18 +43,18 @@ func main() {
 	}
 
 	// Initialize the token store database
-	if err := token_store.InitStore(); err != nil {
+	if err := tokenstore.InitStore(); err != nil {
 		log.Fatalf("Failed to initialize token store: %v", err)
 	}
-	defer token_store.CloseStore()
+	defer tokenstore.CloseStore()
 
 	// Load user configuration AFTER bootstrap and token store init
-	if err := user.LoadUsersConfig(); err != nil {
+	if err := userservice.LoadUsersConfig(); err != nil {
 		log.Fatalf("Failed to load user configuration: %v", err)
 	}
 
 	// Load UI settings configuration AFTER bootstrap
-	if err := ui_settings.LoadUISettings(); err != nil {
+	if err := uisettings.LoadUISettings(); err != nil {
 		log.Fatalf("Failed to load UI settings configuration: %v", err)
 	}
 

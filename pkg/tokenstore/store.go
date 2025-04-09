@@ -1,4 +1,4 @@
-package token_store
+package tokenstore
 
 import (
 	"encoding/json"
@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/OG-Open-Source/PanelBase/internal/models" // For UserPermissions
+	"github.com/OG-Open-Source/PanelBase/pkg/models"
 	bolt "go.etcd.io/bbolt"
 )
 

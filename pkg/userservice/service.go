@@ -1,4 +1,4 @@
-package user
+package userservice
 
 import (
 	"encoding/json"
@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"log" // Added for logging potential errors during save
+	"log"
 
-	"github.com/OG-Open-Source/PanelBase/internal/models"
+	"github.com/OG-Open-Source/PanelBase/pkg/models"
 )
 
 const usersFileName = "users.json"
@@ -123,6 +123,13 @@ func GetUserByUsername(username string) (models.User, bool, error) {
 
 // AddUser adds a new user to the configuration
 func AddUser(user models.User) error {
+	mu.Lock()         // Acquire write lock
+	defer mu.Unlock() // Ensure lock is released
+
+	if usersConfig == nil {
+		return fmt.Errorf("users config not loaded")
+	}
+
 	// Check if user already exists
 	if _, exists := usersConfig.Users[user.ID]; exists {
 		return fmt.Errorf("user with ID %s already exists", user.ID)
@@ -144,6 +151,13 @@ func AddUser(user models.User) error {
 
 // UpdateUser updates an existing user in the configuration
 func UpdateUser(user models.User) error {
+	mu.Lock()         // Acquire write lock
+	defer mu.Unlock() // Ensure lock is released
+
+	if usersConfig == nil {
+		return fmt.Errorf("users config not loaded")
+	}
+
 	// Check if user exists
 	if _, exists := usersConfig.Users[user.ID]; !exists {
 		return fmt.Errorf("user with ID %s does not exist", user.ID)
@@ -168,6 +182,13 @@ func UpdateUser(user models.User) error {
 
 // DeleteUser deletes a user from the configuration
 func DeleteUser(id string) error {
+	mu.Lock()         // Acquire write lock
+	defer mu.Unlock() // Ensure lock is released
+
+	if usersConfig == nil {
+		return fmt.Errorf("users config not loaded")
+	}
+
 	// Check if user exists
 	if _, exists := usersConfig.Users[id]; !exists {
 		return fmt.Errorf("user with ID %s does not exist", id)

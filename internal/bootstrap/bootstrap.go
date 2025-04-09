@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/OG-Open-Source/PanelBase/internal/models" // Import the user service
+	"github.com/OG-Open-Source/PanelBase/pkg/models" // UPDATED PATH // Import the user service
 	"golang.org/x/crypto/bcrypt"
 )
 

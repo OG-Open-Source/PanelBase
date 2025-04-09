@@ -7,8 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+// Add a placeholder for future unreleased changes
+
+## [0.9.0] - 2025-04-10 Project Structure Refactoring
+
 ### Changed
 
+- **Refactor**: Reorganized project structure for API versioning and separation of concerns.
+  - Moved API v1 routes and handlers to `internal/api/v1/`.
+  - Created placeholder for API v2 (`internal/api/v2/`).
+  - Moved core services (Auth Utils, API Token Service, UI Settings Service, User Service, Token Store) and Models to `pkg/`.
+  - Standardized API token routes: `/account/token` for self-service and `/users/:user_id/token` for admin actions, both using `:id` path parameter for specific token operations (GET, PATCH, DELETE).
+  - Updated all imports and function calls to reflect the new structure.
+
+### Fixed
+
+- Resolved build errors related to duplicate context key declarations in middleware.
+- Corrected API token route definitions in `internal/api/v1/routes.go` to use path parameters consistently.
+- Resolved issues with missing or duplicated struct definitions in `pkg/models`.
+
+### Removed
+
+- Deleted obsolete service directories (`internal/auth`, `internal/api_token`, `internal/ui_settings`).
+
+// --- Previous [Unreleased] content moved here under 0.9.0 ---
+// Note: Some of these might be superseded or incorporated into the main refactoring description above.
+// Review and cleanup might be needed.
+
+- **Refactor**: Reorganized API routes and handlers for versioning (`v1`, `v2` placeholder).
+  - Moved v1 routes to `internal/api/v1/routes.go`.
+  - Moved v1 handlers (auth, token, settings) to `internal/api/v1/handlers/` subdirectories.
+  - Updated imports accordingly.
 - **Configuration**: Changed configuration format from JSON to TOML, moved config file from `config/config.json` to `configs/config.toml`.
 - **Configuration**: Changed token expiration time format from `time.Duration` to seconds (integer).
 - **User Management**: Improved user creation logic with creation time and random password generation.
@@ -17,11 +46,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Resolved build errors related to previous file moves and function signature changes during refactoring.
 - Resolved a build error (`too many arguments`) in `cmd/panelbase/main.go` caused by an incorrect call to `routes.SetupRoutes`.
 - Fixed a compilation error (`undefined: store`) in `internal/token_store/store.go` by removing a redundant variable assignment.
 
 ### Added
 
+- Created placeholder structure for API v2 (`internal/api/v2/`).
 - (Future changes will go here)
 
 ## [0.8.1] - 2025-04-08 Logger and API ID Refinements
@@ -29,13 +60,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Logging**: Replaced `zerolog` with a custom Gin middleware logger using the standard `log` package.
-    - Format: `[API/WEB] RFC3339_Timestamp | Status | Latency | ClientIP | Method Path Errors`.
-    - Added request body logging on a new line, prefixed by UserID (from context) or '-' with 6 spaces indentation: `      userID: {body}`.
-    - Removed default flags from standard logger to allow full custom formatting.
+  - Format: `[API/WEB] RFC3339_Timestamp | Status | Latency | ClientIP | Method Path Errors`.
+  - Added request body logging on a new line, prefixed by UserID (from context) or '-' with 6 spaces indentation: `      userID: {body}`.
+  - Removed default flags from standard logger to allow full custom formatting.
 - **API Token Handling**: Standardized the identifier for API tokens in API requests and routes.
-    - Changed JSON field in request bodies (Update/Delete) from `token_id` to `id`.
-    - Changed URL path parameter for getting a specific token from `:token_id` to `:id` (`GET /api/v1/account/token/:id`).
-    - Updated handlers (`internal/api_token/token_handler.go`), routes (`internal/routes/routes.go`), documentation (`COMMANDS.md`), and test script (`example/test/test_api.sh`) accordingly.
+  - Changed JSON field in request bodies (Update/Delete) from `token_id` to `id`.
+  - Changed URL path parameter for getting a specific token from `:token_id` to `:id` (`GET /api/v1/account/token/:id`).
+  - Updated handlers (`internal/api_token/token_handler.go`), routes (`internal/routes/routes.go`), documentation (`COMMANDS.md`), and test script (`example/test/test_api.sh`) accordingly.
 
 ## [0.7.2] - 2025-04-07 Refinements and Centralization
 

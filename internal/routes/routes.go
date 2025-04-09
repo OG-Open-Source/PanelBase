@@ -9,78 +9,24 @@ import (
 	"strings"
 	"time"
 
-	"github.com/OG-Open-Source/PanelBase/internal/api_token"
-	"github.com/OG-Open-Source/PanelBase/internal/auth"
-	"github.com/OG-Open-Source/PanelBase/internal/middleware"
-	"github.com/OG-Open-Source/PanelBase/internal/ui_settings"
+	// Remove old direct handler imports if they are only used by v1 routes
+	// "github.com/OG-Open-Source/PanelBase/internal/api_token"
+	// "github.com/OG-Open-Source/PanelBase/internal/auth"
+	// Keep if used elsewhere
+	v1 "github.com/OG-Open-Source/PanelBase/internal/api/v1" // Import the new v1 routes package
+	"github.com/OG-Open-Source/PanelBase/pkg/uisettings"     // UPDATED PATH // Keep for serveHTMLTemplate
 	"github.com/gin-gonic/gin"
 )
 
 // SetupRoutes configures the main application routes.
 func SetupRoutes(router *gin.Engine) {
-	// API v1 routes
-	apiV1 := router.Group("/api/v1")
-	{
-		// Authentication routes (public)
-		authGroup := apiV1.Group("/auth")
-		{
-			authGroup.POST("/login", auth.LoginHandler())
-			authGroup.POST("/register", auth.RegisterHandler)
-		}
+	// Setup API v1 routes
+	apiV1Group := router.Group("/api/v1")
+	v1.SetupV1Routes(apiV1Group) // Call the new setup function
 
-		// Protected API routes
-		protectedGroup := apiV1.Group("")
-		protectedGroup.Use(middleware.AuthMiddleware())
-		{
-			// Token Refresh Route
-			protectedGroup.POST("/auth/token", auth.RefreshTokenHandler())
-
-			// Account Management (Self)
-			account := protectedGroup.Group("/account")
-			{
-				// Placeholder for GET /account, PATCH /account, DELETE /account
-				// account.GET("", middleware.RequirePermission("account", "read"), ...)
-				// account.PATCH("", middleware.RequirePermission("account", "update"), ...)
-				// account.DELETE("", middleware.RequirePermission("account", "delete"), ...)
-
-				// API Token Management Routes (under /account)
-				token := account.Group("/token") // Define token group under account
-				{
-					// Note: Permissions are checked inside handlers now for api tokens
-					token.POST("", api_token.CreateTokenHandler)
-					token.GET("", api_token.GetTokensHandler)      // List user's tokens (or admin targets another user via ?user_id=...)
-					token.GET("/:id", api_token.GetTokensHandler)  // Get specific token by ID (admin can target another user via ?user_id=...)
-					token.PATCH("", api_token.UpdateTokenHandler)  // Requires 'id' in body
-					token.DELETE("", api_token.DeleteTokenHandler) // Requires 'id' in body
-				}
-			}
-
-			// User Management (Admin) - Routes are placeholders
-			/* // Comment out until handlers are implemented
-			users := protectedGroup.Group("/users")
-			{
-				// Placeholder for admin user management
-				// users.GET("", middleware.RequirePermission("users", "read:list"), ...)
-				// users.POST("", middleware.RequirePermission("users", "create"), ...)
-				// users.PATCH("/:id", middleware.RequirePermission("users", "update"), ...)
-				// users.DELETE("/:id", middleware.RequirePermission("users", "delete"), ...)
-			}
-			*/
-
-			// Settings
-			settingsGroup := protectedGroup.Group("/settings")
-			{
-				// UI Settings
-				settingsGroup.GET("/ui", middleware.RequirePermission("settings", "read"), ui_settings.GetSettingsHandler)
-				settingsGroup.PATCH("/ui", middleware.RequirePermission("settings", "update"), ui_settings.UpdateSettingsHandler)
-			}
-
-			// Commands, Plugins, Themes (Placeholders)
-			// commands := protectedGroup.Group("/commands") { ... }
-			// plugins := protectedGroup.Group("/plugins") { ... }
-			// themes := protectedGroup.Group("/themes") { ... }
-		}
-	}
+	// API v2 routes (Placeholder - to be added later)
+	// apiV2Group := router.Group("/api/v2")
+	// v2.SetupV2Routes(apiV2Group)
 
 	// Serve static files specifically from the web/assets directory
 	router.Static("/assets", "./web/assets")
@@ -134,9 +80,10 @@ func SetupRoutes(router *gin.Engine) {
 }
 
 // serveHTMLTemplate loads UI settings, parses and executes an HTML template
+// This function remains here as it's not API specific
 func serveHTMLTemplate(c *gin.Context, templatePath string) {
 	// Get UI settings
-	uiSettings, err := ui_settings.GetUISettings()
+	uiSettingsData, err := uisettings.GetUISettings() // UPDATED package name
 	if err != nil {
 		log.Printf("%s Error getting UI settings for template %s: %v", time.Now().UTC().Format(time.RFC3339), templatePath, err)
 		c.String(http.StatusInternalServerError, "Error loading UI settings")
@@ -152,7 +99,7 @@ func serveHTMLTemplate(c *gin.Context, templatePath string) {
 	}
 
 	// Execute template
-	if err := tmpl.Execute(c.Writer, uiSettings); err != nil {
+	if err := tmpl.Execute(c.Writer, uiSettingsData); err != nil { // Use uiSettingsData
 		log.Printf("%s Error executing template %s: %v", time.Now().UTC().Format(time.RFC3339), templatePath, err)
 		c.String(http.StatusInternalServerError, "Error executing template")
 		return

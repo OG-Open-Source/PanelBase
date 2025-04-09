@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/OG-Open-Source/PanelBase/internal/models"
-	"github.com/OG-Open-Source/PanelBase/internal/server"
+	"github.com/OG-Open-Source/PanelBase/pkg/models"
+	"github.com/OG-Open-Source/PanelBase/pkg/serverutils"
 	"github.com/gin-gonic/gin"
 )
 
@@ -42,20 +42,20 @@ func CheckPermission(c *gin.Context, resource string, requiredAction string) boo
 	// Use string(Constant) to get the key for context lookup
 	permissions, exists := c.Get(string(ContextKeyPermissions))
 	if !exists {
-		server.ErrorResponse(c, http.StatusInternalServerError, "User permissions not found in context")
+		serverutils.ErrorResponse(c, http.StatusInternalServerError, "User permissions not found in context")
 		return false
 	}
 
 	userPermissions, ok := permissions.(models.UserPermissions)
 	if !ok {
-		server.ErrorResponse(c, http.StatusInternalServerError, "Invalid user permissions format")
+		serverutils.ErrorResponse(c, http.StatusInternalServerError, "Invalid user permissions format")
 		return false
 	}
 
 	// Use string(Constant) for user ID lookup as well
 	_, userExists := c.Get(string(ContextKeyUserID))
 	if !userExists {
-		server.ErrorResponse(c, http.StatusInternalServerError, "Authenticated User ID not found in context")
+		serverutils.ErrorResponse(c, http.StatusInternalServerError, "Authenticated User ID not found in context")
 		return false
 	}
 
@@ -69,7 +69,7 @@ func CheckPermission(c *gin.Context, resource string, requiredAction string) boo
 	allowedActions, resourceExists := userPermissions[resource]
 
 	if !resourceExists {
-		server.ErrorResponse(c, http.StatusForbidden, fmt.Sprintf("Permission denied: Resource '%s' access not configured", resource))
+		serverutils.ErrorResponse(c, http.StatusForbidden, fmt.Sprintf("Permission denied: Resource '%s' access not configured", resource))
 		return false
 	}
 
@@ -81,7 +81,7 @@ func CheckPermission(c *gin.Context, resource string, requiredAction string) boo
 	}
 
 	// If loop finishes, the action was not found
-	server.ErrorResponse(c, http.StatusForbidden, fmt.Sprintf("Permission denied: Action '%s' not allowed for resource '%s'", requiredAction, resource))
+	serverutils.ErrorResponse(c, http.StatusForbidden, fmt.Sprintf("Permission denied: Action '%s' not allowed for resource '%s'", requiredAction, resource))
 	return false
 }
 

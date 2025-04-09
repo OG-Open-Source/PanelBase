@@ -1,4 +1,4 @@
-package ui_settings
+package uisettings
 
 import (
 	"encoding/json"
@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/OG-Open-Source/PanelBase/internal/models"
+	"github.com/OG-Open-Source/PanelBase/pkg/models"
 )
 
 // Define constants locally within this package
