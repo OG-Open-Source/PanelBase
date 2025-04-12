@@ -45,3 +45,34 @@ Run `go run cmd/server/main.go` to start the server.
 - Changed default Gin mode to `release`. Bootstrap now writes `mode = "release"` on first config creation, and server defaults to release mode if config is missing or invalid.
 - Reduced verbosity of initialization and template loading logs.
 - Combined server startup information (Mode, Address, Admin Entry) into a single log line.
+- Added JWT authentication and permission-based authorization:
+  - Added `/api/v1/auth/register` and `/api/v1/auth/login` endpoints.
+  - Implemented user storage using `configs/users.json` (for development).
+  - Passwords are hashed using bcrypt.
+  - Login returns a JWT containing user ID, username, and permissions.
+  - Added `/api/v1/protected` example routes secured by JWT middleware.
+  - Middleware checks for required permissions (e.g., `/protected/admin/users` requires "admin" permission).
+  - Configured JWT secret and duration via `configs/config.toml`.
+- Moved `users.json` creation logic from storage layer to bootstrap initialization.
+- Removed verbose "Creating..." log messages during bootstrap initialization.
+- Updated user model (`models.User`) and storage (`users.json` format, `JSONUserStore`) to match example structure (including Name, Email, Active, Scopes).
+- Updated JWT claims and authorization middleware to use Scopes map instead of simple permissions list.
+- Removed example `/protected` API routes.
+- Added initial API tests for auth endpoints (`/test/auth_api_test.go`) using testify.
+- Added `functions.themes` boolean flag to `configs/config.toml`.
+- Made creation of `/themes`, `/plugins`, `/commands` directories conditional based on `functions.*` flags in `config.toml`.
+- Registration endpoint (`/api/v1/auth/register`) is now conditionally enabled based on `functions.users` flag in `config.toml`.
+- Implemented custom error handling for HTTP status codes (4xx, 5xx):
+  - Priority 1: Serves `/web/<entry>/templates/<status_code>.html` (or `.htm`) if it exists, rendered with `uiSettingsData`.
+  - Priority 2: Serves `/web/<entry>/error.html` (or `.htm`) if it exists, rendered with `http_status_code`, `http_status_message`, and `uiSettingsData`.
+  - Priority 3: Returns PanelBase's default plain text message (`<code>: <Reason-Phrase>`) as fallback.
+  - Integrated into `NoRoute` (404) and `NoMethod` (405) handlers, and also called directly by the static file handler on failure. API errors still return JSON.
+- Refactored web serving logic (static files, templates, error pages) into a dedicated `internal/webserver` package:
+  - Moved `handleStaticFileRequest`, `loadTemplates`, `handleErrorResponse` functions.
+  - Created `webserver.RegisterHandlers` to encapsulate setup.
+  - Updated `cmd/server/main.go` to call `webserver.RegisterHandlers`.
+- Simplified server startup logs by removing verbose messages from `internal/webserver` package (template scanning, route registration details).
+- Fixed error page handling for entry-specific paths (`/<entry>/...`) by having `handleStaticFileRequest` directly call `handleErrorResponse` when a file is not found.
+- Further simplified logs by removing messages about which specific error template is being served.
+- Re-created API tests for auth endpoints (`/test/auth_api_test.go`) covering registration and login scenarios (success, conflict, missing fields, incorrect credentials, registration disabled).
+- Added interactive PowerShell API test script (`/test/api_test.ps1`) with menu for server control, config initialization, and running auth tests.

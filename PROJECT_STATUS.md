@@ -48,7 +48,7 @@ To build a web panel application using the Go programming language and the Gin w
 - [x] Add Gin dependency: `go get github.com/gin-gonic/gin`
 - [x] Implement custom Gin logger format in `pkg/logger`.
 - [x] Implement automatic log file creation in `/logs` with timestamped filename (handled by `pkg/logger`).
-- [x] Refactor initialization script `cmd/init/main.go` to handle mandatory dirs (`configs`, `themes`, `web`) and conditional creation based on `configs/config.toml` (`plugins`, `commands`, `users.json`).
+- [x] Refactor initialization script `cmd/init/main.go` to handle mandatory dirs (`configs`, `themes`, `web`) and conditional creation based on `configs/config.toml` (`plugins`, `commands`, `users.json`, `themes`).
 - [x] Integrate project initialization into server startup (`cmd/server/main.go` calls `pkg/bootstrap`).
 - [x] Dynamically generate available port (1024-49151) and random entry string in `config.toml` on first creation.
 - [x] Read server IP/port/entry from `config.toml` at server startup.
@@ -59,3 +59,17 @@ To build a web panel application using the Go programming language and the Gin w
 - [x] Render `.html`/`.htm` files as Go templates, passing UI settings data (using manual template loading).
 - [x] Ensure a default `index.html` is created in the target web directory if none exists.
 - [x] Set Gin mode (defaulting to release) based on `server.mode` in `configs/config.toml`.
+- [x] Add dependencies for auth (bcrypt, jwt, uuid).
+- [x] Add JWT config (`jwt_secret`, `token_duration_minutes`) to `config.toml` (bootstrap & server).
+- [x] Define User model (`internal/models/user.go`) (Updated with Name, Email, Active, Scopes).
+- [x] Define UserStore interface (`internal/storage/user_store.go`).
+- [x] Implement JSONUserStore (`internal/storage/json_user_store.go`) (Updated for new file format and model).
+- [x] Implement JWT generation/validation (`internal/auth/jwt.go`) (Updated for Scopes).
+- [x] Implement auth handlers (Register, Login) (`internal/api/v1/handlers/auth_handler.go`) (Updated for new model/scopes).
+- [x] Implement auth middleware (JWT validation, scope check) (`internal/api/v1/middleware/auth_middleware.go`) (Updated for Scopes).
+- [x] Register auth routes and remove protected example routes in API v1 (`internal/api/v1/routes.go`).
+- [x] Integrate UserStore and AuthHandler into server startup (`cmd/server/main.go`).
+- [x] Ensure `users.json` creation is handled by bootstrap initialization.
+- [x] Remove verbose "Creating..." logs during initialization.
+- [x] Add initial auth API tests (`/test/auth_api_test.go`).
+- [x] Add `functions.themes` boolean flag to `config.toml`.

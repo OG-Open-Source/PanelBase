@@ -62,10 +62,15 @@ type configStructure struct {
 		Ip    string `toml:"ip"`
 		Mode  string `toml:"mode"`
 	}
+	Auth struct {
+		JwtSecret            string `toml:"jwt_secret"`
+		TokenDurationMinutes int    `toml:"token_duration_minutes"`
+	}
 	Functions struct {
 		Plugins  bool `toml:"plugins"`
 		Commands bool `toml:"commands"`
 		Users    bool `toml:"users"`
+		Themes   bool `toml:"themes"`
 	}
 }
 
@@ -101,7 +106,7 @@ func isPortAvailable(port int) bool {
 func ensureDir(dirPath string) error {
 	absPath, _ := filepath.Abs(dirPath)
 	if _, err := os.Stat(absPath); os.IsNotExist(err) {
-		log.Printf("Creating directory: %s", dirPath)
+		// log.Printf("Creating directory: %s", dirPath) // Remove creation log
 		if err := os.MkdirAll(absPath, 0755); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dirPath, err)
 		}
@@ -117,11 +122,8 @@ func ensureDir(dirPath string) error {
 func InitializeProject() error {
 	// log.Println("Checking project structure...")
 
-	// 1. Ensure mandatory directories exist
+	// 1. Ensure mandatory directories exist (EXCLUDING themes now)
 	if err := ensureDir(configDir); err != nil {
-		return err
-	}
-	if err := ensureDir(themeDir); err != nil {
 		return err
 	}
 	if err := ensureDir(webDir); err != nil {
@@ -131,7 +133,7 @@ func InitializeProject() error {
 	// 2. Ensure config.toml exists (create with dynamic defaults if not)
 	configAbsPath, _ := filepath.Abs(configFile)
 	if _, err := os.Stat(configAbsPath); os.IsNotExist(err) {
-		log.Printf("Creating configuration file: %s", configFile)
+		// log.Printf("Creating configuration file: %s", configFile) // Remove creation log
 
 		// Generate random entry
 		entry := generateRandomString(entryLength)
@@ -151,18 +153,22 @@ func InitializeProject() error {
 		}
 
 		// Construct default TOML content dynamically
-		defaultContent := fmt.Sprintf(`
-[server]
+		defaultContent := fmt.Sprintf(`[server]
 ip    = "%s"
 port  = %d
 entry = "%s"
 mode  = "release"
 
+[auth]
+jwt_secret = "%s"
+token_duration_minutes = %d
+
 [functions]
 plugins = false
 commands = false
 users = false
-`, defaultIP, port, entry)
+themes = false
+`, defaultIP, port, entry, generateRandomString(32), 60) // Generate a random secret, default duration 60 min
 
 		// Write the new config file
 		if errWrite := os.WriteFile(configAbsPath, []byte(defaultContent), 0664); errWrite != nil {
@@ -170,20 +176,29 @@ users = false
 		}
 
 	} else if err != nil {
-		// Error checking the file (other than NotExist)
 		return fmt.Errorf("failed to check config file %s: %w", configFile, err)
 	}
 
 	// 3. Ensure ui_settings.json exists (create with default if not)
 	uiSettingsAbsPath, _ := filepath.Abs(uiSettingsFile)
 	if _, err := os.Stat(uiSettingsAbsPath); os.IsNotExist(err) {
-		log.Printf("Creating file: %s", uiSettingsFile)
+		// log.Printf("Creating file: %s", uiSettingsFile) // Remove creation log
 		if errWrite := os.WriteFile(uiSettingsAbsPath, []byte(defaultUISettingsContent), 0664); errWrite != nil {
-			// Log warning, but probably not fatal for initialization
 			log.Printf("WARN: Failed to create file %s: %v", uiSettingsFile, errWrite)
 		}
 	} else if err != nil {
 		log.Printf("WARN: Failed to check file %s: %v", uiSettingsFile, err)
+	}
+
+	// 4. Ensure users.json exists (create if not)
+	usersAbsPath, _ := filepath.Abs(usersFile)
+	if _, err := os.Stat(usersAbsPath); os.IsNotExist(err) {
+		// log.Printf("Creating file: %s", usersFile) // Remove creation log
+		if errWrite := os.WriteFile(usersAbsPath, []byte("[]\n"), 0664); errWrite != nil {
+			log.Printf("WARN: Failed to create file %s: %v", usersFile, errWrite)
+		}
+	} else if err != nil {
+		log.Printf("WARN: Failed to check file %s: %v", usersFile, err)
 	}
 
 	// --- Reading config for conditional creation (moved down) ---
@@ -199,7 +214,7 @@ users = false
 		}
 	}
 
-	// 4. Ensure entry-specific web directory exists (using the config.Server.Entry value)
+	// 5. Ensure entry-specific web directory exists (using the config.Server.Entry value)
 	targetWebDir := webDir // Default to base web directory
 	if config.Server.Entry != "" {
 		entryWebDir := filepath.Join(webDir, config.Server.Entry)
@@ -212,28 +227,24 @@ users = false
 		// log.Printf("INFO: server.entry is empty, using base web directory '%s'", webDir)
 	}
 
-	// 5. Conditional creation based on config
+	// 6. Conditional directory creation based on config
 	if config.Functions.Plugins {
 		if err := ensureDir(pluginDir); err != nil {
-			log.Printf("WARN: Failed during conditional creation: %v", err) // Log warning but continue
+			log.Printf("WARN: Failed during conditional directory creation (plugins): %v", err)
 		}
 	}
 	if config.Functions.Commands {
 		if err := ensureDir(commandDir); err != nil {
-			log.Printf("WARN: Failed during conditional creation: %v", err)
+			log.Printf("WARN: Failed during conditional directory creation (commands): %v", err)
 		}
 	}
-	if config.Functions.Users {
-		usersAbsPath, _ := filepath.Abs(usersFile)
-		if _, err := os.Stat(usersAbsPath); os.IsNotExist(err) {
-			log.Printf("Creating file: %s", usersFile)
-			if err := os.WriteFile(usersAbsPath, []byte("{}\n"), 0664); err != nil {
-				log.Printf("WARN: Failed to create file %s: %v", usersFile, err)
-			}
-		} // No need for ensureFile complex logic here
+	if config.Functions.Themes { // Create themes dir conditionally
+		if err := ensureDir(themeDir); err != nil {
+			log.Printf("WARN: Failed during conditional directory creation (themes): %v", err)
+		}
 	}
 
-	// 6. Ensure a default index file exists in the target web directory
+	// 7. Ensure a default index file exists in the target web directory
 	indexPathHtml := filepath.Join(targetWebDir, "index.html")
 	indexPathHtm := filepath.Join(targetWebDir, "index.htm")
 
@@ -241,7 +252,7 @@ users = false
 	_, errHtm := os.Stat(indexPathHtm)
 
 	if os.IsNotExist(errHtml) && os.IsNotExist(errHtm) {
-		log.Printf("Creating default index file: %s", indexPathHtml)
+		// log.Printf("Creating default index file: %s", indexPathHtml) // Remove creation log
 		if errWrite := os.WriteFile(indexPathHtml, []byte(defaultIndexContent), 0664); errWrite != nil {
 			log.Printf("WARN: Failed to create default index file %s: %v", indexPathHtml, errWrite)
 		}
