@@ -1,0 +1,45 @@
+2025/04/13 01:09:06 Loaded 0 users from configs/users.json
+2025/04/13 01:09:06 INFO: Using entry directory: web\3VLRYq5iAJaP
+2025/04/13 01:09:06 Loading 6 template(s) from E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP
+2025/04/13 01:09:06 Web server handlers registered.
+2025/04/13 01:09:06 Starting server | Mode: release | Addr: 0.0.0.0:2102 | Admin Entry: /3VLRYq5iAJaP/
+[WEB] 2025-04-12T17:09:08Z | [97;42m 200 [0m |      1.2354ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/
+2025/04/13 01:09:08 INFO: File or template not found for request: /main.js (checked E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js.html, E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js.htm, E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js)
+[WEB] 2025-04-12T17:09:08Z | [90;43m 404 [0m |       11.54ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/main.js
+[WEB] 2025-04-12T17:09:08Z | [97;42m 200 [0m |     133.405ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/js/nav.js
+[WEB] 2025-04-12T17:09:08Z | [97;42m 200 [0m |    140.2635ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/style.css
+[WEB] 2025-04-12T17:09:08Z | [97;42m 200 [0m |    134.9412ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/js/script.js
+2025/04/13 01:09:09 INFO: File or template not found for request: /main.js (checked E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js.html, E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js.htm, E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js)
+[WEB] 2025-04-12T17:09:09Z | [90;43m 404 [0m |      1.6069ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/main.js
+[WEB] 2025-04-12T17:09:09Z | [90;43m 404 [0m |            0s |       127.0.0.1 | [34mGET    [0m /favicon.ico
+[WEB] 2025-04-12T17:09:10Z | [97;42m 200 [0m |      1.0811ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/docker
+[WEB] 2025-04-12T17:09:11Z | [97;42m 200 [0m |      1.7885ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/website
+[WEB] 2025-04-12T17:09:11Z | [97;42m 200 [0m |      1.2264ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/filemanager
+[API] 2025-04-12T17:09:11Z | [90;43m 404 [0m |      1.0019ms |       127.0.0.1 | [34mGET    [0m /api/main.js
+[WEB] 2025-04-12T17:09:12Z | [97;42m 200 [0m |      1.0694ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/market
+[WEB] 2025-04-12T17:09:13Z | [97;42m 200 [0m |         506µs |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/settings
+[WEB] 2025-04-12T17:09:13Z | [90;43m 404 [0m |       483.9µs |       127.0.0.1 | [34mGET    [0m /
+[WEB] 2025-04-12T17:09:39Z | [97;42m 200 [0m |       627.5µs |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/settings
+[WEB] 2025-04-12T17:09:40Z | [97;42m 200 [0m |       517.6µs |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/docker
+[WEB] 2025-04-12T17:09:40Z | [97;42m 200 [0m |       508.4µs |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/
+2025/04/13 01:09:40 INFO: File or template not found for request: /main.js (checked E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js.html, E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js.htm, E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js)
+[WEB] 2025-04-12T17:09:40Z | [90;43m 404 [0m |      1.6733ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/main.js
+2025/04/13 01:09:40 INFO: File or template not found for request: /main.js (checked E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js.html, E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js.htm, E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js)
+[WEB] 2025-04-12T17:09:40Z | [90;43m 404 [0m |      2.5088ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/main.js
+[WEB] 2025-04-12T17:09:41Z | [97;42m 200 [0m |       508.5µs |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/docker
+[WEB] 2025-04-12T17:09:42Z | [97;42m 200 [0m |       506.4µs |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/
+2025/04/13 01:09:42 INFO: File or template not found for request: /main.js (checked E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js.html, E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js.htm, E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js)
+[WEB] 2025-04-12T17:09:42Z | [90;43m 404 [0m |      1.0578ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/main.js
+2025/04/13 01:09:42 INFO: File or template not found for request: /main.js (checked E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js.html, E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js.htm, E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js)
+[WEB] 2025-04-12T17:09:42Z | [90;43m 404 [0m |      1.2169ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/main.js
+[WEB] 2025-04-12T17:09:44Z | [97;42m 200 [0m |      1.7391ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/docker
+[WEB] 2025-04-12T17:09:45Z | [97;42m 200 [0m |      1.5409ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/website
+[WEB] 2025-04-12T17:09:46Z | [90;43m 404 [0m |       518.5µs |       127.0.0.1 | [34mGET    [0m /
+[WEB] 2025-04-12T17:12:20Z | [90;43m 404 [0m |       536.2µs |       127.0.0.1 | [34mGET    [0m /
+[WEB] 2025-04-12T17:12:23Z | [97;42m 200 [0m |      1.5093ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/website
+[WEB] 2025-04-12T17:12:24Z | [97;42m 200 [0m |       676.8µs |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/
+2025/04/13 01:12:24 INFO: File or template not found for request: /main.js (checked E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js.html, E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js.htm, E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js)
+[WEB] 2025-04-12T17:12:24Z | [90;43m 404 [0m |      1.0835ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/main.js
+2025/04/13 01:12:24 INFO: File or template not found for request: /main.js (checked E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js.html, E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js.htm, E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\main.js)
+[WEB] 2025-04-12T17:12:24Z | [90;43m 404 [0m |       1.059ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/main.js
+[WEB] 2025-04-12T17:12:26Z | [97;42m 200 [0m |       506.8µs |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/website

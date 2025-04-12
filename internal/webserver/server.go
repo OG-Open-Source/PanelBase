@@ -195,61 +195,102 @@ func handleErrorResponse(c *gin.Context, statusCode int, config AppConfig, uiDat
 	c.Abort()
 }
 
-// handleStaticFileRequest attempts to serve a static file or render a template.
+// handleStaticFileRequest attempts to serve a static file or render a template dynamically.
 // Internal to the webserver package.
 func handleStaticFileRequest(c *gin.Context, baseDir string, requestedFile string, uiData map[string]interface{}, config AppConfig) {
 	fsRoot, _ := filepath.Abs(baseDir)
-	cleanedPath := strings.Trim(requestedFile, "/")
+	cleanedPath := filepath.Clean(strings.TrimPrefix(requestedFile, "/")) // Clean the path
+	requestedPathAbs := filepath.Join(fsRoot, cleanedPath)
 
-	// Deny direct .html/.htm access in the URL path itself
+	// Prevent directory traversal attacks
+	if !strings.HasPrefix(requestedPathAbs, fsRoot) {
+		log.Printf("WARN: Directory traversal attempt blocked: %s (requested %s)", requestedPathAbs, requestedFile)
+		handleErrorResponse(c, http.StatusNotFound, config, uiData)
+		return
+	}
+
+	// Prevent direct access to the templates directory
+	if strings.HasPrefix(cleanedPath, "templates/") || cleanedPath == "templates" {
+		log.Printf("INFO: Direct access to templates directory blocked: %s", requestedFile)
+		handleErrorResponse(c, http.StatusNotFound, config, uiData)
+		return
+	}
+
+	// Deny direct .html/.htm access in the URL path itself - This check might be redundant now but kept for clarity
 	if strings.HasSuffix(strings.ToLower(c.Request.URL.Path), ".html") || strings.HasSuffix(strings.ToLower(c.Request.URL.Path), ".htm") {
-		// Delegate to NoRoute handler, which will call handleErrorResponse
-		c.AbortWithStatus(http.StatusNotFound)
+		log.Printf("INFO: Direct access to .html/.htm via URL blocked: %s", c.Request.URL.Path)
+		handleErrorResponse(c, http.StatusNotFound, config, uiData)
 		return
 	}
 
-	// Handle root path (serve index.html or index.htm)
-	if cleanedPath == "" || cleanedPath == "." {
-		// Use router's built-in template rendering
-		if _, err := os.Stat(filepath.Join(fsRoot, "index.html")); err == nil {
-			c.HTML(http.StatusOK, "index.html", uiData)
-			return
-		}
-		if _, err := os.Stat(filepath.Join(fsRoot, "index.htm")); err == nil {
-			c.HTML(http.StatusOK, "index.htm", uiData)
-			return
-		}
-		// If no index file, delegate to NoRoute
-		c.AbortWithStatus(http.StatusNotFound)
+	// --- Dynamic Template Rendering ---
+
+	// Determine the template file base name (e.g., "index" for "/", "market" for "/market")
+	templateBaseName := cleanedPath
+	if cleanedPath == "" || cleanedPath == "." || requestedFile == "/" {
+		templateBaseName = "index" // Special case for root requests
+	}
+
+	// Check for .html first
+	templatePathHtml := filepath.Join(fsRoot, templateBaseName+".html")
+	if _, err := os.Stat(templatePathHtml); err == nil {
+		renderDynamicTemplate(c, templatePathHtml, uiData, config)
 		return
 	}
 
-	// Try serving <cleanedPath>.html as a template
-	templateNameHtml := cleanedPath + ".html"
-	filePathHtml := filepath.Join(fsRoot, templateNameHtml)
-	if _, err := os.Stat(filePathHtml); err == nil {
-		c.HTML(http.StatusOK, templateNameHtml, uiData)
+	// Check for .htm if .html not found
+	templatePathHtm := filepath.Join(fsRoot, templateBaseName+".htm")
+	if _, err := os.Stat(templatePathHtm); err == nil {
+		renderDynamicTemplate(c, templatePathHtm, uiData, config)
 		return
 	}
 
-	// Try serving <cleanedPath>.htm as a template
-	templateNameHtm := cleanedPath + ".htm"
-	filePathHtm := filepath.Join(fsRoot, templateNameHtm)
-	if _, err := os.Stat(filePathHtm); err == nil {
-		c.HTML(http.StatusOK, templateNameHtm, uiData)
-		return
-	}
+	// --- Static File Serving (Fallback) ---
 
-	// Try serving the file directly (CSS, JS, images, etc.)
-	directPath := filepath.Join(fsRoot, cleanedPath)
+	// If no matching template found, try serving as a direct static file (CSS, JS, images, etc.)
+	directPath := requestedPathAbs // Use the absolute path we calculated earlier
 	if fi, err := os.Stat(directPath); err == nil && !fi.IsDir() {
 		// Use http.ServeFile for correct content type and caching headers
 		http.ServeFile(c.Writer, c.Request, directPath)
 		return
 	}
 
-	// Not found - call handleErrorResponse directly
+	// --- Not Found ---
+
+	// If neither a template nor a static file is found, return 404
+	// log.Printf("INFO: File or template not found for request: %s (checked %s, %s, %s)",
+	// 	requestedFile, templatePathHtml, templatePathHtm, directPath)
 	handleErrorResponse(c, http.StatusNotFound, config, uiData)
+}
+
+// renderDynamicTemplate reads, parses, and executes a template file on the fly.
+func renderDynamicTemplate(c *gin.Context, templatePath string, uiData map[string]interface{}, config AppConfig) {
+	templateContent, err := os.ReadFile(templatePath)
+	if err != nil {
+		log.Printf("ERROR: Failed to read template file '%s': %v", templatePath, err)
+		handleErrorResponse(c, http.StatusInternalServerError, config, uiData) // Internal error if read fails
+		return
+	}
+
+	tmpl, err := template.New(filepath.Base(templatePath)).Parse(string(templateContent))
+	if err != nil {
+		log.Printf("ERROR: Failed to parse template file '%s': %v", templatePath, err)
+		handleErrorResponse(c, http.StatusInternalServerError, config, uiData) // Internal error if parse fails
+		return
+	}
+
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	c.Status(http.StatusOK)
+	err = tmpl.Execute(c.Writer, uiData)
+	if err != nil {
+		// Log execution error, but response headers might already be sent
+		log.Printf("ERROR: Failed to execute template '%s': %v", templatePath, err)
+		// Attempt to send a plain text error if possible, though it might fail
+		if !c.Writer.Written() {
+			c.String(http.StatusInternalServerError, httpStatusMessages[http.StatusInternalServerError])
+		}
+		c.Abort()
+	}
 }
 
 // loadTemplates manually finds and loads .html and .htm files from a directory.

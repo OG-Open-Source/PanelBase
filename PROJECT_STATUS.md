@@ -19,7 +19,7 @@ To build a web panel application using the Go programming language and the Gin w
     - `/internal/models`: Data structure definitions.
     - `/internal/services`: Core business logic implementation.
   - `/pkg`: Shared libraries reusable within this project or potentially externally (logger, errors, utils).
-  - `/web`: Frontend assets, including static files (`/web/static`) and HTML templates (`/web/templates`).
+  - `/web`: Frontend assets, including static files (`/web/static`) and HTML templates (`/web/templates`). HTML Templates are now rendered dynamically on request.
 - **API Versioning:** Implemented via URL path (`/api/v1`, `/api/v2`, ...). Routes are defined within their respective version directories (`internal/api/vX/routes.go`).
 - **Naming Convention:** Directory and file names use underscores (`_`) as separators (e.g., `api_token`).
 
@@ -73,3 +73,8 @@ To build a web panel application using the Go programming language and the Gin w
 - [x] Remove verbose "Creating..." logs during initialization.
 - [x] Add initial auth API tests (`/test/auth_api_test.go`).
 - [x] Add `functions.themes` boolean flag to `config.toml`.
+- [x] Enhance debug mode: Force port 32768 and add `/debug` API endpoint.
+- [x] Fix routing conflict between root static file handler and entry-specific handler.
+- [x] Implement dynamic HTML template rendering instead of pre-loading.
+- [x] Prevent direct access to `/web/<entry>/templates/` via URL.
+- [x] Adjust logging level for file not found errors.

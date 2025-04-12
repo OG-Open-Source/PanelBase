@@ -1,0 +1,27 @@
+2025/04/13 01:01:14 Loaded 0 users from configs/users.json
+2025/04/13 01:01:14 INFO: Using entry directory: web\3VLRYq5iAJaP
+2025/04/13 01:01:14 Scanning for templates (.html, .htm) in: E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP (excluding E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\templates)
+2025/04/13 01:01:14 Found template: docker.html
+2025/04/13 01:01:14 Found template: filemanager.html
+2025/04/13 01:01:14 Found template: index.html
+2025/04/13 01:01:14 Found template: market.html
+2025/04/13 01:01:14 Found template: settings.html
+2025/04/13 01:01:14 Found template: website.html
+2025/04/13 01:01:14 Attempting to load 6 template(s): [E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\docker.html E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\filemanager.html E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\index.html E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\market.html E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\settings.html E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\website.html]
+2025/04/13 01:01:14 Web server handlers registered.
+2025/04/13 01:01:14 Starting server | Mode: release | Addr: 0.0.0.0:2102 | Admin Entry: /3VLRYq5iAJaP/
+[WEB] 2025-04-12T17:01:21Z | [97;42m 200 [0m |      1.3422ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/docker
+[WEB] 2025-04-12T17:01:21Z | [97;42m 200 [0m |    117.0421ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/js/nav.js
+[WEB] 2025-04-12T17:01:21Z | [97;42m 200 [0m |     122.405ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/style.css
+[WEB] 2025-04-12T17:01:21Z | [97;42m 200 [0m |    119.3161ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/js/script.js
+[WEB] 2025-04-12T17:01:22Z | [97;42m 200 [0m |            0s |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/docker
+[WEB] 2025-04-12T17:01:22Z | [97;42m 200 [0m |      2.0584ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/style.css
+[WEB] 2025-04-12T17:01:22Z | [97;42m 200 [0m |      1.0096ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/js/nav.js
+[WEB] 2025-04-12T17:01:22Z | [97;42m 200 [0m |      1.4704ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/js/script.js
+[WEB] 2025-04-12T17:01:22Z | [90;43m 404 [0m |      1.0248ms |       127.0.0.1 | [34mGET    [0m /favicon.ico
+[WEB] 2025-04-12T17:01:23Z | [97;42m 200 [0m |            0s |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/
+Error #01: html/template:index.html: "<" in attribute name: "</span>\n\t\t\t\t\t\t</div>\n\t\t\t\t\t\t<div "
+[WEB] 2025-04-12T17:01:25Z | [97;42m 200 [0m |            0s |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/
+Error #01: html/template:index.html: "<" in attribute name: "</span>\n\t\t\t\t\t\t</div>\n\t\t\t\t\t\t<div "
+[WEB] 2025-04-12T17:01:29Z | [97;42m 200 [0m |            0s |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/
+Error #01: html/template:index.html: "<" in attribute name: "</span>\n\t\t\t\t\t\t</div>\n\t\t\t\t\t\t<div "

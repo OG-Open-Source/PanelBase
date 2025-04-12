@@ -76,3 +76,8 @@ Run `go run cmd/server/main.go` to start the server.
 - Further simplified logs by removing messages about which specific error template is being served.
 - Re-created API tests for auth endpoints (`/test/auth_api_test.go`) covering registration and login scenarios (success, conflict, missing fields, incorrect credentials, registration disabled).
 - Added interactive PowerShell API test script (`/test/api_test.ps1`) with menu for server control, config initialization, and running auth tests.
+- Added `/debug` API endpoint and port override (32768) when `server.mode` is "debug".
+- Fixed route conflict between root static file handler and entry-specific handler when `server.entry` is set.
+- Implemented dynamic HTML template rendering (on-demand parsing) instead of pre-loading, allowing runtime addition of HTML files.
+- Prevented direct URL access to files within the `/web/<entry>/templates` directory.
+- Removed INFO log message when a requested file/template is not found.

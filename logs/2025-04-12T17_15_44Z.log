@@ -1,0 +1,20 @@
+2025/04/13 01:15:44 Loaded 0 users from configs/users.json
+2025/04/13 01:15:44 INFO: Using entry directory: web\3VLRYq5iAJaP
+2025/04/13 01:15:44 Loading 6 template(s) from E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP
+2025/04/13 01:15:44 Web server handlers registered.
+2025/04/13 01:15:44 Starting server | Mode: release | Addr: 0.0.0.0:2102 | Admin Entry: /3VLRYq5iAJaP/
+[WEB] 2025-04-12T17:16:01Z | [97;42m 200 [0m |      1.1331ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/website
+[WEB] 2025-04-12T17:16:01Z | [97;42m 200 [0m |    125.8317ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/js/nav.js
+[WEB] 2025-04-12T17:16:01Z | [97;42m 200 [0m |    128.1591ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/style.css
+[WEB] 2025-04-12T17:16:01Z | [97;42m 200 [0m |    127.3943ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/js/script.js
+[WEB] 2025-04-12T17:16:01Z | [90;43m 404 [0m |       509.2µs |       127.0.0.1 | [34mGET    [0m /favicon.ico
+[WEB] 2025-04-12T17:16:04Z | [97;42m 200 [0m |      1.6763ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/docker
+[WEB] 2025-04-12T17:16:04Z | [97;42m 200 [0m |       507.9µs |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/filemanager
+[API] 2025-04-12T17:16:04Z | [90;43m 404 [0m |       507.2µs |       127.0.0.1 | [34mGET    [0m /api/main.js
+[WEB] 2025-04-12T17:16:05Z | [97;42m 200 [0m |      1.0499ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/docker
+[WEB] 2025-04-12T17:16:06Z | [97;42m 200 [0m |      1.1618ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/settings
+[WEB] 2025-04-12T17:16:06Z | [97;42m 200 [0m |      1.8636ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/market
+[WEB] 2025-04-12T17:16:07Z | [97;42m 200 [0m |       554.2µs |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/docker
+[WEB] 2025-04-12T17:16:07Z | [97;42m 200 [0m |       507.3µs |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/
+[WEB] 2025-04-12T17:16:07Z | [90;43m 404 [0m |       509.1µs |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/main.js
+[WEB] 2025-04-12T17:16:07Z | [90;43m 404 [0m |       507.3µs |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/main.js

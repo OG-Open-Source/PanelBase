@@ -1,0 +1,18 @@
+2025/04/13 00:51:40 Loaded 0 users from configs/users.json
+2025/04/13 00:51:40 INFO: Using entry directory: web\3VLRYq5iAJaP
+2025/04/13 00:51:40 Loading 6 template(s) from E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP
+2025/04/13 00:51:40 Web server handlers registered.
+2025/04/13 00:51:40 Starting server | Mode: release | Addr: 0.0.0.0:2102 | Admin Entry: /3VLRYq5iAJaP/
+[WEB] 2025-04-12T16:51:43Z | [97;42m 200 [0m |       578.2µs |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/website
+[WEB] 2025-04-12T16:51:44Z | [97;42m 200 [0m |            0s |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/website
+[WEB] 2025-04-12T16:51:45Z | [97;42m 200 [0m |            0s |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/website
+[WEB] 2025-04-12T16:51:45Z | [97;42m 200 [0m |       508.6µs |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/docker
+[WEB] 2025-04-12T16:51:46Z | [97;42m 200 [0m |       467.8µs |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/docker
+[WEB] 2025-04-12T16:51:47Z | [97;42m 200 [0m |            0s |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/docker
+[WEB] 2025-04-12T16:51:49Z | [97;42m 200 [0m |            0s |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/docker
+[WEB] 2025-04-12T16:51:49Z | [97;42m 200 [0m |       2.044ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/website
+[WEB] 2025-04-12T16:51:50Z | [97;42m 200 [0m |      1.5092ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/filemanager
+[API] 2025-04-12T16:51:50Z | [90;43m 404 [0m |       508.3µs |       127.0.0.1 | [34mGET    [0m /api/main.js
+[WEB] 2025-04-12T16:51:51Z | [97;42m 200 [0m |            0s |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/market
+[WEB] 2025-04-12T16:51:52Z | [97;42m 200 [0m |            0s |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/website
+[WEB] 2025-04-12T16:51:52Z | [97;42m 200 [0m |       530.2µs |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/docker
