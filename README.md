@@ -40,3 +40,8 @@ Run `go run cmd/server/main.go` to start the server.
 - HTML/HTM files served via the custom handler are now rendered using Go's template engine, injecting UI settings data.
 - Changed template loading from `LoadHTMLGlob` to manual file walking (`LoadHTMLFiles`) to support both `.html` and `.htm` without panic.
 - Initialization process now automatically creates a default `index.html` in the target web directory (`web/` or `web/<entry>/`) if neither `index.html` nor `index.htm` exists.
+- Added `server.mode` option to `configs/config.toml` (defaulting to "debug" on creation).
+- Gin run mode is now set based on `server.mode` configuration before router initialization.
+- Changed default Gin mode to `release`. Bootstrap now writes `mode = "release"` on first config creation, and server defaults to release mode if config is missing or invalid.
+- Reduced verbosity of initialization and template loading logs.
+- Combined server startup information (Mode, Address, Admin Entry) into a single log line.

@@ -58,3 +58,4 @@ To build a web panel application using the Go programming language and the Gin w
 - [x] Load UI settings from `/configs/ui_settings.json`.
 - [x] Render `.html`/`.htm` files as Go templates, passing UI settings data (using manual template loading).
 - [x] Ensure a default `index.html` is created in the target web directory if none exists.
+- [x] Set Gin mode (defaulting to release) based on `server.mode` in `configs/config.toml`.

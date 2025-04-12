@@ -23,6 +23,7 @@ type AppConfig struct {
 		Port  int    `toml:"port"`
 		Entry string `toml:"entry"`
 		Ip    string `toml:"ip"`
+		Mode  string `toml:"mode"`
 	}
 }
 
@@ -32,6 +33,7 @@ const (
 	configFile     = "configs/config.toml"
 	uiSettingsFile = "configs/ui_settings.json"
 	baseWebDir     = "web"
+	defaultMode    = gin.ReleaseMode
 )
 
 // handleStaticFileRequest attempts to serve a static file from baseDir based on the requestedFile path,
@@ -101,12 +103,11 @@ func loadTemplates(router *gin.Engine, baseDir string) error {
 	walkErr := filepath.WalkDir(baseDirAbs, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			log.Printf("WARN: Error accessing path %q: %v\n", path, err)
-			return err // Propagate the error
+			return err
 		}
 		if !d.IsDir() {
 			ext := strings.ToLower(filepath.Ext(path))
 			if ext == ".html" || ext == ".htm" {
-				log.Printf("  Found template: %s", path)
 				templateFiles = append(templateFiles, path)
 			}
 		}
@@ -119,13 +120,11 @@ func loadTemplates(router *gin.Engine, baseDir string) error {
 
 	if len(templateFiles) == 0 {
 		log.Printf("WARN: No template files (.html, .htm) found in %s", baseDirAbs)
-		return nil // Not necessarily an error if no templates are expected
+		return nil
 	}
 
 	log.Printf("Loading %d template files...", len(templateFiles))
 	router.LoadHTMLFiles(templateFiles...)
-	// LoadHTMLFiles doesn't return an error to check here in Gin's current implementation
-	// It internally uses template.Must which panics on error during parsing.
 
 	return nil
 }
@@ -156,7 +155,8 @@ func main() {
 			Port  int    `toml:"port"`
 			Entry string `toml:"entry"`
 			Ip    string `toml:"ip"`
-		}{Port: defaultPort, Ip: defaultIP}, // Set defaults
+			Mode  string `toml:"mode"`
+		}{Port: defaultPort, Ip: defaultIP, Mode: defaultMode},
 	}
 	configData, err := os.ReadFile(configFile)
 	if err != nil {
@@ -164,18 +164,38 @@ func main() {
 	} else {
 		err = toml.Unmarshal(configData, &config)
 		if err != nil {
-			log.Printf("WARN: Failed to parse config file '%s': %v. Using default server settings.", configFile, err)
-			config.Server.Port = defaultPort // Reset to default on parse error
-			config.Server.Ip = defaultIP
+			log.Printf("WARN: Failed to parse config file '%s': %v. Using default/incomplete server settings.", configFile, err)
+			if config.Server.Port == 0 {
+				config.Server.Port = defaultPort
+			}
+			if config.Server.Ip == "" {
+				config.Server.Ip = defaultIP
+			}
+			if config.Server.Mode == "" {
+				config.Server.Mode = defaultMode
+			}
 		}
 	}
 	if config.Server.Ip == "" {
 		config.Server.Ip = defaultIP
 		log.Printf("WARN: Server IP not set in config, defaulting to %s", defaultIP)
 	}
+	if config.Server.Mode == "" {
+		config.Server.Mode = defaultMode
+		log.Printf("WARN: Server Mode not set in config, defaulting to %s", defaultMode)
+	}
 	listenAddr := fmt.Sprintf("%s:%d", config.Server.Ip, config.Server.Port)
+	// --- End Load Configuration ---
 
-	// Load UI Settings
+	// --- Set Gin Mode BEFORE creating router ---
+	ginMode := gin.DebugMode // Default for logic
+	if strings.ToLower(config.Server.Mode) == gin.ReleaseMode {
+		ginMode = gin.ReleaseMode
+	}
+	gin.SetMode(ginMode)
+	// --- End Set Gin Mode ---
+
+	// --- Load UI Settings AFTER setting mode, BEFORE router ---
 	uiSettingsData := make(map[string]interface{})
 	uiSettingsBytes, err := os.ReadFile(uiSettingsFile)
 	if err != nil {
@@ -187,9 +207,9 @@ func main() {
 			uiSettingsData = make(map[string]interface{}) // Ensure it's an empty map on error
 		}
 	}
-	// --- End Load Configuration ---
+	// --- End Load UI Settings ---
 
-	// Create a gin router without default middleware
+	// Create a gin router
 	router := gin.New()
 	router.Use(gin.Recovery())
 	logConfig := gin.LoggerConfig{
@@ -223,33 +243,29 @@ func main() {
 	// --- End Explicit Routes ---
 
 	// --- Setup Static File Serving / NoRoute Handler ---
+	adminEntryPath := "Disabled (server.entry is empty in config)"
 	if config.Server.Entry != "" {
 		// Serve entry-specific directory at /<entry>/
 		entryWebDir := filepath.Join(baseWebDir, config.Server.Entry)
 		entryRoutePath := "/" + config.Server.Entry
-		log.Printf("Serving files from '%s' at URL path '%s/*' with custom handler", entryWebDir, entryRoutePath)
 		router.GET(entryRoutePath+"/*filepath", func(c *gin.Context) {
 			handleStaticFileRequest(c, entryWebDir, c.Param("filepath"), uiSettingsData)
 		})
-		log.Printf("Admin Entry: %s", entryRoutePath)
-
-		// Handle NoRoute when entry exists (likely a real 404)
-		router.NoRoute(func(c *gin.Context) {
-			c.AbortWithStatus(http.StatusNotFound)
-		})
-
+		adminEntryPath = entryRoutePath
 	} else {
 		// Handle NoRoute when entry is empty (try serving from baseWebDir)
-		log.Printf("Serving files from base '%s' at root path '%s' via NoRoute handler", baseWebDir, "/")
 		router.NoRoute(func(c *gin.Context) {
 			handleStaticFileRequest(c, baseWebDir, c.Request.URL.Path, uiSettingsData)
 		})
-		log.Printf("Admin Entry: Disabled (server.entry is empty in config)")
 	}
 	// --- End Static File Serving ---
 
-	// Start the server
-	log.Printf("Starting server on %s", listenAddr)
+	// Start the server with combined log message
+	log.Printf("Starting server | Mode: %s | Addr: %s | Admin Entry: %s",
+		ginMode,
+		listenAddr,
+		adminEntryPath,
+	)
 	if err := router.Run(listenAddr); err != nil {
 		log.Fatalf("Failed to run server: %v", err)
 	}

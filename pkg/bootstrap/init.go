@@ -60,6 +60,7 @@ type configStructure struct {
 		Port  int    `toml:"port"`
 		Entry string `toml:"entry"`
 		Ip    string `toml:"ip"`
+		Mode  string `toml:"mode"`
 	}
 	Functions struct {
 		Plugins  bool `toml:"plugins"`
@@ -114,7 +115,7 @@ func ensureDir(dirPath string) error {
 
 // InitializeProject ensures necessary directories and files exist based on configuration.
 func InitializeProject() error {
-	log.Println("Checking project structure...")
+	// log.Println("Checking project structure...")
 
 	// 1. Ensure mandatory directories exist
 	if err := ensureDir(configDir); err != nil {
@@ -141,7 +142,7 @@ func InitializeProject() error {
 			testPort := rand.Intn(maxPort-minPort+1) + minPort
 			if isPortAvailable(testPort) {
 				port = testPort
-				log.Printf("Found available port: %d", port)
+				// log.Printf("Found available port: %d", port)
 				break
 			}
 		}
@@ -155,6 +156,7 @@ func InitializeProject() error {
 ip    = "%s"
 port  = %d
 entry = "%s"
+mode  = "release"
 
 [functions]
 plugins = false
@@ -207,7 +209,7 @@ users = false
 			targetWebDir = entryWebDir // Update target if successfully created/exists
 		}
 	} else {
-		log.Printf("INFO: server.entry is empty, using base web directory '%s'", webDir)
+		// log.Printf("INFO: server.entry is empty, using base web directory '%s'", webDir)
 	}
 
 	// 5. Conditional creation based on config
@@ -247,6 +249,6 @@ users = false
 		// log.Printf("Index file (index.html or index.htm) already exists in %s", targetWebDir)
 	}
 
-	log.Println("Project structure check complete.")
+	// log.Println("Project structure check complete.")
 	return nil
 }
