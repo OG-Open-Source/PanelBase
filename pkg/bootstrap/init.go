@@ -14,13 +14,14 @@ import (
 )
 
 const (
-	configDir  = "configs"
-	themeDir   = "themes"
-	webDir     = "web"
-	pluginDir  = "plugins"
-	commandDir = "commands"
-	configFile = "configs/config.toml"
-	usersFile  = "configs/users.json"
+	configDir      = "configs"
+	themeDir       = "themes"
+	webDir         = "web"
+	pluginDir      = "plugins"
+	commandDir     = "commands"
+	configFile     = "configs/config.toml"
+	usersFile      = "configs/users.json"
+	uiSettingsFile = "configs/ui_settings.json"
 
 	minPort          = 1024
 	maxPort          = 49151
@@ -28,6 +29,30 @@ const (
 	entryLength      = 12
 	defaultIP        = "0.0.0.0"
 )
+
+// Default content for ui_settings.json if it doesn't exist
+const defaultUISettingsContent = `{
+  "site_title": "PanelBase",
+  "welcome_message": "Welcome to the Panel!"
+}
+`
+
+// Default content for index.html if it doesn't exist
+const defaultIndexContent = `<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<title>{{ .site_title }}</title>
+</head>
+
+<body>
+	<h1>{{ .welcome_message }}</h1>
+	<p>Edit this file in your web directory to customize the panel entry point.</p>
+</body>
+
+</html>
+`
 
 // configStructure mirrors the TOML structure for parsing
 type configStructure struct {
@@ -147,6 +172,18 @@ users = false
 		return fmt.Errorf("failed to check config file %s: %w", configFile, err)
 	}
 
+	// 3. Ensure ui_settings.json exists (create with default if not)
+	uiSettingsAbsPath, _ := filepath.Abs(uiSettingsFile)
+	if _, err := os.Stat(uiSettingsAbsPath); os.IsNotExist(err) {
+		log.Printf("Creating file: %s", uiSettingsFile)
+		if errWrite := os.WriteFile(uiSettingsAbsPath, []byte(defaultUISettingsContent), 0664); errWrite != nil {
+			// Log warning, but probably not fatal for initialization
+			log.Printf("WARN: Failed to create file %s: %v", uiSettingsFile, errWrite)
+		}
+	} else if err != nil {
+		log.Printf("WARN: Failed to check file %s: %v", uiSettingsFile, err)
+	}
+
 	// --- Reading config for conditional creation (moved down) ---
 	configData, err := os.ReadFile(configFile)
 	config := configStructure{} // Default values are false
@@ -161,13 +198,16 @@ users = false
 	}
 
 	// 4. Ensure entry-specific web directory exists (using the config.Server.Entry value)
+	targetWebDir := webDir // Default to base web directory
 	if config.Server.Entry != "" {
 		entryWebDir := filepath.Join(webDir, config.Server.Entry)
 		if err := ensureDir(entryWebDir); err != nil {
 			log.Printf("WARN: Failed to create entry-specific web directory '%s': %v", entryWebDir, err)
+		} else {
+			targetWebDir = entryWebDir // Update target if successfully created/exists
 		}
 	} else {
-		log.Printf("WARN: Server entry is empty in config, cannot create entry-specific web directory.")
+		log.Printf("INFO: server.entry is empty, using base web directory '%s'", webDir)
 	}
 
 	// 5. Conditional creation based on config
@@ -189,6 +229,22 @@ users = false
 				log.Printf("WARN: Failed to create file %s: %v", usersFile, err)
 			}
 		} // No need for ensureFile complex logic here
+	}
+
+	// 6. Ensure a default index file exists in the target web directory
+	indexPathHtml := filepath.Join(targetWebDir, "index.html")
+	indexPathHtm := filepath.Join(targetWebDir, "index.htm")
+
+	_, errHtml := os.Stat(indexPathHtml)
+	_, errHtm := os.Stat(indexPathHtm)
+
+	if os.IsNotExist(errHtml) && os.IsNotExist(errHtm) {
+		log.Printf("Creating default index file: %s", indexPathHtml)
+		if errWrite := os.WriteFile(indexPathHtml, []byte(defaultIndexContent), 0664); errWrite != nil {
+			log.Printf("WARN: Failed to create default index file %s: %v", indexPathHtml, errWrite)
+		}
+	} else {
+		// log.Printf("Index file (index.html or index.htm) already exists in %s", targetWebDir)
 	}
 
 	log.Println("Project structure check complete.")

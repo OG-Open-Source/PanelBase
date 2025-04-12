@@ -35,3 +35,8 @@ Run `go run cmd/server/main.go` to start the server.
 - Refactored static file handling to use a shared handler function (`createStaticHandler`).
 - If `server.entry` is empty in `config.toml`, the server now serves the `/web` directory at the root URL (`/`) using the same custom rules.
 - Refactored static file serving to use `NoRoute` handler for root path when `server.entry` is empty, resolving route conflicts.
+- Initialization process now ensures `/configs/ui_settings.json` exists, creating it with default values if necessary.
+- Server now loads UI settings from `/configs/ui_settings.json` at startup.
+- HTML/HTM files served via the custom handler are now rendered using Go's template engine, injecting UI settings data.
+- Changed template loading from `LoadHTMLGlob` to manual file walking (`LoadHTMLFiles`) to support both `.html` and `.htm` without panic.
+- Initialization process now automatically creates a default `index.html` in the target web directory (`web/` or `web/<entry>/`) if neither `index.html` nor `index.htm` exists.

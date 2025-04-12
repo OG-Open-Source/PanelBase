@@ -54,3 +54,7 @@ To build a web panel application using the Go programming language and the Gin w
 - [x] Read server IP/port/entry from `config.toml` at server startup.
 - [x] Create entry-specific web directory (`/web/<entry>`) during initialization.
 - [x] Implement custom static file serving using explicit routes and `NoRoute`: Deny direct `.html`/`.htm` access, allow access via clean URLs. Serve `/web/<entry>` at `/<entry>/` if entry exists, otherwise serve `/web` at `/` via `NoRoute`.
+- [x] Ensure `/configs/ui_settings.json` is created with default content during initialization.
+- [x] Load UI settings from `/configs/ui_settings.json`.
+- [x] Render `.html`/`.htm` files as Go templates, passing UI settings data (using manual template loading).
+- [x] Ensure a default `index.html` is created in the target web directory if none exists.

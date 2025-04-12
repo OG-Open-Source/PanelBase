@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -25,15 +27,16 @@ type AppConfig struct {
 }
 
 const (
-	defaultPort = 8080
-	defaultIP   = "0.0.0.0"
-	configFile  = "configs/config.toml"
-	baseWebDir  = "web"
+	defaultPort    = 8080
+	defaultIP      = "0.0.0.0"
+	configFile     = "configs/config.toml"
+	uiSettingsFile = "configs/ui_settings.json"
+	baseWebDir     = "web"
 )
 
 // handleStaticFileRequest attempts to serve a static file from baseDir based on the requestedFile path,
-// applying custom rules (deny .html/.htm, allow clean URLs).
-func handleStaticFileRequest(c *gin.Context, baseDir string, requestedFile string) {
+// applying custom rules and rendering HTML templates with uiData.
+func handleStaticFileRequest(c *gin.Context, baseDir string, requestedFile string, uiData map[string]interface{}) {
 	fsRoot, _ := filepath.Abs(baseDir)
 
 	// Remove leading/trailing slashes for consistency
@@ -49,42 +52,82 @@ func handleStaticFileRequest(c *gin.Context, baseDir string, requestedFile strin
 	if cleanedPath == "" || cleanedPath == "." {
 		indexPathHtml := filepath.Join(fsRoot, "index.html")
 		if _, err := os.Stat(indexPathHtml); err == nil {
-			c.File(indexPathHtml)
+			c.HTML(http.StatusOK, "index.html", uiData) // Render template
 			return
 		}
 		indexPathHtm := filepath.Join(fsRoot, "index.htm")
 		if _, err := os.Stat(indexPathHtm); err == nil {
-			c.File(indexPathHtm)
+			c.HTML(http.StatusOK, "index.htm", uiData) // Render template
 			return
 		}
-		// If no index file, fall through to 404
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
 
 	// 3. Try serving <cleanedPath>.html
-	filePathHtml := filepath.Join(fsRoot, cleanedPath+".html")
+	templateNameHtml := cleanedPath + ".html"
+	filePathHtml := filepath.Join(fsRoot, templateNameHtml)
 	if _, err := os.Stat(filePathHtml); err == nil {
-		c.File(filePathHtml)
+		c.HTML(http.StatusOK, templateNameHtml, uiData) // Render template
 		return
 	}
 
 	// 4. Try serving <cleanedPath>.htm
-	filePathHtm := filepath.Join(fsRoot, cleanedPath+".htm")
+	templateNameHtm := cleanedPath + ".htm"
+	filePathHtm := filepath.Join(fsRoot, templateNameHtm)
 	if _, err := os.Stat(filePathHtm); err == nil {
-		c.File(filePathHtm)
+		c.HTML(http.StatusOK, templateNameHtm, uiData) // Render template
 		return
 	}
 
 	// 5. Try serving the file directly (for CSS, JS, images, etc.)
 	directPath := filepath.Join(fsRoot, cleanedPath)
 	if fi, err := os.Stat(directPath); err == nil && !fi.IsDir() {
-		c.File(directPath)
+		c.File(directPath) // Serve non-template file directly
 		return
 	}
 
 	// 6. Not found
 	c.AbortWithStatus(http.StatusNotFound)
+}
+
+// loadTemplates manually finds and loads .html and .htm files from a directory.
+func loadTemplates(router *gin.Engine, baseDir string) error {
+	var templateFiles []string
+	baseDirAbs, _ := filepath.Abs(baseDir)
+
+	log.Printf("Scanning for templates (.html, .htm) in: %s", baseDirAbs)
+
+	walkErr := filepath.WalkDir(baseDirAbs, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			log.Printf("WARN: Error accessing path %q: %v\n", path, err)
+			return err // Propagate the error
+		}
+		if !d.IsDir() {
+			ext := strings.ToLower(filepath.Ext(path))
+			if ext == ".html" || ext == ".htm" {
+				log.Printf("  Found template: %s", path)
+				templateFiles = append(templateFiles, path)
+			}
+		}
+		return nil
+	})
+
+	if walkErr != nil {
+		return fmt.Errorf("error walking template directory %s: %w", baseDirAbs, walkErr)
+	}
+
+	if len(templateFiles) == 0 {
+		log.Printf("WARN: No template files (.html, .htm) found in %s", baseDirAbs)
+		return nil // Not necessarily an error if no templates are expected
+	}
+
+	log.Printf("Loading %d template files...", len(templateFiles))
+	router.LoadHTMLFiles(templateFiles...)
+	// LoadHTMLFiles doesn't return an error to check here in Gin's current implementation
+	// It internally uses template.Must which panics on error during parsing.
+
+	return nil
 }
 
 func main() {
@@ -131,6 +174,19 @@ func main() {
 		log.Printf("WARN: Server IP not set in config, defaulting to %s", defaultIP)
 	}
 	listenAddr := fmt.Sprintf("%s:%d", config.Server.Ip, config.Server.Port)
+
+	// Load UI Settings
+	uiSettingsData := make(map[string]interface{})
+	uiSettingsBytes, err := os.ReadFile(uiSettingsFile)
+	if err != nil {
+		log.Printf("WARN: Failed to read UI settings file '%s': %v. UI data will be empty.", uiSettingsFile, err)
+	} else {
+		err = json.Unmarshal(uiSettingsBytes, &uiSettingsData)
+		if err != nil {
+			log.Printf("WARN: Failed to parse UI settings file '%s': %v. UI data will be empty.", uiSettingsFile, err)
+			uiSettingsData = make(map[string]interface{}) // Ensure it's an empty map on error
+		}
+	}
 	// --- End Load Configuration ---
 
 	// Create a gin router without default middleware
@@ -141,6 +197,17 @@ func main() {
 		Output:    logWriter,
 	}
 	router.Use(gin.LoggerWithConfig(logConfig))
+
+	// --- Load HTML Templates ---
+	templateBaseDir := baseWebDir
+	if config.Server.Entry != "" {
+		templateBaseDir = filepath.Join(baseWebDir, config.Server.Entry)
+	}
+	// Load templates manually
+	if err := loadTemplates(router, templateBaseDir); err != nil {
+		log.Printf("ERROR: Failed to load HTML templates: %v", err)
+	}
+	// --- End Load Templates ---
 
 	// --- Register Explicit Routes FIRST ---
 	// API v1 group
@@ -162,7 +229,7 @@ func main() {
 		entryRoutePath := "/" + config.Server.Entry
 		log.Printf("Serving files from '%s' at URL path '%s/*' with custom handler", entryWebDir, entryRoutePath)
 		router.GET(entryRoutePath+"/*filepath", func(c *gin.Context) {
-			handleStaticFileRequest(c, entryWebDir, c.Param("filepath"))
+			handleStaticFileRequest(c, entryWebDir, c.Param("filepath"), uiSettingsData)
 		})
 		log.Printf("Admin Entry: %s", entryRoutePath)
 
@@ -175,7 +242,7 @@ func main() {
 		// Handle NoRoute when entry is empty (try serving from baseWebDir)
 		log.Printf("Serving files from base '%s' at root path '%s' via NoRoute handler", baseWebDir, "/")
 		router.NoRoute(func(c *gin.Context) {
-			handleStaticFileRequest(c, baseWebDir, c.Request.URL.Path)
+			handleStaticFileRequest(c, baseWebDir, c.Request.URL.Path, uiSettingsData)
 		})
 		log.Printf("Admin Entry: Disabled (server.entry is empty in config)")
 	}
