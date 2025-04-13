@@ -1,7 +1,0 @@
-2025/04/13 01:06:39 Loaded 0 users from configs/users.json
-2025/04/13 01:06:39 INFO: Using entry directory: web\3VLRYq5iAJaP
-2025/04/13 01:06:39 Loading 6 template(s) from E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP
-2025/04/13 01:06:39 Web server handlers registered.
-2025/04/13 01:06:39 Starting server | Mode: release | Addr: 0.0.0.0:2102 | Admin Entry: /3VLRYq5iAJaP/
-2025/04/13 01:06:43 ERROR: Failed to execute template 'E:\Github Desktop\PanelBase\web\3VLRYq5iAJaP\index.html': html/template:index.html: "<" in attribute name: "\n\t\t\t\t\t\t\t\t</span>\n\t\t\t\t\t\t</div>\n\t\t"
-[WEB] 2025-04-12T17:06:43Z | [97;41m 500 [0m |      1.1796ms |       127.0.0.1 | [34mGET    [0m /3VLRYq5iAJaP/

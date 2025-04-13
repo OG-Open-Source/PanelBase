@@ -31,11 +31,12 @@ func NewAuthHandler(store storage.UserStore, jwtSecret string, tokenDurationMin 
 
 // RegisterRequest defines the expected request body for user registration.
 type RegisterRequest struct {
-	Username string              `json:"username" binding:"required,min=3"`
-	Password string              `json:"password" binding:"required,min=6"`
-	Name     string              `json:"name"`                            // Added Name
-	Email    string              `json:"email" binding:"omitempty,email"` // Added Email (optional, validate format)
-	Scopes   map[string][]string `json:"scopes"`                          // Changed from Permissions
+	Username string `json:"username" binding:"required,min=3"`
+	Password string `json:"password" binding:"required,min=6"`
+	Name     string `json:"name"`
+	Email    string `json:"email" binding:"omitempty,email"`
+	// Allow registering with scopes, but they might be overridden by CreateUser logic
+	Scopes map[string]interface{} `json:"scopes"` // Changed to map[string]interface{}
 }
 
 // Register handles user registration.
@@ -54,20 +55,25 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
+	// Ensure request scopes are initialized if nil
+	requestScopes := req.Scopes
+	if requestScopes == nil {
+		requestScopes = make(map[string]interface{}) // Use interface{} type
+	}
+
 	// Create user model
 	user := &models.User{
 		Username:     req.Username,
 		PasswordHash: string(hashedPassword),
-		Name:         req.Name,   // Set Name
-		Email:        req.Email,  // Set Email
-		Active:       true,       // Default new users to active
-		Scopes:       req.Scopes, // Use provided scopes or nil/empty map
-		// CreatedAt will be set by the store
+		Name:         req.Name,
+		Email:        req.Email,
+		Active:       true,
+		Scopes:       requestScopes, // Assign map[string]interface{}
 	}
-	// Ensure Scopes map is initialized if nil from request
-	if user.Scopes == nil {
-		user.Scopes = make(map[string][]string)
-	}
+
+	// Note: The CreateUser handler will potentially override these scopes
+	// with default scopes if the registration endpoint itself doesn't
+	// inherently grant 'users:update:scopes' permission (which it shouldn't).
 
 	// Store the user
 	if err := h.UserStore.CreateUser(context.Background(), user); err != nil {
@@ -128,8 +134,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// Generate JWT
-	tokenString, err := auth.GenerateToken(user, h.JwtSecret, h.TokenDurationMin)
+	// Generate JWT (Web Token)
+	tokenString, err := auth.GenerateToken(user, h.JwtSecret, h.TokenDurationMin, auth.TokenTypeWeb) // Specify token type
 	if err != nil {
 		log.Printf("ERROR: Failed to generate token: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Login failed"})
@@ -138,4 +144,3 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	c.JSON(http.StatusOK, LoginResponse{Token: tokenString})
 }
- 

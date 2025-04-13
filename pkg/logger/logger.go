@@ -3,7 +3,6 @@ package logger
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -31,8 +30,6 @@ func SetupLogWriter(logDir string) (io.Writer, *os.File, error) {
 
 	// Create a multi-writer to write to both stdout and the log file
 	multiWriter := io.MultiWriter(os.Stdout, logFile)
-
-	log.Printf("Logging to console and file: %s", logFilePath) // Log initialization info
 
 	return multiWriter, logFile, nil
 }

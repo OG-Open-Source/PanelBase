@@ -78,3 +78,18 @@ To build a web panel application using the Go programming language and the Gin w
 - [x] Implement dynamic HTML template rendering instead of pre-loading.
 - [x] Prevent direct access to `/web/<entry>/templates/` via URL.
 - [x] Adjust logging level for file not found errors.
+- [x] Implement basic IP-based rate limiting middleware.
+- [x] Add configuration for rate limiting and trusted proxy.
+- [x] Add ID generator utility (`pkg/utils/id_generator.go`).
+- [x] Update user creation (`JSONUserStore`) to use ID generator.
+- [x] Ensure `created_at` in `users.json` uses RFC3339 format.
+- [x] Implement hierarchical scope-based authorization middleware (`map[string]interface{}`).
+- [x] Update JWT generation/validation for hierarchical scopes and `aud`/`jti`/`name` claims.
+- [x] Apply fine-grained scope checks to user management routes (`users:*`).
+- [x] Implement initial admin user creation with full scopes in bootstrap.
+- [x] Implement default scope assignment for newly created users in CreateUser handler.
+- [x] Implement `/account` routes for self-management (profile, password).
+- [x] Design and implement basic API Token management (create, list, delete for self; stored in users.json).
+- [ ] Implement JTI validation for API tokens (requires DB or store modification).
+- [ ] Implement routes and scope checks for `themes`, `plugins`, `commands`.
+- [ ] Write comprehensive API tests for authorization scenarios.

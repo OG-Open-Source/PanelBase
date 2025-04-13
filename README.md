@@ -6,6 +6,11 @@ A Go-based web panel.
 
 Project initialization (directory/file creation) is now handled automatically when starting the server.
 
+## Configuration Notes
+
+*   **Rate Limiting:** Basic IP-based rate limiting is enabled by default (`server.rate_limit_r` = 10 req/s, `server.rate_limit_b` = 20 burst). These values can be adjusted in `configs/config.toml`.
+*   **Trusted Proxies:** If PanelBase runs behind a reverse proxy (like Nginx, Caddy, Cloudflare), it's **crucial** to configure `server.trusted_proxy` in `configs/config.toml` with the proxy's IP address or CIDR block. This allows the rate limiter and logging to see the *real* client IP address instead of the proxy's IP. Example: `trusted_proxy = "192.168.1.1"` or `trusted_proxy = "10.0.0.0/8"`. If not running behind a proxy, leave this empty.
+
 ## Run
 
 Run `go run cmd/server/main.go` to start the server.
@@ -81,3 +86,8 @@ Run `go run cmd/server/main.go` to start the server.
 - Implemented dynamic HTML template rendering (on-demand parsing) instead of pre-loading, allowing runtime addition of HTML files.
 - Prevented direct URL access to files within the `/web/<entry>/templates` directory.
 - Removed INFO log message when a requested file/template is not found.
+- Added basic IP-based rate limiting middleware (`golang.org/x/time/rate`) to mitigate simple DoS/Brute-force attacks.
+- Added configuration for rate limit (RPS, Burst) and trusted proxy in `configs/config.toml`.
+- Added ID generator utility (`pkg/utils/id_generator.go`) for creating prefixed random IDs.
+- Updated user creation (`JSONUserStore`) to use the new ID generator utility.
+- Ensured `created_at` timestamps in `configs/users.json` are saved in RFC3339 format (without nanoseconds).

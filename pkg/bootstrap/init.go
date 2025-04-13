@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"math/rand"
@@ -10,7 +11,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/OG-Open-Source/PanelBase/internal/models"
+	"github.com/OG-Open-Source/PanelBase/pkg/utils"
 	"github.com/pelletier/go-toml/v2"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -28,6 +32,9 @@ const (
 	portCheckRetries = 20
 	entryLength      = 12
 	defaultIP        = "0.0.0.0"
+
+	initialUsername       = "admin"
+	initialPasswordLength = 16
 )
 
 // Default content for ui_settings.json if it doesn't exist
@@ -53,6 +60,22 @@ const defaultIndexContent = `<!DOCTYPE html>
 
 </html>
 `
+
+// initialAdminScopes defines the default scopes for the first admin user.
+// Using "*" grants all actions for the resource and its sub-resources.
+var initialAdminScopes = map[string]interface{}{
+	"users":    "*",
+	"account":  "*", // Technically covered by users:*, but explicit for clarity
+	"themes":   "*",
+	"plugins":  "*",
+	"commands": "*",
+}
+
+// usersFileFormat mirrors the structure expected in users.json
+// Duplicated here to avoid circular dependency with storage, consider refactoring.
+type bootstrapUsersFileFormat struct {
+	Users map[string]*models.User `json:"users"`
+}
 
 // configStructure mirrors the TOML structure for parsing
 type configStructure struct {
@@ -190,15 +213,66 @@ themes = false
 		log.Printf("WARN: Failed to check file %s: %v", uiSettingsFile, err)
 	}
 
-	// 4. Ensure users.json exists (create if not)
+	// 4. Ensure users.json exists and create initial admin user if it does not.
 	usersAbsPath, _ := filepath.Abs(usersFile)
 	if _, err := os.Stat(usersAbsPath); os.IsNotExist(err) {
-		// log.Printf("Creating file: %s", usersFile) // Remove creation log
-		if errWrite := os.WriteFile(usersAbsPath, []byte("[]\n"), 0664); errWrite != nil {
-			log.Printf("WARN: Failed to create file %s: %v", usersFile, errWrite)
+		// log.Printf("INFO: users.json not found. Creating file and initial admin user...") // Removed this log
+
+		// Generate initial admin credentials
+		initialPassword := generateRandomString(initialPasswordLength)
+		hashedPassword, hashErr := bcrypt.GenerateFromPassword([]byte(initialPassword), bcrypt.DefaultCost)
+		if hashErr != nil {
+			return fmt.Errorf("failed to hash initial admin password: %w", hashErr)
 		}
+
+		// Generate admin user ID using utils constants
+		adminID, idErr := utils.GeneratePrefixedID(utils.UserIDPrefix, utils.UserIDRandomLength)
+		if idErr != nil {
+			return fmt.Errorf("failed to generate initial admin user ID: %w", idErr)
+		}
+
+		initialAdminUser := &models.User{
+			ID:           adminID,
+			Username:     initialUsername,
+			PasswordHash: string(hashedPassword),
+			Name:         "Administrator",                        // Default name
+			Email:        "",                                     // Default empty email
+			CreatedAt:    time.Now().UTC().Truncate(time.Second), // Use RFC3339
+			Active:       true,
+			Scopes:       initialAdminScopes,
+		}
+
+		// Prepare the file content
+		usersData := bootstrapUsersFileFormat{
+			Users: map[string]*models.User{
+				adminID: initialAdminUser,
+			},
+		}
+
+		jsonData, marshalErr := json.MarshalIndent(usersData, "", "  ")
+		if marshalErr != nil {
+			return fmt.Errorf("failed to marshal initial user data: %w", marshalErr)
+		}
+
+		// Write the new users.json file
+		if errWrite := os.WriteFile(usersAbsPath, jsonData, 0664); errWrite != nil {
+			return fmt.Errorf("failed to create file %s: %w", usersFile, errWrite)
+		}
+
+		// Keep the important credential logging block
+		log.Println("###########################################################")
+		log.Println("IMPORTANT: Initial administrator account created:")
+		log.Printf("  Username: %s", initialUsername)
+		log.Printf("  Password: %s", initialPassword)
+		log.Println("Please log in immediately and change the password.")
+		log.Println("###########################################################")
+
 	} else if err != nil {
-		log.Printf("WARN: Failed to check file %s: %v", usersFile, err)
+		// Error checking the file (permissions?)
+		return fmt.Errorf("failed to check file %s: %w", usersFile, err)
+	} else {
+		// users.json exists, no action needed for initial user here.
+		// log.Printf("INFO: users.json found.")
 	}
 
 	// --- Reading config for conditional creation (moved down) ---

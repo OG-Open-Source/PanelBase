@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/OG-Open-Source/PanelBase/internal/models"
-	"github.com/google/uuid"
 )
 
 var (
@@ -15,16 +14,17 @@ var (
 
 // UserStore defines the interface for user data storage operations.
 type UserStore interface {
-	// CreateUser adds a new user to the store.
+	// User CRUD operations
 	CreateUser(ctx context.Context, user *models.User) error
-	// GetUserByUsername retrieves a user by their username.
 	GetUserByUsername(ctx context.Context, username string) (*models.User, error)
-	// GetUserByID retrieves a user by their ID.
-	GetUserByID(ctx context.Context, id uuid.UUID) (*models.User, error)
-	// UpdateUser updates an existing user's data (e.g., permissions).
-	// Note: Password updates should likely have a separate, more specific method.
+	GetUserByID(ctx context.Context, id string) (*models.User, error)
+	GetAllUsers(ctx context.Context) ([]models.User, error)
 	UpdateUser(ctx context.Context, user *models.User) error
-	// DeleteUser removes a user from the store.
-	DeleteUser(ctx context.Context, id uuid.UUID) error
+	DeleteUser(ctx context.Context, id string) error
+
+	// API Token operations
+	AddApiToken(ctx context.Context, userID string, token models.ApiToken) error
+	GetUserApiTokens(ctx context.Context, userID string) ([]models.ApiToken, error)
+	DeleteApiToken(ctx context.Context, userID string, tokenID string) error
+	GetApiTokenByID(ctx context.Context, userID string, tokenID string) (*models.ApiToken, error) // For JTI lookup
 }
- 

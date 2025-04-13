@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -13,11 +12,174 @@ import (
 const (
 	AuthorizationHeaderKey = "Authorization"
 	AuthTypeBearer         = "bearer"
-	ContextUserClaimsKey   = "userClaims"
+	UserClaimsKey          = "userClaims"
+	UserIDKey              = "userID"
 )
 
-// RequireAuth creates a middleware function that validates JWT and checks permissions/scopes.
-func RequireAuth(jwtSecret string, requiredPermissions ...string) gin.HandlerFunc {
+// Helper function to recursively check for a scope within the nested map.
+func hasScope(userScopes map[string]interface{}, requiredScope string) bool {
+	if userScopes == nil {
+		return false
+	}
+
+	parts := strings.Split(requiredScope, ":")
+	currentLevel := userScopes
+
+	for i, part := range parts {
+		value, ok := currentLevel[part]
+		if !ok {
+			return false // Path does not exist
+		}
+
+		if i == len(parts)-1 {
+			// Last part, should be the action (string or list of strings)
+			switch v := value.(type) {
+			case string:
+				return v == "*" // Check for wildcard action at the end of the path
+			case []interface{}: // JSON arrays decode to []interface{}
+				for _, item := range v {
+					if strAction, ok := item.(string); ok && strAction == "*" {
+						return true // Wildcard action found in list
+					}
+				}
+				return false // Action not found or no wildcard
+			case []string: // Handle case where it might already be []string
+				for _, action := range v {
+					if action == "*" {
+						return true // Wildcard action found
+					}
+				}
+				return false
+			default:
+				return false // Unexpected type at the end
+			}
+		} else {
+			// Not the last part, should be a map for the next level
+			nextLevel, ok := value.(map[string]interface{})
+			if !ok {
+				// Check for wildcard scope higher up the chain
+				switch v := value.(type) {
+				case string:
+					if v == "*" {
+						return true
+					}
+				case []interface{}:
+					for _, item := range v {
+						if strAction, ok := item.(string); ok && strAction == "*" {
+							return true
+						}
+					}
+				case []string:
+					for _, action := range v {
+						if action == "*" {
+							return true
+						}
+					}
+				}
+				return false // Path part exists but is not a map and not a wildcard
+			}
+			currentLevel = nextLevel
+		}
+	}
+	// Should not be reached if requiredScope has parts, but return false just in case.
+	return false
+}
+
+// HasAction checks if the user scopes contain the required action within the scope path.
+func HasAction(userScopes map[string]interface{}, requiredScopePath string, requiredAction string) bool {
+	if userScopes == nil {
+		return false
+	}
+
+	parts := strings.Split(requiredScopePath, ":")
+	currentLevel := userScopes
+
+	for i, part := range parts {
+		value, ok := currentLevel[part]
+		if !ok {
+			// Check for wildcard at this level before declaring path non-existent
+			if wildcardValue, wildcardOk := currentLevel["*"]; wildcardOk {
+				// If wildcard is just "*", grant access
+				if ws, ok := wildcardValue.(string); ok && ws == "*" {
+					return true
+				}
+				// If wildcard is a list containing "*", grant access
+				if wList, ok := wildcardValue.([]interface{}); ok {
+					for _, item := range wList {
+						if sItem, ok := item.(string); ok && sItem == "*" {
+							return true
+						}
+					}
+				} else if wStrList, ok := wildcardValue.([]string); ok {
+					for _, action := range wStrList {
+						if action == "*" {
+							return true
+						}
+					}
+				}
+			}
+			return false // Path does not exist and no applicable wildcard
+		}
+
+		if i == len(parts)-1 {
+			// Reached the target resource level. Now check actions.
+			switch actions := value.(type) {
+			case string:
+				// If a string, check if it's the action or a wildcard
+				return actions == requiredAction || actions == "*"
+			case []interface{}:
+				for _, item := range actions {
+					if strAction, ok := item.(string); ok {
+						if strAction == requiredAction || strAction == "*" {
+							return true // Action or wildcard found
+						}
+					}
+				}
+				return false // Action not found in list
+			case []string: // Handle case where it might already be []string
+				for _, action := range actions {
+					if action == requiredAction || action == "*" {
+						return true // Action or wildcard found
+					}
+				}
+				return false
+			default:
+				return false // Unexpected type at the action level
+			}
+		} else {
+			// Intermediate level, must be a map or wildcard string/list
+			switch v := value.(type) {
+			case map[string]interface{}:
+				currentLevel = v
+			case string:
+				if v == "*" {
+					return true // Wildcard at intermediate level grants access
+				}
+				return false // String that is not a wildcard at intermediate level blocks path
+			default:
+				// Check for wildcard in list at intermediate level
+				if actionsList, ok := value.([]interface{}); ok {
+					for _, item := range actionsList {
+						if strAction, ok := item.(string); ok && strAction == "*" {
+							return true // Wildcard found
+						}
+					}
+				} else if strActionsList, ok := value.([]string); ok {
+					for _, action := range strActionsList {
+						if action == "*" {
+							return true // Wildcard found
+						}
+					}
+				}
+				return false // Not a map and not a wildcard string/list
+			}
+		}
+	}
+	return false // Should not be reached
+}
+
+// RequireAuth creates a middleware function that validates the JWT.
+func RequireAuth(jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader(AuthorizationHeaderKey)
 		if len(authHeader) == 0 {
@@ -32,56 +194,67 @@ func RequireAuth(jwtSecret string, requiredPermissions ...string) gin.HandlerFun
 		}
 
 		accessToken := fields[1]
-		claims, err := auth.ValidateToken(accessToken, jwtSecret)
+		claims, err := auth.ValidateToken(accessToken, jwtSecret, auth.TokenTypeAPI)
 		if err != nil {
-			log.Printf("DEBUG: Token validation failed: %v", err) // Log details for debugging
+			log.Printf("DEBUG: Token validation failed: %v", err)
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
 			return
 		}
 
-		// Store claims in context for later use
-		c.Set(ContextUserClaimsKey, claims)
-
-		// Check permissions if any are required
-		if len(requiredPermissions) > 0 {
-			if !hasRequiredScopes(claims.Scopes, requiredPermissions) {
-				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions"})
-				return
-			}
+		// Extract Subject (User ID) and store it in the context
+		userID := claims.Subject
+		if userID == "" {
+			log.Printf("ERROR: Valid token received but Subject (UserID) is empty.")
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims (missing user ID)"})
+			return
 		}
+		c.Set(UserIDKey, userID)
+
+		// Store the full claims object as well, needed by RequireScope and handlers
+		c.Set(UserClaimsKey, claims)
 
 		c.Next()
 	}
 }
 
-// hasRequiredScopes checks if the user has all the required permissions/scopes.
-// Permissions can be simple strings ("admin") or scope:action ("users:create").
-func hasRequiredScopes(userScopes map[string][]string, requiredPermissions []string) bool {
-	// Build a set of all permissions the user has for quick lookup.
-	userPermsSet := make(map[string]struct{})
-	if userScopes != nil {
-		for scope, actions := range userScopes {
-			// Add the scope itself as a permission (e.g., having "users" scope implies basic access)
-			userPermsSet[scope] = struct{}{}
-			for _, action := range actions {
-				// Add scope:action permission
-				userPermsSet[fmt.Sprintf("%s:%s", scope, action)] = struct{}{}
-				// Optionally, add just the action as a global permission if needed?
-				// userPermsSet[action] = struct{}{}
-			}
+// RequireScope creates a middleware function that checks if the authenticated user
+// (whose claims should already be in the context via RequireAuth) has the required scope.
+// The requiredScope format is colon-separated, e.g., "users:read" or "account:profile:update".
+func RequireScope(requiredScope string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Retrieve claims from context (must be set by RequireAuth middleware first)
+		claimsValue, exists := c.Get(UserClaimsKey)
+		if !exists {
+			log.Printf("ERROR: User claims not found in context. Ensure RequireAuth runs before RequireScope.")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Authentication context error"})
+			return
 		}
-	}
-	// Allow a global "admin" scope/permission to bypass other checks
-	if _, isAdmin := userPermsSet["admin"]; isAdmin {
-		return true
-	}
 
-	for _, reqPerm := range requiredPermissions {
-		if _, ok := userPermsSet[reqPerm]; !ok {
-			log.Printf("DEBUG: Permission check failed. User missing required permission: %s", reqPerm)
-			return false // Missing a required permission
+		claims, ok := claimsValue.(*auth.Claims)
+		if !ok || claims == nil {
+			log.Printf("ERROR: Invalid claims type or nil claims in context.")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Authentication context error"})
+			return
 		}
+
+		// Separate the path and the final action from the required scope
+		parts := strings.Split(requiredScope, ":")
+		if len(parts) < 2 { // Ensure at least resource:action format
+			log.Printf("ERROR: Invalid requiredScope format. Must be at least resource:action, got: %s", requiredScope)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Internal server configuration error"})
+			return
+		}
+
+		requiredAction := parts[len(parts)-1]
+		requiredScopePath := strings.Join(parts[:len(parts)-1], ":")
+
+		// Check if the user has the required action within the scope path
+		if !HasAction(claims.Scopes, requiredScopePath, requiredAction) {
+			log.Printf("DEBUG: Permission check failed for scope '%s'. User scopes: %v", requiredScope, claims.Scopes) // Log for debugging
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions"})
+			return
+		}
+
+		c.Next() // User has required scope/action, proceed
 	}
-	return true
 }
- 

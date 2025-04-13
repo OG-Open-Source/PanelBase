@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -263,73 +262,40 @@ func handleStaticFileRequest(c *gin.Context, baseDir string, requestedFile strin
 	handleErrorResponse(c, http.StatusNotFound, config, uiData)
 }
 
-// renderDynamicTemplate reads, parses, and executes a template file on the fly.
+// renderDynamicTemplate parses and executes a single template file.
 func renderDynamicTemplate(c *gin.Context, templatePath string, uiData map[string]interface{}, config AppConfig) {
+	// log.Printf("Rendering template: %s", templatePath) // Remove rendering log
 	templateContent, err := os.ReadFile(templatePath)
 	if err != nil {
 		log.Printf("ERROR: Failed to read template file '%s': %v", templatePath, err)
-		handleErrorResponse(c, http.StatusInternalServerError, config, uiData) // Internal error if read fails
+		handleErrorResponse(c, http.StatusInternalServerError, config, uiData)
 		return
 	}
 
-	tmpl, err := template.New(filepath.Base(templatePath)).Parse(string(templateContent))
+	// Use the file name as the template name for uniqueness
+	templateName := filepath.Base(templatePath)
+	tmpl, err := template.New(templateName).Parse(string(templateContent))
 	if err != nil {
-		log.Printf("ERROR: Failed to parse template file '%s': %v", templatePath, err)
-		handleErrorResponse(c, http.StatusInternalServerError, config, uiData) // Internal error if parse fails
+		log.Printf("ERROR: Failed to parse template '%s': %v", templatePath, err)
+		handleErrorResponse(c, http.StatusInternalServerError, config, uiData)
 		return
 	}
 
 	c.Header("Content-Type", "text/html; charset=utf-8")
-	c.Status(http.StatusOK)
 	err = tmpl.Execute(c.Writer, uiData)
 	if err != nil {
-		// Log execution error, but response headers might already be sent
 		log.Printf("ERROR: Failed to execute template '%s': %v", templatePath, err)
-		// Attempt to send a plain text error if possible, though it might fail
-		if !c.Writer.Written() {
-			c.String(http.StatusInternalServerError, httpStatusMessages[http.StatusInternalServerError])
-		}
-		c.Abort()
+		// Don't call handleErrorResponse here to avoid infinite loop if error template fails
+		c.String(http.StatusInternalServerError, "%d: %s", http.StatusInternalServerError, httpStatusMessages[http.StatusInternalServerError])
 	}
 }
 
-// loadTemplates manually finds and loads .html and .htm files from a directory.
-// Internal to the webserver package.
+// loadTemplates is deprecated as templates are loaded dynamically.
+/*
 func loadTemplates(router *gin.Engine, baseDir string) error {
-	var templateFiles []string
-	baseDirAbs, _ := filepath.Abs(baseDir)
-
-	// log.Printf("Scanning for templates (.html, .htm) in: %s", baseDirAbs) // Simplified
-
-	walkErr := filepath.WalkDir(baseDirAbs, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			log.Printf("WARN: Error accessing path %q during template scan: %v\n", path, err)
-			return fs.SkipDir
-		}
-		if !d.IsDir() {
-			ext := strings.ToLower(filepath.Ext(path))
-			if ext == ".html" || ext == ".htm" {
-				// log.Printf("Found template: %s", path) // Simplified
-				templateFiles = append(templateFiles, path)
-			}
-		}
-		return nil
-	})
-
-	if walkErr != nil {
-		return fmt.Errorf("error walking template directory %s: %w", baseDirAbs, walkErr)
-	}
-
-	if len(templateFiles) == 0 {
-		log.Printf("WARN: No template files (.html, .htm) found in %s", baseDirAbs)
-		return nil
-	}
-
-	log.Printf("Loading %d template(s) from %s", len(templateFiles), baseDirAbs) // Keep this summary log
-	router.LoadHTMLFiles(templateFiles...)                                       // LoadHTMLFiles handles parsing
-
-	return nil
+	// ... old logic ...
 }
+*/
 
 // debugInfoHandler provides debug information about the server.
 // Accessible only when server.mode is "debug".
@@ -354,71 +320,92 @@ func debugInfoHandler(config AppConfig) gin.HandlerFunc {
 	}
 }
 
-// RegisterHandlers sets up the routes and handlers for serving web content.
-func RegisterHandlers(router *gin.Engine, config AppConfig, uiData map[string]interface{}, uiSettingsFile string) {
-	webRoot := baseWebDir
-	entryDir := ""
-	entryRoute := ""
+// robotsHandler generates and serves the robots.txt file.
+func robotsHandler(config AppConfig) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var content strings.Builder
+		content.WriteString("User-agent: *\n")
 
-	if config.Server.Entry != "" {
-		checkEntryDir := filepath.Join(baseWebDir, config.Server.Entry)
-		if _, err := os.Stat(checkEntryDir); err == nil {
-			entryDir = checkEntryDir
-			webRoot = entryDir // Override webRoot if entry exists
-			entryRoute = "/" + config.Server.Entry
-			log.Printf("INFO: Using entry directory: %s", entryDir)
+		if config.Server.Entry != "" {
+			// If entry is set, disallow crawling the entire site starting from root.
+			// This effectively hides the entry path without revealing it.
+			content.WriteString("Disallow: /\n")
 		} else {
-			log.Printf("WARN: Entry directory '%s' specified but not found. Static files served from '%s'.", checkEntryDir, baseWebDir)
-			// Keep webRoot as baseWebDir, entryRoute remains empty
+			// If entry is not set, disallow common sensitive paths
+			content.WriteString("Disallow: /api/\n")
+			if strings.ToLower(config.Server.Mode) == gin.DebugMode {
+				content.WriteString("Disallow: /debug/\n")
+			}
+			// Add other Disallow rules if needed
+		}
+
+		c.Header("Content-Type", "text/plain; charset=utf-8")
+		c.String(http.StatusOK, content.String())
+	}
+}
+
+// RegisterHandlers sets up all web-related routes and handlers.
+func RegisterHandlers(router *gin.Engine, config AppConfig, uiData map[string]interface{}, uiSettingsFile string) {
+	baseDir := baseWebDir
+	entryPath := "/"
+	if config.Server.Entry != "" {
+		entryDirAbs := filepath.Join(baseDir, config.Server.Entry)
+		if _, err := os.Stat(entryDirAbs); err == nil {
+			baseDir = entryDirAbs
+			entryPath = "/" + config.Server.Entry + "/"
+		} else {
+			log.Printf("WARN: Entry directory '%s' not found, serving from base '%s' at root path.", entryDirAbs, baseWebDir)
+			baseDir = baseWebDir // Fallback to base web dir
 		}
 	}
 
-	// Add Debug route if in debug mode
-	if strings.ToLower(config.Server.Mode) == gin.DebugMode {
-		log.Println("INFO: Registering /debug API endpoint.")
-		router.GET("/debug", debugInfoHandler(config)) // Pass config to the handler
-	}
+	// Serve files from the determined base directory
+	// fsRoot, _ := filepath.Abs(baseDir) // fsRoot is not directly used by NoRoute handler
+	// fileServer := http.FileServer(http.Dir(fsRoot)) // fileServer is not used directly
 
-	// Load templates from the determined web root
-	if err := loadTemplates(router, webRoot); err != nil {
-		log.Printf("WARN: Failed to load templates from '%s': %v", webRoot, err)
-	}
-
-	// Setup NoRoute handler to manage 404s and custom error pages
+	// Static file serving needs careful handling due to custom rules
+	// For paths starting with the entry path (or root if no entry)
 	router.NoRoute(func(c *gin.Context) {
-		handleErrorResponse(c, http.StatusNotFound, config, uiData)
+		// Check if the request path matches the expected entry path or root
+		pathMatchesEntry := false
+		if config.Server.Entry != "" && strings.HasPrefix(c.Request.URL.Path, entryPath) {
+			pathMatchesEntry = true
+		} else if config.Server.Entry == "" && (c.Request.URL.Path == "/" || !strings.HasPrefix(c.Request.URL.Path, "/api/")) {
+			pathMatchesEntry = true
+		}
+
+		if pathMatchesEntry {
+			// Extract the relative file path within the entry/web directory
+			relativeRequestPath := c.Request.URL.Path
+			if config.Server.Entry != "" {
+				relativeRequestPath = strings.TrimPrefix(relativeRequestPath, entryPath)
+			}
+			// Ensure it's always relative
+			relativeRequestPath = strings.TrimPrefix(relativeRequestPath, "/")
+
+			handleStaticFileRequest(c, baseDir, relativeRequestPath, uiData, config)
+		} else {
+			// If the path doesn't match the entry/root structure or is an API path not handled elsewhere
+			handleErrorResponse(c, http.StatusNotFound, config, uiData)
+		}
 	})
 
-	// --- Static File Serving --- Priority: Entry Dir -> Base Dir
-
-	// 1. Serve from Entry Directory (if configured and exists)
-	if entryDir != "" {
-		// Serve index/specific templates from the entry directory
-		router.GET(entryRoute+"/*filepath", func(c *gin.Context) {
-			requestedFile := c.Param("filepath")
-			handleStaticFileRequest(c, entryDir, requestedFile, uiData, config)
-		})
-		// Handle root of the entry directory
-		router.GET(entryRoute, func(c *gin.Context) {
-			handleStaticFileRequest(c, entryDir, "/", uiData, config)
-		})
-		// If entryDir is set, DO NOT register base dir routes to avoid conflict.
-	} else {
-		// 2. Serve from Base Directory (web/) ONLY if entryDir is NOT set
-		log.Printf("INFO: Serving static files from base directory: %s", baseWebDir)
-		// Handle root path ("/")
-		router.GET("/", func(c *gin.Context) {
-			handleStaticFileRequest(c, baseWebDir, "/", uiData, config)
-		})
-
-		// Serve other files from the base directory
-		router.GET("/*filepath", func(c *gin.Context) {
-			requestedFile := c.Param("filepath")
-			handleStaticFileRequest(c, baseWebDir, requestedFile, uiData, config)
+	// Explicitly handle GET requests for the entry path root (e.g., /entry/)
+	if config.Server.Entry != "" {
+		router.GET(entryPath, func(c *gin.Context) {
+			handleStaticFileRequest(c, baseDir, "index", uiData, config) // Serve index template
 		})
 	}
 
-	log.Println("Web server handlers registered.")
+	// Register other specific web handlers if needed (e.g., /robots.txt)
+	router.GET("/robots.txt", robotsHandler(config))
+
+	// Debug Info Handler (already handled in main.go based on mode)
+	// if config.Server.Mode == gin.DebugMode {
+	// 	router.GET("/debug/info", debugInfoHandler(config))
+	// }
+
+	// log.Println("Web server handlers registered.") // Removed registration log
 }
 
 // LoadAppConfig is needed if AppConfig definition stays here and is used by RegisterHandlers
