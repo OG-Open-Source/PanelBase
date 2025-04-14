@@ -11,3 +11,4 @@ const (
 	// ScopeAccountWrite grants permission to update the authenticated user's own account information.
 	ScopeAccountWrite = "account:write"
 )
+ 

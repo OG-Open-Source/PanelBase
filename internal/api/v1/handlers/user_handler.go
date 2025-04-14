@@ -9,6 +9,7 @@ import (
 	"github.com/OG-Open-Source/PanelBase/internal/auth"
 	"github.com/OG-Open-Source/PanelBase/internal/models"
 	"github.com/OG-Open-Source/PanelBase/internal/storage"
+	"github.com/OG-Open-Source/PanelBase/pkg/response"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -64,21 +65,21 @@ type UpdateUserRequest struct {
 // @Tags users
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {array} models.UserResponse
-// @Failure 500 {object} gin.H{"error":string}
+// @Success 200 {object} response.ApiResponse{data=[]models.UserResponse}
+// @Failure 500 {object} response.ApiResponse
 // @Router /api/v1/users [get]
 func (h *UserHandler) GetAllUsers(c *gin.Context) {
 	users, err := h.store.GetAllUsers(c.Request.Context())
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve users"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Failed to retrieve users", nil))
 		return
 	}
 
-	resp := make([]models.UserResponse, len(users))
+	respData := make([]models.UserResponse, len(users))
 	for i, u := range users {
-		resp[i] = models.NewUserResponse(&u)
+		respData[i] = models.NewUserResponse(&u)
 	}
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, response.Success("Users retrieved successfully", respData))
 }
 
 // CreateUser godoc
@@ -89,15 +90,15 @@ func (h *UserHandler) GetAllUsers(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param user body CreateUserRequest true "User data"
-// @Success 201 {object} models.UserResponse
-// @Failure 400 {object} gin.H{"error":string}
-// @Failure 409 {object} gin.H{"error":string} "Username already exists"
-// @Failure 500 {object} gin.H{"error":string}
+// @Success 201 {object} response.ApiResponse{data=models.UserResponse}
+// @Failure 400 {object} response.ApiResponse
+// @Failure 409 {object} response.ApiResponse
+// @Failure 500 {object} response.ApiResponse
 // @Router /api/v1/users [post]
 func (h *UserHandler) CreateUser(c *gin.Context) {
 	var req CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request body: " + err.Error()})
+		c.AbortWithStatusJSON(http.StatusBadRequest, response.Failure("Invalid request body: "+err.Error(), nil))
 		return
 	}
 
@@ -105,13 +106,13 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	claimsValue, exists := c.Get(middleware.UserClaimsKey)
 	if !exists {
 		log.Printf("ERROR: User claims not found in context during CreateUser.")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Authentication context error"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Authentication context error", nil))
 		return
 	}
 	requesterClaims, ok := claimsValue.(*auth.Claims)
 	if !ok || requesterClaims == nil {
 		log.Printf("ERROR: Invalid claims type or nil claims in context during CreateUser.")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Authentication context error"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Authentication context error", nil))
 		return
 	}
 
@@ -137,7 +138,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Failed to hash password", nil))
 		return
 	}
 
@@ -153,14 +154,14 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	err = h.store.CreateUser(c.Request.Context(), newUser)
 	if err != nil {
 		if errors.Is(err, storage.ErrUserExists) {
-			c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": "Username already exists"})
+			c.AbortWithStatusJSON(http.StatusConflict, response.Failure("Username already exists", nil))
 		} else {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+			c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Failed to create user", nil))
 		}
 		return
 	}
 
-	c.JSON(http.StatusCreated, models.NewUserResponse(newUser))
+	c.JSON(http.StatusCreated, response.Success("User created successfully", models.NewUserResponse(newUser)))
 }
 
 // GetUserByID godoc
@@ -170,9 +171,9 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "User ID (e.g., usr_...)"
-// @Success 200 {object} models.UserResponse
-// @Failure 404 {object} gin.H{"error":string} "User not found"
-// @Failure 500 {object} gin.H{"error":string}
+// @Success 200 {object} response.ApiResponse{data=models.UserResponse}
+// @Failure 404 {object} response.ApiResponse
+// @Failure 500 {object} response.ApiResponse
 // @Router /api/v1/users/{id} [get]
 func (h *UserHandler) GetUserByID(c *gin.Context) {
 	userID := c.Param("id")
@@ -185,13 +186,13 @@ func (h *UserHandler) GetUserByID(c *gin.Context) {
 	user, err := h.store.GetUserByID(c.Request.Context(), userID)
 	if err != nil {
 		if errors.Is(err, storage.ErrUserNotFound) {
-			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			c.AbortWithStatusJSON(http.StatusNotFound, response.Failure("User not found", nil))
 		} else {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user"})
+			c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Failed to retrieve user", nil))
 		}
 		return
 	}
-	c.JSON(http.StatusOK, models.NewUserResponse(user))
+	c.JSON(http.StatusOK, response.Success("User retrieved successfully", models.NewUserResponse(user)))
 }
 
 // UpdateUser godoc
@@ -203,11 +204,11 @@ func (h *UserHandler) GetUserByID(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path string true "User ID (e.g., usr_...)"
 // @Param user body UpdateUserRequest true "User data to update"
-// @Success 200 {object} models.UserResponse
-// @Failure 400 {object} gin.H{"error":string} "Invalid request body or ID"
-// @Failure 404 {object} gin.H{"error":string} "User not found"
-// @Failure 409 {object} gin.H{"error":string} "Username conflict (if trying to update username - currently not supported)"
-// @Failure 500 {object} gin.H{"error":string}
+// @Success 200 {object} response.ApiResponse{data=models.UserResponse}
+// @Failure 400 {object} response.ApiResponse
+// @Failure 404 {object} response.ApiResponse
+// @Failure 409 {object} response.ApiResponse
+// @Failure 500 {object} response.ApiResponse
 // @Router /api/v1/users/{id} [patch]
 func (h *UserHandler) UpdateUser(c *gin.Context) {
 	userID := c.Param("id")
@@ -219,7 +220,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 
 	var req UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request body: " + err.Error()})
+		c.AbortWithStatusJSON(http.StatusBadRequest, response.Failure("Invalid request body: "+err.Error(), nil))
 		return
 	}
 
@@ -227,9 +228,9 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	user, err := h.store.GetUserByID(c.Request.Context(), userID)
 	if err != nil {
 		if errors.Is(err, storage.ErrUserNotFound) {
-			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			c.AbortWithStatusJSON(http.StatusNotFound, response.Failure("User not found", nil))
 		} else {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user for update"})
+			c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Failed to retrieve user for update", nil))
 		}
 		return
 	}
@@ -258,7 +259,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	}
 
 	if !updated {
-		c.JSON(http.StatusOK, models.NewUserResponse(user)) // Nothing to update, return current state
+		c.JSON(http.StatusOK, response.Success("No changes detected", models.NewUserResponse(user))) // Nothing to update, return current state
 		return
 	}
 
@@ -266,16 +267,16 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	err = h.store.UpdateUser(c.Request.Context(), user)
 	if err != nil {
 		if errors.Is(err, storage.ErrUserNotFound) { // Should not happen if GetUserByID succeeded, but check anyway
-			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "User not found during update"})
+			c.AbortWithStatusJSON(http.StatusNotFound, response.Failure("User not found during update", nil))
 		} else if errors.Is(err, storage.ErrUserExists) { // Handle potential username conflicts if username updates were allowed
-			c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": "Username conflict"})
+			c.AbortWithStatusJSON(http.StatusConflict, response.Failure("Username conflict", nil))
 		} else {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
+			c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Failed to update user", nil))
 		}
 		return
 	}
 
-	c.JSON(http.StatusOK, models.NewUserResponse(user))
+	c.JSON(http.StatusOK, response.Success("User updated successfully", models.NewUserResponse(user)))
 }
 
 // DeleteUser godoc
@@ -285,10 +286,10 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "User ID (e.g., usr_...)"
-// @Success 204 "No Content"
-// @Failure 400 {object} gin.H{"error":string} "Invalid user ID format"
-// @Failure 404 {object} gin.H{"error":string} "User not found"
-// @Failure 500 {object} gin.H{"error":string}
+// @Success 200 {object} response.ApiResponse
+// @Failure 400 {object} response.ApiResponse
+// @Failure 404 {object} response.ApiResponse
+// @Failure 500 {object} response.ApiResponse
 // @Router /api/v1/users/{id} [delete]
 func (h *UserHandler) DeleteUser(c *gin.Context) {
 	userID := c.Param("id")
@@ -301,14 +302,14 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 	err := h.store.DeleteUser(c.Request.Context(), userID)
 	if err != nil {
 		if errors.Is(err, storage.ErrUserNotFound) {
-			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			c.AbortWithStatusJSON(http.StatusNotFound, response.Failure("User not found", nil))
 		} else {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user"})
+			c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Failed to delete user", nil))
 		}
 		return
 	}
 
-	c.Status(http.StatusNoContent) // Successfully deleted
+	c.JSON(http.StatusOK, response.Success("User deleted successfully", nil))
 }
 
 // Need to define models.Timestamp or remove its usage if not available

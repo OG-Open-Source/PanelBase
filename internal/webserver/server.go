@@ -345,7 +345,13 @@ func robotsHandler(config AppConfig) gin.HandlerFunc {
 }
 
 // RegisterHandlers sets up all web-related routes and handlers.
-func RegisterHandlers(router *gin.Engine, config AppConfig, uiData map[string]interface{}, uiSettingsFile string) {
+func RegisterHandlers(
+	router *gin.Engine,
+	config AppConfig,
+	uiData map[string]interface{},
+	uiSettingsFile string,
+	apiPrefix string, // Added apiPrefix parameter
+) {
 	baseDir := baseWebDir
 	entryPath := "/"
 	if config.Server.Entry != "" {
@@ -355,57 +361,59 @@ func RegisterHandlers(router *gin.Engine, config AppConfig, uiData map[string]in
 			entryPath = "/" + config.Server.Entry + "/"
 		} else {
 			log.Printf("WARN: Entry directory '%s' not found, serving from base '%s' at root path.", entryDirAbs, baseWebDir)
-			baseDir = baseWebDir // Fallback to base web dir
+			baseDir = baseWebDir
 		}
 	}
 
-	// Serve files from the determined base directory
-	// fsRoot, _ := filepath.Abs(baseDir) // fsRoot is not directly used by NoRoute handler
-	// fileServer := http.FileServer(http.Dir(fsRoot)) // fileServer is not used directly
-
 	// Static file serving needs careful handling due to custom rules
-	// For paths starting with the entry path (or root if no entry)
 	router.NoRoute(func(c *gin.Context) {
-		// Check if the request path matches the expected entry path or root
+		requestPath := c.Request.URL.Path
+
+		// Immediately pass through if it's an API path or debug path
+		if strings.HasPrefix(requestPath, apiPrefix+"/") || strings.HasPrefix(requestPath, "/debug/") {
+			// Let Gin handle potential 404s for API/debug routes not explicitly defined
+			handleErrorResponse(c, http.StatusNotFound, config, uiData) // Or c.Next() if other middleware might handle?
+			return
+		}
+
+		// Check if the request path matches the expected web entry path or root
 		pathMatchesEntry := false
-		if config.Server.Entry != "" && strings.HasPrefix(c.Request.URL.Path, entryPath) {
+		if config.Server.Entry != "" && strings.HasPrefix(requestPath, entryPath) {
 			pathMatchesEntry = true
-		} else if config.Server.Entry == "" && (c.Request.URL.Path == "/" || !strings.HasPrefix(c.Request.URL.Path, "/api/")) {
-			pathMatchesEntry = true
+		} else if config.Server.Entry == "" {
+			pathMatchesEntry = true // Any non-API/debug path matches root when no entry
 		}
 
 		if pathMatchesEntry {
 			// Extract the relative file path within the entry/web directory
-			relativeRequestPath := c.Request.URL.Path
+			relativeRequestPath := requestPath
 			if config.Server.Entry != "" {
 				relativeRequestPath = strings.TrimPrefix(relativeRequestPath, entryPath)
+			} else {
+				relativeRequestPath = strings.TrimPrefix(relativeRequestPath, "/") // Trim root slash if no entry
 			}
-			// Ensure it's always relative
+			// Ensure it's always relative and clean
 			relativeRequestPath = strings.TrimPrefix(relativeRequestPath, "/")
 
 			handleStaticFileRequest(c, baseDir, relativeRequestPath, uiData, config)
 		} else {
-			// If the path doesn't match the entry/root structure or is an API path not handled elsewhere
+			// If the path doesn't match entry/root and isn't API/debug
 			handleErrorResponse(c, http.StatusNotFound, config, uiData)
 		}
 	})
 
-	// Explicitly handle GET requests for the entry path root (e.g., /entry/)
+	// Explicitly handle GET requests for the entry path root (e.g., /entry/ or /)
+	rootPathHandler := func(c *gin.Context) {
+		handleStaticFileRequest(c, baseDir, "index", uiData, config) // Serve index template
+	}
 	if config.Server.Entry != "" {
-		router.GET(entryPath, func(c *gin.Context) {
-			handleStaticFileRequest(c, baseDir, "index", uiData, config) // Serve index template
-		})
+		router.GET(entryPath, rootPathHandler)
+	} else {
+		router.GET("/", rootPathHandler) // Handle root path when no entry
 	}
 
-	// Register other specific web handlers if needed (e.g., /robots.txt)
+	// Register other specific web handlers (e.g., /robots.txt)
 	router.GET("/robots.txt", robotsHandler(config))
-
-	// Debug Info Handler (already handled in main.go based on mode)
-	// if config.Server.Mode == gin.DebugMode {
-	// 	router.GET("/debug/info", debugInfoHandler(config))
-	// }
-
-	// log.Println("Web server handlers registered.") // Removed registration log
 }
 
 // LoadAppConfig is needed if AppConfig definition stays here and is used by RegisterHandlers

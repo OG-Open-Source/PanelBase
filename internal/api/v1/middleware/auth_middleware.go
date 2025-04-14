@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/OG-Open-Source/PanelBase/internal/auth"
+	"github.com/OG-Open-Source/PanelBase/pkg/response"
 	"github.com/gin-gonic/gin"
 )
 
@@ -183,13 +184,13 @@ func RequireAuth(jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader(AuthorizationHeaderKey)
 		if len(authHeader) == 0 {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header is missing"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, response.Failure("Authorization header is missing", nil))
 			return
 		}
 
 		fields := strings.Fields(authHeader)
 		if len(fields) < 2 || !strings.EqualFold(fields[0], AuthTypeBearer) {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization header format"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, response.Failure("Invalid authorization header format", nil))
 			return
 		}
 
@@ -197,7 +198,7 @@ func RequireAuth(jwtSecret string) gin.HandlerFunc {
 		claims, err := auth.ValidateToken(accessToken, jwtSecret, auth.TokenTypeAPI)
 		if err != nil {
 			log.Printf("DEBUG: Token validation failed: %v", err)
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, response.Failure("Invalid or expired token", nil))
 			return
 		}
 
@@ -205,7 +206,7 @@ func RequireAuth(jwtSecret string) gin.HandlerFunc {
 		userID := claims.Subject
 		if userID == "" {
 			log.Printf("ERROR: Valid token received but Subject (UserID) is empty.")
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims (missing user ID)"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, response.Failure("Invalid token claims (missing user ID)", nil))
 			return
 		}
 		c.Set(UserIDKey, userID)
@@ -222,39 +223,39 @@ func RequireAuth(jwtSecret string) gin.HandlerFunc {
 // The requiredScope format is colon-separated, e.g., "users:read" or "account:profile:update".
 func RequireScope(requiredScope string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Retrieve claims from context (must be set by RequireAuth middleware first)
+		// Retrieve claims from context
 		claimsValue, exists := c.Get(UserClaimsKey)
 		if !exists {
 			log.Printf("ERROR: User claims not found in context. Ensure RequireAuth runs before RequireScope.")
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Authentication context error"})
+			c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Authentication context error", nil))
 			return
 		}
 
 		claims, ok := claimsValue.(*auth.Claims)
 		if !ok || claims == nil {
 			log.Printf("ERROR: Invalid claims type or nil claims in context.")
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Authentication context error"})
+			c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Authentication context error", nil))
 			return
 		}
 
-		// Separate the path and the final action from the required scope
+		// Separate path and action
 		parts := strings.Split(requiredScope, ":")
-		if len(parts) < 2 { // Ensure at least resource:action format
-			log.Printf("ERROR: Invalid requiredScope format. Must be at least resource:action, got: %s", requiredScope)
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Internal server configuration error"})
+		if len(parts) < 2 {
+			log.Printf("ERROR: Invalid requiredScope format: %s", requiredScope)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Internal server configuration error (invalid scope format)", nil))
 			return
 		}
 
 		requiredAction := parts[len(parts)-1]
 		requiredScopePath := strings.Join(parts[:len(parts)-1], ":")
 
-		// Check if the user has the required action within the scope path
+		// Check permission
 		if !HasAction(claims.Scopes, requiredScopePath, requiredAction) {
-			log.Printf("DEBUG: Permission check failed for scope '%s'. User scopes: %v", requiredScope, claims.Scopes) // Log for debugging
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions"})
+			log.Printf("DEBUG: Permission check failed for scope '%s:%s'. User scopes: %v", requiredScopePath, requiredAction, claims.Scopes)
+			c.AbortWithStatusJSON(http.StatusForbidden, response.Failure("Insufficient permissions", nil))
 			return
 		}
 
-		c.Next() // User has required scope/action, proceed
+		c.Next()
 	}
 }

@@ -78,8 +78,7 @@ To build a web panel application using the Go programming language and the Gin w
 - [x] Implement dynamic HTML template rendering instead of pre-loading.
 - [x] Prevent direct access to `/web/<entry>/templates/` via URL.
 - [x] Adjust logging level for file not found errors.
-- [x] Implement basic IP-based rate limiting middleware.
-- [x] Add configuration for rate limiting and trusted proxy.
+- [x] Add configuration for trusted proxy.
 - [x] Add ID generator utility (`pkg/utils/id_generator.go`).
 - [x] Update user creation (`JSONUserStore`) to use ID generator.
 - [x] Ensure `created_at` in `users.json` uses RFC3339 format.
@@ -90,6 +89,7 @@ To build a web panel application using the Go programming language and the Gin w
 - [x] Implement default scope assignment for newly created users in CreateUser handler.
 - [x] Implement `/account` routes for self-management (profile, password).
 - [x] Design and implement basic API Token management (create, list, delete for self; stored in users.json).
+- [x] Implement graceful shutdown handling.
 - [ ] Implement JTI validation for API tokens (requires DB or store modification).
 - [ ] Implement routes and scope checks for `themes`, `plugins`, `commands`.
 - [ ] Write comprehensive API tests for authorization scenarios.

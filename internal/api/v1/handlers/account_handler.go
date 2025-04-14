@@ -11,6 +11,7 @@ import (
 	"github.com/OG-Open-Source/PanelBase/internal/auth" // Need auth package for Claims type
 	"github.com/OG-Open-Source/PanelBase/internal/models"
 	"github.com/OG-Open-Source/PanelBase/internal/storage" // Need utils for ID generation
+	"github.com/OG-Open-Source/PanelBase/pkg/response"     // Import response package
 	"github.com/OG-Open-Source/PanelBase/pkg/utils"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt" // Need bcrypt
@@ -82,22 +83,20 @@ type ApiTokenListResponse struct {
 // @Tags account
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} UserResponse "User profile details"
-// @Failure 401 {object} gin.H{"error":string} "Unauthorized"
-// @Failure 404 {object} gin.H{"error":string} "User not found"
-// @Failure 500 {object} gin.H{"error":string} "Internal server error"
+// @Success 200 {object} response.ApiResponse{data=models.UserResponse} "User profile details"
+// @Failure 401 {object} response.ApiResponse "Unauthorized"
+// @Failure 404 {object} response.ApiResponse "User not found"
+// @Failure 500 {object} response.ApiResponse "Internal server error"
 // @Router /api/v1/account/profile [get]
 func (h *AccountHandler) GetProfile(c *gin.Context) {
 	userIDVal, exists := c.Get(middleware.UserIDKey)
 	if !exists {
-		log.Printf("ERROR: User ID not found in context during GetProfile.")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Authentication context error"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Authentication context error: User ID missing", nil))
 		return
 	}
 	userIDStr, ok := userIDVal.(string)
 	if !ok || userIDStr == "" {
-		log.Printf("ERROR: Invalid User ID type or empty in context during GetProfile.")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Authentication context error"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Authentication context error: Invalid User ID", nil))
 		return
 	}
 
@@ -105,15 +104,15 @@ func (h *AccountHandler) GetProfile(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, storage.ErrUserNotFound) {
 			log.Printf("WARN: User %s not found in store after successful authentication.", userIDStr)
-			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			c.AbortWithStatusJSON(http.StatusNotFound, response.Failure("User not found", nil))
 		} else {
 			log.Printf("ERROR: Failed to retrieve user %s: %v", userIDStr, err)
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user profile"})
+			c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Failed to retrieve user profile", nil))
 		}
 		return
 	}
 
-	c.JSON(http.StatusOK, models.NewUserResponse(user))
+	c.JSON(http.StatusOK, response.Success("Profile retrieved successfully", models.NewUserResponse(user)))
 }
 
 // UpdateProfile godoc
@@ -124,41 +123,30 @@ func (h *AccountHandler) GetProfile(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param profile body UpdateProfileRequest true "Profile data to update"
-// @Success 200 {object} UserResponse "Updated user profile details"
-// @Failure 400 {object} gin.H{"error":string} "Invalid request body"
-// @Failure 401 {object} gin.H{"error":string} "Unauthorized"
-// @Failure 403 {object} gin.H{"error":string} "Forbidden (if trying to update forbidden field)"
-// @Failure 404 {object} gin.H{"error":string} "User not found"
-// @Failure 500 {object} gin.H{"error":string} "Internal server error"
+// @Success 200 {object} response.ApiResponse{data=models.UserResponse} "Updated user profile details"
+// @Failure 400 {object} response.ApiResponse "Invalid request body"
+// @Failure 401 {object} response.ApiResponse "Unauthorized"
+// @Failure 403 {object} response.ApiResponse "Forbidden (if trying to update forbidden field)"
+// @Failure 404 {object} response.ApiResponse "User not found"
+// @Failure 500 {object} response.ApiResponse "Internal server error"
 // @Router /api/v1/account/profile [patch]
 func (h *AccountHandler) UpdateProfile(c *gin.Context) {
-	// 1. Get userID and claims from context
+	// 1. Get userID
 	userIDVal, exists := c.Get(middleware.UserIDKey)
 	if !exists {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Auth context error: User ID missing"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Auth context error: User ID missing", nil))
 		return
 	}
 	userIDStr, ok := userIDVal.(string)
 	if !ok || userIDStr == "" {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Auth context error: Invalid User ID"})
-		return
-	}
-
-	claimsVal, exists := c.Get(middleware.UserClaimsKey)
-	if !exists {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Auth context error: Claims missing"})
-		return
-	}
-	claims, ok := claimsVal.(*auth.Claims)
-	if !ok || claims == nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Auth context error: Invalid Claims"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Auth context error: Invalid User ID", nil))
 		return
 	}
 
 	// 2. Bind JSON request body
 	var req UpdateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request body: " + err.Error()})
+		c.AbortWithStatusJSON(http.StatusBadRequest, response.Failure("Invalid request body: "+err.Error(), nil))
 		return
 	}
 
@@ -166,48 +154,41 @@ func (h *AccountHandler) UpdateProfile(c *gin.Context) {
 	user, err := h.store.GetUserByID(c.Request.Context(), userIDStr)
 	if err != nil {
 		if errors.Is(err, storage.ErrUserNotFound) {
-			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			c.AbortWithStatusJSON(http.StatusNotFound, response.Failure("User not found", nil))
 		} else {
 			log.Printf("ERROR: Failed to retrieve user %s for update: %v", userIDStr, err)
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user profile"})
+			c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Failed to retrieve user profile", nil))
 		}
 		return
 	}
 
-	// 4. Apply updates based on request and check permissions for each field
+	// 4. Apply updates
 	updated := false
-	// Check Name update
 	if req.Name != nil {
-		// Permission check for name update (already done by middleware for this route)
-		// if !middleware.HasAction(claims.Scopes, "account:update", "name") { ... }
 		user.Name = *req.Name
 		updated = true
 	}
-	// Check Email update
 	if req.Email != nil {
-		// Permission check for email update (already done by middleware for this route)
-		// if !middleware.HasAction(claims.Scopes, "account:update", "email") { ... }
 		user.Email = *req.Email
 		updated = true
 	}
 
-	// If nothing was actually updated (e.g., request body was empty or identical)
+	// 5. If nothing was actually updated
 	if !updated {
-		c.JSON(http.StatusOK, models.NewUserResponse(user))
+		c.JSON(http.StatusOK, response.Success("No profile changes detected", models.NewUserResponse(user)))
 		return
 	}
 
 	// 6. Save updated user to store
 	err = h.store.UpdateUser(c.Request.Context(), user)
 	if err != nil {
-		// UpdateUser in storage should handle ErrUserExists if username was changeable
 		log.Printf("ERROR: Failed to update user %s: %v", userIDStr, err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Failed to update profile", nil))
 		return
 	}
 
-	// 8. Return updated UserResponse
-	c.JSON(http.StatusOK, models.NewUserResponse(user))
+	// 7. Return updated UserResponse
+	c.JSON(http.StatusOK, response.Success("Profile updated successfully", models.NewUserResponse(user)))
 }
 
 // UpdatePassword godoc
@@ -218,29 +199,29 @@ func (h *AccountHandler) UpdateProfile(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param password_data body UpdatePasswordRequest true "Old and new password"
-// @Success 200 {object} gin.H{"message":string} "Password updated successfully"
-// @Failure 400 {object} gin.H{"error":string} "Invalid request body or new password too weak"
-// @Failure 401 {object} gin.H{"error":string} "Unauthorized or incorrect old password"
-// @Failure 404 {object} gin.H{"error":string} "User not found"
-// @Failure 500 {object} gin.H{"error":string} "Internal server error"
+// @Success 200 {object} response.ApiResponse
+// @Failure 400 {object} response.ApiResponse "Invalid request body or new password too weak"
+// @Failure 401 {object} response.ApiResponse "Unauthorized or incorrect old password"
+// @Failure 404 {object} response.ApiResponse "User not found"
+// @Failure 500 {object} response.ApiResponse "Internal server error"
 // @Router /api/v1/account/password [patch]
 func (h *AccountHandler) UpdatePassword(c *gin.Context) {
-	// 1. Get userID from context
+	// 1. Get userID
 	userIDVal, exists := c.Get(middleware.UserIDKey)
 	if !exists {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Auth context error: User ID missing"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Auth context error: User ID missing", nil))
 		return
 	}
 	userIDStr, ok := userIDVal.(string)
 	if !ok || userIDStr == "" {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Auth context error: Invalid User ID"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Auth context error: Invalid User ID", nil))
 		return
 	}
 
 	// 2. Bind JSON request body
 	var req UpdatePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request body: " + err.Error()})
+		c.AbortWithStatusJSON(http.StatusBadRequest, response.Failure("Invalid request body: "+err.Error(), nil))
 		return
 	}
 
@@ -248,19 +229,18 @@ func (h *AccountHandler) UpdatePassword(c *gin.Context) {
 	user, err := h.store.GetUserByID(c.Request.Context(), userIDStr)
 	if err != nil {
 		if errors.Is(err, storage.ErrUserNotFound) {
-			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			c.AbortWithStatusJSON(http.StatusNotFound, response.Failure("User not found", nil))
 		} else {
 			log.Printf("ERROR: Failed to retrieve user %s for password update: %v", userIDStr, err)
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user profile"})
+			c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Failed to retrieve user profile", nil))
 		}
 		return
 	}
 
 	// 4. Verify old password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.OldPassword)); err != nil {
-		// If bcrypt.ErrMismatchedHashAndPassword or other error
 		log.Printf("DEBUG: Incorrect old password attempt for user %s", userIDStr)
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Incorrect old password"})
+		c.AbortWithStatusJSON(http.StatusUnauthorized, response.Failure("Incorrect old password", nil))
 		return
 	}
 
@@ -268,7 +248,7 @@ func (h *AccountHandler) UpdatePassword(c *gin.Context) {
 	newHashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
 		log.Printf("ERROR: Failed to hash new password for user %s: %v", userIDStr, err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to process new password"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Failed to process new password", nil))
 		return
 	}
 
@@ -279,13 +259,13 @@ func (h *AccountHandler) UpdatePassword(c *gin.Context) {
 	err = h.store.UpdateUser(c.Request.Context(), user)
 	if err != nil {
 		log.Printf("ERROR: Failed to save updated password for user %s: %v", userIDStr, err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Failed to update password", nil))
 		return
 	}
 
 	// 10. Return success message
 	log.Printf("INFO: User %s successfully updated their password.", userIDStr)
-	c.JSON(http.StatusOK, gin.H{"message": "Password updated successfully"})
+	c.JSON(http.StatusOK, response.Success("Password updated successfully", nil))
 }
 
 // CreateApiToken godoc
@@ -296,28 +276,28 @@ func (h *AccountHandler) UpdatePassword(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param token_data body CreateApiTokenRequest true "API Token details"
-// @Success 201 {object} CreateApiTokenResponse "Created API Token details (including secret - show once)"
-// @Failure 400 {object} gin.H{"error":string} "Invalid request body"
-// @Failure 401 {object} gin.H{"error":string} "Unauthorized"
-// @Failure 500 {object} gin.H{"error":string} "Internal server error"
+// @Success 201 {object} response.ApiResponse{data=CreateApiTokenResponse} "Created API Token details (including secret - show once)"
+// @Failure 400 {object} response.ApiResponse "Invalid request body"
+// @Failure 401 {object} response.ApiResponse "Unauthorized"
+// @Failure 500 {object} response.ApiResponse "Internal server error"
 // @Router /api/v1/account/tokens [post]
 func (h *AccountHandler) CreateApiToken(c *gin.Context) {
 	// 1. Get userID
 	userIDVal, exists := c.Get(middleware.UserIDKey)
 	if !exists {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Auth context error: User ID missing"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Auth context error: User ID missing", nil))
 		return
 	}
 	userIDStr, ok := userIDVal.(string)
 	if !ok || userIDStr == "" {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Auth context error: Invalid User ID"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Auth context error: Invalid User ID", nil))
 		return
 	}
 
 	// 2. Bind request
 	var req CreateApiTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request body: " + err.Error()})
+		c.AbortWithStatusJSON(http.StatusBadRequest, response.Failure("Invalid request body: "+err.Error(), nil))
 		return
 	}
 
@@ -325,7 +305,7 @@ func (h *AccountHandler) CreateApiToken(c *gin.Context) {
 	rawSecret, err := utils.GenerateSecureRandomString(apiSecretLength)
 	if err != nil {
 		log.Printf("ERROR: Failed to generate API token secret for user %s: %v", userIDStr, err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token secret"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Failed to generate token secret", nil))
 		return
 	}
 
@@ -333,43 +313,45 @@ func (h *AccountHandler) CreateApiToken(c *gin.Context) {
 	hashedSecret, err := bcrypt.GenerateFromPassword([]byte(rawSecret), bcrypt.DefaultCost)
 	if err != nil {
 		log.Printf("ERROR: Failed to hash API token secret for user %s: %v", userIDStr, err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to process token secret"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Failed to process token secret", nil))
 		return
 	}
 
 	// 5. Generate token ID (tok_...)
-	// Note: We don't use GeneratePrefixedID here as the prefix is part of the standard JTI format for API tokens
-	tokenID := auth.JtiPrefixToken + uuid.NewString() // Assuming google/uuid is imported in auth or utils
+	tokenID := auth.JtiPrefixToken + uuid.NewString()
 
 	// 6. Create models.ApiToken struct
 	apiToken := models.ApiToken{
 		ID:         tokenID,
 		Name:       req.Name,
 		SecretHash: string(hashedSecret),
-		CreatedAt:  time.Now().UTC().Truncate(time.Second), // Use RFC3339 format
-		ExpiresAt:  req.ExpiresAt,                          // Assign optional expiration from request
-		// LastUsedAt will be nil initially
+		CreatedAt:  time.Now().UTC().Truncate(time.Second),
+		ExpiresAt:  req.ExpiresAt,
 	}
 
 	// 7. Call store.AddApiToken
 	if err := h.store.AddApiToken(c.Request.Context(), userIDStr, apiToken); err != nil {
 		log.Printf("ERROR: Failed to add API token %s for user %s: %v", tokenID, userIDStr, err)
-		// Handle potential duplicate JTI error specifically?
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to save API token"})
+		// Consider specific error for JTI conflict
+		if strings.Contains(err.Error(), "already exists") {
+			c.AbortWithStatusJSON(http.StatusConflict, response.Failure("API token ID conflict", nil))
+		} else {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Failed to save API token", nil))
+		}
 		return
 	}
 
-	// 8. Return CreateApiTokenResponse with raw secret
-	response := CreateApiTokenResponse{
+	// 8. Prepare response data (including raw secret)
+	respData := CreateApiTokenResponse{
 		ID:          apiToken.ID,
 		Name:        apiToken.Name,
 		CreatedAt:   apiToken.CreatedAt,
 		ExpiresAt:   apiToken.ExpiresAt,
-		TokenSecret: rawSecret, // IMPORTANT: Show this only once!
+		TokenSecret: rawSecret,
 	}
 
 	log.Printf("INFO: Created API token '%s' (ID: %s) for user %s", apiToken.Name, apiToken.ID, userIDStr)
-	c.JSON(http.StatusCreated, response)
+	c.JSON(http.StatusCreated, response.Success("API Token created successfully. Secret is shown only once.", respData))
 }
 
 // ListApiTokens godoc
@@ -378,41 +360,41 @@ func (h *AccountHandler) CreateApiToken(c *gin.Context) {
 // @Tags account
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {array} ApiTokenListResponse "List of API Tokens (secrets omitted)"
-// @Failure 401 {object} gin.H{"error":string} "Unauthorized"
-// @Failure 500 {object} gin.H{"error":string} "Internal server error"
+// @Success 200 {object} response.ApiResponse{data=[]ApiTokenListResponse} "List of API Tokens (secrets omitted)"
+// @Failure 401 {object} response.ApiResponse "Unauthorized"
+// @Failure 500 {object} response.ApiResponse "Internal server error"
 // @Router /api/v1/account/tokens [get]
 func (h *AccountHandler) ListApiTokens(c *gin.Context) {
 	// 1. Get userID
 	userIDVal, exists := c.Get(middleware.UserIDKey)
 	if !exists {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Auth context error: User ID missing"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Auth context error: User ID missing", nil))
 		return
 	}
 	userIDStr, ok := userIDVal.(string)
 	if !ok || userIDStr == "" {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Auth context error: Invalid User ID"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Auth context error: Invalid User ID", nil))
 		return
 	}
 
 	// 2. Call store.GetUserApiTokens
 	tokens, err := h.store.GetUserApiTokens(c.Request.Context(), userIDStr)
 	if err != nil {
-		// Handle case where user doesn't exist (shouldn't happen after auth)
 		if errors.Is(err, storage.ErrUserNotFound) {
 			log.Printf("WARN: User %s not found in store trying to list tokens.", userIDStr)
-			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			// It's not really a failure if user exists but has no tokens, return success with empty list
+			c.JSON(http.StatusOK, response.Success("No API tokens found", []ApiTokenListResponse{}))
 		} else {
 			log.Printf("ERROR: Failed to get API tokens for user %s: %v", userIDStr, err)
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve API tokens"})
+			c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Failed to retrieve API tokens", nil))
 		}
 		return
 	}
 
-	// 3. Convert []models.ApiToken to []ApiTokenListResponse (omitting secret hash)
-	resp := make([]ApiTokenListResponse, len(tokens))
+	// 3. Convert []models.ApiToken to []ApiTokenListResponse
+	respData := make([]ApiTokenListResponse, len(tokens))
 	for i, t := range tokens {
-		resp[i] = ApiTokenListResponse{
+		respData[i] = ApiTokenListResponse{
 			ID:         t.ID,
 			Name:       t.Name,
 			CreatedAt:  t.CreatedAt,
@@ -422,7 +404,7 @@ func (h *AccountHandler) ListApiTokens(c *gin.Context) {
 	}
 
 	// 4. Return list
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, response.Success("API tokens retrieved successfully", respData))
 }
 
 // DeleteApiToken godoc
@@ -432,56 +414,54 @@ func (h *AccountHandler) ListApiTokens(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param tokenId path string true "ID of the token to delete (tok_...)"
-// @Success 204 "No Content"
-// @Failure 401 {object} gin.H{"error":string} "Unauthorized"
-// @Failure 404 {object} gin.H{"error":string} "Token not found"
-// @Failure 500 {object} gin.H{"error":string} "Internal server error"
+// @Success 200 {object} response.ApiResponse "No Content"
+// @Failure 401 {object} response.ApiResponse "Unauthorized"
+// @Failure 404 {object} response.ApiResponse "Token not found"
+// @Failure 500 {object} response.ApiResponse "Internal server error"
 // @Router /api/v1/account/tokens/{tokenId} [delete]
 func (h *AccountHandler) DeleteApiToken(c *gin.Context) {
 	// 1. Get userID
 	userIDVal, exists := c.Get(middleware.UserIDKey)
 	if !exists {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Auth context error: User ID missing"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Auth context error: User ID missing", nil))
 		return
 	}
 	userIDStr, ok := userIDVal.(string)
 	if !ok || userIDStr == "" {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Auth context error: Invalid User ID"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Auth context error: Invalid User ID", nil))
 		return
 	}
 
 	// 2. Get tokenId from path parameter
 	tokenID := c.Param("tokenId")
 	if tokenID == "" {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Token ID is required"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, response.Failure("Token ID is required", nil))
 		return
 	}
-	// Basic format check for JTI might be useful here
 	if !strings.HasPrefix(tokenID, auth.JtiPrefixToken) {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid token ID format"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, response.Failure("Invalid token ID format", nil))
 		return
 	}
 
 	// 3. Call store.DeleteApiToken
 	if err := h.store.DeleteApiToken(c.Request.Context(), userIDStr, tokenID); err != nil {
-		// Check if the error is because the token wasn't found
-		// TODO: Refine storage layer to return a specific ErrTokenNotFound
-		if strings.Contains(err.Error(), "not found") { // Simple check for now
+		// TODO: Refine storage layer to return ErrTokenNotFound
+		if strings.Contains(err.Error(), "not found") { // Simple check
 			log.Printf("DEBUG: API token %s not found for deletion for user %s", tokenID, userIDStr)
-			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "API token not found"})
+			c.AbortWithStatusJSON(http.StatusNotFound, response.Failure("API token not found", nil))
 		} else if errors.Is(err, storage.ErrUserNotFound) {
 			log.Printf("WARN: User %s not found trying to delete token %s", userIDStr, tokenID)
-			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			c.AbortWithStatusJSON(http.StatusNotFound, response.Failure("User not found", nil))
 		} else {
 			log.Printf("ERROR: Failed to delete API token %s for user %s: %v", tokenID, userIDStr, err)
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete API token"})
+			c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Failed to delete API token", nil))
 		}
 		return
 	}
 
-	// 5. Return 204 No Content on success
+	// 4. Return 200 OK with Success response
 	log.Printf("INFO: Deleted API token %s for user %s", tokenID, userIDStr)
-	c.Status(http.StatusNoContent)
+	c.JSON(http.StatusOK, response.Success("API token deleted successfully", nil))
 }
 
 // Note: Consider moving newUserResponse helper to a shared location if used by both UserHandler and AccountHandler.

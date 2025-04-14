@@ -1,34 +1,38 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
+	"net/url"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
 	v1 "github.com/OG-Open-Source/PanelBase/internal/api/v1"
 	v1handlers "github.com/OG-Open-Source/PanelBase/internal/api/v1/handlers"
-	"github.com/OG-Open-Source/PanelBase/internal/api/v1/middleware"
 	"github.com/OG-Open-Source/PanelBase/internal/storage"
 	"github.com/OG-Open-Source/PanelBase/internal/webserver"
 	"github.com/OG-Open-Source/PanelBase/pkg/bootstrap"
 	"github.com/OG-Open-Source/PanelBase/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/pelletier/go-toml/v2"
-	"golang.org/x/time/rate"
+	// "golang.org/x/time/rate" // No longer needed
 )
 
 // AppConfig holds application configuration read from config.toml
 type AppConfig struct {
 	Server struct {
-		Port         int     `toml:"port"`
-		Entry        string  `toml:"entry"`
-		Ip           string  `toml:"ip"`
-		Mode         string  `toml:"mode"`
-		RateLimitR   float64 `toml:"rate_limit_r"`  // Requests per second
-		RateLimitB   int     `toml:"rate_limit_b"`  // Burst size
-		TrustedProxy string  `toml:"trusted_proxy"` // Single trusted proxy IP or CIDR
+		Port         int    `toml:"port"`
+		Entry        string `toml:"entry"`
+		Ip           string `toml:"ip"`
+		Mode         string `toml:"mode"`
+		TrustedProxy string `toml:"trusted_proxy"`
 	}
 	Auth struct {
 		JwtSecret            string `toml:"jwt_secret"`
@@ -48,8 +52,6 @@ const (
 	defaultMode          = gin.ReleaseMode
 	defaultJwtSecret     = "change-this-in-config-toml" // Default secret (should be changed)
 	defaultTokenDuration = 60                           // Default duration in minutes
-	defaultRateLimitR    = 10.0                         // Default rate limit: 10 req/sec
-	defaultRateLimitB    = 20                           // Default burst size: 20
 	defaultTrustedProxy  = ""                           // Default: No trusted proxy
 )
 
@@ -77,14 +79,12 @@ func main() {
 	// --- Load Configuration ---
 	config := AppConfig{
 		Server: struct {
-			Port         int     `toml:"port"`
-			Entry        string  `toml:"entry"`
-			Ip           string  `toml:"ip"`
-			Mode         string  `toml:"mode"`
-			RateLimitR   float64 `toml:"rate_limit_r"`
-			RateLimitB   int     `toml:"rate_limit_b"`
-			TrustedProxy string  `toml:"trusted_proxy"`
-		}{Port: defaultPort, Ip: defaultIP, Mode: defaultMode, RateLimitR: defaultRateLimitR, RateLimitB: defaultRateLimitB, TrustedProxy: defaultTrustedProxy},
+			Port         int    `toml:"port"`
+			Entry        string `toml:"entry"`
+			Ip           string `toml:"ip"`
+			Mode         string `toml:"mode"`
+			TrustedProxy string `toml:"trusted_proxy"`
+		}{Port: defaultPort, Ip: defaultIP, Mode: defaultMode, TrustedProxy: defaultTrustedProxy},
 		Auth: struct {
 			JwtSecret            string `toml:"jwt_secret"`
 			TokenDurationMinutes int    `toml:"token_duration_minutes"`
@@ -110,13 +110,6 @@ func main() {
 			if config.Server.Mode == "" {
 				config.Server.Mode = defaultMode
 			}
-			if config.Server.RateLimitR <= 0 {
-				config.Server.RateLimitR = defaultRateLimitR
-			}
-			if config.Server.RateLimitB <= 0 {
-				config.Server.RateLimitB = defaultRateLimitB
-			}
-			// TrustedProxy can be empty
 			if config.Auth.JwtSecret == "" {
 				config.Auth.JwtSecret = defaultJwtSecret
 			}
@@ -134,14 +127,6 @@ func main() {
 	if config.Server.Mode == "" {
 		config.Server.Mode = defaultMode
 		log.Printf("WARN: Server Mode not set, defaulting to %s", defaultMode)
-	}
-	if config.Server.RateLimitR <= 0 {
-		config.Server.RateLimitR = defaultRateLimitR
-		log.Printf("WARN: Invalid RateLimitR, defaulting to %.2f", defaultRateLimitR)
-	}
-	if config.Server.RateLimitB <= 0 {
-		config.Server.RateLimitB = defaultRateLimitB
-		log.Printf("WARN: Invalid RateLimitB, defaulting to %d", defaultRateLimitB)
 	}
 	if config.Auth.JwtSecret == "" || config.Auth.JwtSecret == defaultJwtSecret {
 		config.Auth.JwtSecret = defaultJwtSecret
@@ -195,7 +180,7 @@ func main() {
 	// --- End Load UI Settings ---
 
 	// --- Setup Gin Router ---
-	router := gin.New() // Use New instead of Default to have more control
+	router := gin.New()
 
 	// --- Global Middleware ---
 	// Custom Logger (using config)
@@ -203,14 +188,14 @@ func main() {
 		Formatter: logger.CustomLogFormatter,
 		Output:    logWriter, // Use the multi-writer
 	}
-	router.Use(gin.LoggerWithConfig(logConfig)) // Use configured logger
+	router.Use(gin.LoggerWithConfig(logConfig))
 
 	// Recovery Middleware (built-in)
 	router.Use(gin.Recovery())
 
-	// Rate Limiting
-	rateLimiter := rate.NewLimiter(rate.Limit(config.Server.RateLimitR), config.Server.RateLimitB)
-	router.Use(middleware.RateLimitMiddleware(rateLimiter)) // Use the exported middleware
+	// Rate Limiting (REMOVED)
+	// rateLimiter := rate.NewLimiter(rate.Limit(config.Server.RateLimitR), config.Server.RateLimitB)
+	// router.Use(middleware.RateLimitMiddleware(rateLimiter))
 
 	// Trusted Proxies
 	if config.Server.TrustedProxy != "" {
@@ -235,26 +220,35 @@ func main() {
 	accountHandler := v1handlers.NewAccountHandler(userStore) // Create AccountHandler
 	// --- End Setup Handlers ---
 
-	// --- Register API Routes ---
-	api := router.Group("/api")
+	// --- Register API Routes (Dynamic Prefix) ---
+	apiPrefix := "/api"
+	if config.Server.Entry != "" {
+		var err error
+		apiPrefix, err = url.JoinPath("/", config.Server.Entry, "api")
+		if err != nil {
+			log.Fatalf("CRITICAL: Failed to construct API path prefix: %v", err)
+		}
+	}
+
+	apiGroup := router.Group(apiPrefix)
 	{
-		v1Group := api.Group("/v1")
+		v1Group := apiGroup.Group("/v1") // v1 is relative to the dynamic apiGroup
 		{
 			v1.RegisterRoutes(
 				v1Group,
 				authHandler,
 				userHandler,
-				accountHandler, // Pass AccountHandler
+				accountHandler,
 				config.Auth.JwtSecret,
-				config.Functions.Users, // Use config flag to allow/disallow registration
+				config.Functions.Users,
 			)
 		}
-		// Register other API versions here (e.g., v2)
+		// Register other API versions relative to apiGroup here...
 	}
 	// --- End Register API Routes ---
 
-	// --- Register Web Server Handlers (Static files, Templates, Error pages) ---
-	// Create webserver config struct needed by RegisterHandlers
+	// --- Register Web Server Handlers ---
+	// Pass the determined apiPrefix to RegisterHandlers
 	webServerConfig := webserver.AppConfig{
 		Server: struct {
 			Entry string `toml:"entry"`
@@ -264,12 +258,12 @@ func main() {
 			Mode:  config.Server.Mode,
 		},
 	}
-	webserver.RegisterHandlers(router, webServerConfig, uiSettingsData, uiSettingsFile) // Pass correct arguments
+	webserver.RegisterHandlers(router, webServerConfig, uiSettingsData, uiSettingsFile, apiPrefix)
 	// --- End Web Server Handlers ---
 
-	// --- Debug Endpoint (if enabled) ---
-	if debugModeActive {
-		debug := router.Group("/debug")
+	// --- Debug Endpoint (Remains at root) ---
+	if debugModeActive { // Use the existing debugModeActive flag
+		debug := router.Group("/debug") // Register under root router
 		{
 			debug.GET("/ping", func(c *gin.Context) {
 				c.JSON(200, gin.H{"message": "pong"})
@@ -279,18 +273,43 @@ func main() {
 	}
 	// --- End Debug Endpoint ---
 
-	// --- Start Server ---
-	// Build the startup log message
-	startupMsg := fmt.Sprintf("Starting PanelBase | Mode: %s | Addr: %s",
-		gin.Mode(),
-		listenAddr,
-	)
+	// --- Start Server with Graceful Shutdown ---
+	srv := &http.Server{
+		Addr:    listenAddr,
+		Handler: router,
+	}
+
+	// Initial startup message
+	startupMsg := fmt.Sprintf("Starting PanelBase | Mode: %s | Addr: %s", gin.Mode(), listenAddr)
 	if config.Server.Entry != "" {
 		startupMsg += fmt.Sprintf(" | Entry: /%s/", config.Server.Entry)
 	}
-	log.Println(startupMsg) // Print the combined message
+	log.Println(startupMsg)
 
-	if err := router.Run(listenAddr); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	// Start server in a goroutine so that it doesn't block.
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("listen: %s\n", err)
+		}
+	}()
+
+	// Wait for interrupt signal to gracefully shutdown the server with a timeout.
+	quit := make(chan os.Signal, 1) // Buffer of 1
+	// kill (no param) default send syscall.SIGTERM
+	// kill -2 is syscall.SIGINT
+	// kill -9 is syscall.SIGKILL but can't be caught, so don't need to add it
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit // Block until a signal is received
+	log.Println("Shutting down server...")
+
+	// The context is used to inform the server it has 5 seconds to finish
+	// the requests it is currently handling
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatal("Server forced to shutdown: ", err)
 	}
+
+	log.Println("Server exiting")
 }

@@ -8,8 +8,25 @@ Project initialization (directory/file creation) is now handled automatically wh
 
 ## Configuration Notes
 
-*   **Rate Limiting:** Basic IP-based rate limiting is enabled by default (`server.rate_limit_r` = 10 req/s, `server.rate_limit_b` = 20 burst). These values can be adjusted in `configs/config.toml`.
-*   **Trusted Proxies:** If PanelBase runs behind a reverse proxy (like Nginx, Caddy, Cloudflare), it's **crucial** to configure `server.trusted_proxy` in `configs/config.toml` with the proxy's IP address or CIDR block. This allows the rate limiter and logging to see the *real* client IP address instead of the proxy's IP. Example: `trusted_proxy = "192.168.1.1"` or `trusted_proxy = "10.0.0.0/8"`. If not running behind a proxy, leave this empty.
+- **Trusted Proxies:** If PanelBase runs behind a reverse proxy (like Nginx, Caddy, Cloudflare), it's **crucial** to configure `server.trusted_proxy` in `configs/config.toml` with the proxy's IP address or CIDR block. This allows logging to see the _real_ client IP address instead of the proxy's IP. Example: `trusted_proxy = "192.168.1.1"` or `trusted_proxy = "10.0.0.0/8"`. If not running behind a proxy, leave this empty.
+
+## API Response Format
+
+All API v1 endpoints (except for successful DELETE requests which return 204 No Content) adhere to a standard JSON response format:
+
+```json
+{
+  "status": "success | failure",
+  "message": "Descriptive message about the outcome.",
+  "data": { ... } // Optional: Contains the actual response data (object or array)
+}
+```
+
+- **status**: Indicates the overall outcome.
+  - `"success"`: The request was successful (typically HTTP 2xx).
+  - `"failure"`: The request failed due to client-side issues (e.g., validation, permissions, not found - typically HTTP 4xx) or server-side issues (typically HTTP 5xx).
+- **message**: A user-friendly string describing the result.
+- **data**: An optional field containing the response payload. For list endpoints, this will be an array. For single resource endpoints, it will be an object. It's omitted or null for errors or operations that don't return data.
 
 ## Run
 
@@ -86,8 +103,9 @@ Run `go run cmd/server/main.go` to start the server.
 - Implemented dynamic HTML template rendering (on-demand parsing) instead of pre-loading, allowing runtime addition of HTML files.
 - Prevented direct URL access to files within the `/web/<entry>/templates` directory.
 - Removed INFO log message when a requested file/template is not found.
-- Added basic IP-based rate limiting middleware (`golang.org/x/time/rate`) to mitigate simple DoS/Brute-force attacks.
-- Added configuration for rate limit (RPS, Burst) and trusted proxy in `configs/config.toml`.
 - Added ID generator utility (`pkg/utils/id_generator.go`) for creating prefixed random IDs.
 - Updated user creation (`JSONUserStore`) to use the new ID generator utility.
 - Ensured `created_at` timestamps in `configs/users.json` are saved in RFC3339 format (without nanoseconds).
+- Implemented graceful shutdown handling for the server.
+- Removed IP-based rate limiting middleware.
+- Standardized API JSON response format (`status`, `message`, `data`).
