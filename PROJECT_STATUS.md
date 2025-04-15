@@ -90,6 +90,8 @@ To build a web panel application using the Go programming language and the Gin w
 - [x] Implement `/account` routes for self-management (profile, password).
 - [x] Design and implement basic API Token management (create, list, delete for self; stored in users.json).
 - [x] Implement graceful shutdown handling.
+- [x] Implement configurable auth rules (require old password, allow self-delete, prevent admin delete via User ID) in `config.toml`.
+- [x] Implement default scope assignment based on `config.toml` for new users.
 - [ ] Implement JTI validation for API tokens (requires DB or store modification).
 - [ ] Implement routes and scope checks for `themes`, `plugins`, `commands`.
 - [ ] Write comprehensive API tests for authorization scenarios.

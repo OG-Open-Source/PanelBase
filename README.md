@@ -109,3 +109,8 @@ Run `go run cmd/server/main.go` to start the server.
 - Implemented graceful shutdown handling for the server.
 - Removed IP-based rate limiting middleware.
 - Standardized API JSON response format (`status`, `message`, `data`).
+- Implemented full User Management API (`/api/v1/users`) with CRUD operations and fine-grained scope checks (`users:read`, `users:create`, `users:delete`, `users:update:name`, `users:update:email`, `users:update:active`, `users:update:scopes`, `users:update:api_tokens`).
+- Implemented Account Management API (`/api/v1/account`) for self-service: profile updates (`account:profile:read`, `account:update:name`, `account:update:email`), password change (`account:password:update`), self-deletion (`account:self_delete:execute`), and API Token management (`account:tokens:create`, `account:tokens:read`, `account:tokens:delete`).
+- Made authentication rules configurable via `configs/config.toml`: requiring old password for update, allowing self-deletion, and protecting specific User IDs from deletion.
+- Added default scope assignment for new users based on `configs/config.toml`.
+- Bootstrap process now adds the initial admin User ID to the protected list in `configs/config.toml`.

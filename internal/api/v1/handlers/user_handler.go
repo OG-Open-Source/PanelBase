@@ -4,17 +4,24 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"reflect" // Import reflect for type assertion
 
 	"github.com/OG-Open-Source/PanelBase/internal/api/v1/middleware"
 	"github.com/OG-Open-Source/PanelBase/internal/auth"
 	"github.com/OG-Open-Source/PanelBase/internal/models"
 	"github.com/OG-Open-Source/PanelBase/internal/storage"
 	"github.com/OG-Open-Source/PanelBase/pkg/response"
+
+	// Import the config rules struct definition location (assuming it's in main for now)
+	// This might need adjustment if the config struct is refactored.
+	// main "github.com/OG-Open-Source/PanelBase/cmd/server"
+
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Default scopes assigned to newly created users unless overridden by an admin with scope update permissions.
+// Removed defaultUserScopes as it now comes from config
+/*
 var defaultUserScopes = map[string]interface{}{
 	"account": map[string]interface{}{
 		"profile": []string{"read", "update"},
@@ -22,15 +29,68 @@ var defaultUserScopes = map[string]interface{}{
 		// "password": []string{"update"},
 	},
 }
+*/
 
 // UserHandler handles user management API requests.
 type UserHandler struct {
-	store storage.UserStore
+	store         storage.UserStore
+	defaultScopes map[string]interface{} // Store default scopes from config
+	authRules     interface{}            // Store auth rules as interface{}
 }
 
 // NewUserHandler creates a new UserHandler.
-func NewUserHandler(store storage.UserStore) *UserHandler {
-	return &UserHandler{store: store}
+// Accept authRules as interface{} to avoid import cycle.
+func NewUserHandler(store storage.UserStore, defaultScopes map[string]interface{}, authRules interface{}) *UserHandler {
+	return &UserHandler{
+		store:         store,
+		defaultScopes: defaultScopes,
+		authRules:     authRules,
+	}
+}
+
+// Helper function to safely get AuthConfigRules from the interface{}
+func (h *UserHandler) getAuthConfigRules() (protectedUserIDs []string, allowSelfDelete bool, requireOldPassword bool) {
+	// Set defaults in case type assertion fails
+	protectedUserIDs = []string{} // Default to empty slice
+	allowSelfDelete = true
+	requireOldPassword = true
+
+	if h.authRules == nil {
+		log.Printf("WARN: Auth rules are nil in UserHandler. Using default rules.")
+		return
+	}
+
+	// Use reflection to access fields without direct import
+	val := reflect.ValueOf(h.authRules)
+	if val.Kind() != reflect.Struct {
+		log.Printf("WARN: Auth rules in UserHandler are not a struct (%s). Using default rules.", val.Kind())
+		return
+	}
+
+	preventField := val.FieldByName("ProtectedUserIDs") // Read the new field
+	if preventField.IsValid() && preventField.Kind() == reflect.Slice {
+		// Iterate through the slice and convert to string
+		protectedIDs := []string{}
+		for i := 0; i < preventField.Len(); i++ {
+			elem := preventField.Index(i)
+			if elem.Kind() == reflect.String {
+				protectedIDs = append(protectedIDs, elem.String())
+			}
+		}
+		protectedUserIDs = protectedIDs // Assign the successfully extracted slice
+	}
+
+	allowField := val.FieldByName("AllowSelfDelete")
+	if allowField.IsValid() && allowField.Kind() == reflect.Bool {
+		allowSelfDelete = allowField.Bool()
+	}
+
+	requireOldField := val.FieldByName("RequireOldPasswordForUpdate")
+	if requireOldField.IsValid() && requireOldField.Kind() == reflect.Bool {
+		requireOldPassword = requireOldField.Bool()
+	}
+
+	return
 }
 
 // --- DTOs (Data Transfer Objects) ---
@@ -52,6 +112,7 @@ type UpdateUserRequest struct {
 	Active *bool                   `json:"active"`
 	Scopes *map[string]interface{} `json:"scopes"` // Changed to *map[string]interface{}
 	// Password changes should have a dedicated endpoint
+	ApiTokens *[]models.ApiToken `json:"api_tokens"` // Allow updating API tokens (carefully!)
 }
 
 // UserResponse struct is now defined in models package
@@ -125,8 +186,8 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		finalScopes = req.Scopes
 		log.Printf("DEBUG: Admin creating user with custom scopes: %v", finalScopes)
 	} else {
-		// Use default scopes if admin doesn't provide specific ones or if creator lacks permission
-		finalScopes = defaultUserScopes
+		// Use default scopes from config if admin doesn't provide specific ones or if creator lacks permission
+		finalScopes = h.defaultScopes // Use handler's default scopes
 		if req.Scopes != nil && !canUpdateScopes {
 			log.Printf("WARN: User creation request included scopes, but creator lacks 'users:update:scopes' permission. Applying default scopes.")
 		}
@@ -143,12 +204,12 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	}
 
 	newUser := &models.User{
-		Username:     req.Username,
-		PasswordHash: string(hashedPassword),
-		Name:         req.Name,
-		Email:        req.Email,
-		Active:       req.Active,
-		Scopes:       finalScopes,
+		Username: req.Username,
+		Password: string(hashedPassword),
+		Name:     req.Name,
+		Email:    req.Email,
+		Active:   req.Active,
+		Scopes:   finalScopes,
 	}
 
 	err = h.store.CreateUser(c.Request.Context(), newUser)
@@ -258,6 +319,16 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 		updated = true
 	}
 
+	// API Tokens update (Requires users:update:api_tokens scope, checked by middleware chain)
+	if req.ApiTokens != nil {
+		// **Warning:** Replacing the entire list can be dangerous.
+		// Consider if separate add/delete endpoints for tokens under /users/:id/tokens are better.
+		// For now, we allow replacing the whole slice if the scope is present.
+		user.ApiTokens = *req.ApiTokens
+		updated = true
+		log.Printf("DEBUG: Updating API tokens for user %s (requires users:update:api_tokens scope)", userID)
+	}
+
 	if !updated {
 		c.JSON(http.StatusOK, response.Success("No changes detected", models.NewUserResponse(user))) // Nothing to update, return current state
 		return
@@ -293,11 +364,37 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 // @Router /api/v1/users/{id} [delete]
 func (h *UserHandler) DeleteUser(c *gin.Context) {
 	userID := c.Param("id")
-	// // Basic validation for prefix - Removed
-	// if !strings.HasPrefix(userID, userIDPrefix) {
-	//     c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID format"})
-	//     return
-	// }
+
+	// Get ID of the user making the request
+	requesterIDVal, exists := c.Get(middleware.UserIDKey)
+	if !exists {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Authentication context error: User ID missing", nil))
+		return
+	}
+	requesterID, ok := requesterIDVal.(string)
+	if !ok || requesterID == "" {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Authentication context error: Invalid User ID", nil))
+		return
+	}
+
+	// Get rules using helper
+	protectedIDsRule, _, _ := h.getAuthConfigRules()
+
+	// Check if trying to delete self
+	if userID == requesterID {
+		// Check if self-delete is allowed via this endpoint (usually not, handled by account handler)
+		c.AbortWithStatusJSON(http.StatusForbidden, response.Failure("Cannot delete own account via this endpoint. Use account management endpoints.", nil))
+		return
+	}
+
+	// Check if deleting a protected user ID
+	for _, protectedID := range protectedIDsRule {
+		if userID == protectedID {
+			log.Printf("WARN: Attempt to delete protected user ID (%s) blocked by configuration.", userID)
+			c.AbortWithStatusJSON(http.StatusForbidden, response.Failure("Deleting this user is forbidden by configuration.", nil))
+			return
+		}
+	}
 
 	err := h.store.DeleteUser(c.Request.Context(), userID)
 	if err != nil {

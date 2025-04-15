@@ -207,7 +207,7 @@ func RequireAuth(jwtSecret string) gin.HandlerFunc {
 		if userID == "" {
 			log.Printf("ERROR: Valid token received but Subject (UserID) is empty.")
 			c.AbortWithStatusJSON(http.StatusUnauthorized, response.Failure("Invalid token claims (missing user ID)", nil))
-			return
+				return
 		}
 		c.Set(UserIDKey, userID)
 
@@ -259,3 +259,4 @@ func RequireScope(requiredScope string) gin.HandlerFunc {
 		c.Next()
 	}
 }
+ 

@@ -19,14 +19,16 @@ type AuthHandler struct {
 	UserStore        storage.UserStore
 	JwtSecret        string
 	TokenDurationMin int
+	DefaultScopes    map[string]interface{}
 }
 
 // NewAuthHandler creates a new AuthHandler.
-func NewAuthHandler(store storage.UserStore, jwtSecret string, tokenDurationMin int) *AuthHandler {
+func NewAuthHandler(store storage.UserStore, jwtSecret string, tokenDurationMin int, defaultScopes map[string]interface{}) *AuthHandler {
 	return &AuthHandler{
 		UserStore:        store,
 		JwtSecret:        jwtSecret,
 		TokenDurationMin: tokenDurationMin,
+		DefaultScopes:    defaultScopes,
 	}
 }
 
@@ -64,12 +66,12 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	// Create user model
 	user := &models.User{
-		Username:     req.Username,
-		PasswordHash: string(hashedPassword),
-		Name:         req.Name,
-		Email:        req.Email,
-		Active:       true,
-		Scopes:       requestScopes,
+		Username: req.Username,
+		Password: string(hashedPassword),
+		Name:     req.Name,
+		Email:    req.Email,
+		Active:   true,
+		Scopes:   h.DefaultScopes,
 	}
 
 	// Store the user
@@ -120,7 +122,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	// Compare password hash
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, response.Failure("Invalid username or password", nil))
 		return
 	}

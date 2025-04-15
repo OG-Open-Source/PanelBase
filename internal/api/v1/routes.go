@@ -5,6 +5,7 @@ import (
 
 	"github.com/OG-Open-Source/PanelBase/internal/api/v1/handlers"
 	"github.com/OG-Open-Source/PanelBase/internal/api/v1/middleware"
+	"github.com/OG-Open-Source/PanelBase/pkg/response"
 	"github.com/gin-gonic/gin"
 )
 
@@ -26,9 +27,9 @@ func RegisterRoutes(
 		if allowRegister {
 			authRoutes.POST("/register", authHandler.Register)
 		} else {
-			// Optionally, return a specific status code like 405 Method Not Allowed or 404 Not Found
+			// Use the standard response format for disabled registration
 			authRoutes.POST("/register", func(c *gin.Context) {
-				c.JSON(http.StatusNotFound, gin.H{"error": "Registration is disabled"})
+				c.AbortWithStatusJSON(http.StatusNotFound, response.Failure("Registration is disabled", nil))
 			})
 		}
 		authRoutes.POST("/login", authHandler.Login)
@@ -56,6 +57,7 @@ func RegisterRoutes(
 			middleware.RequireScope("users:update:email"),
 			middleware.RequireScope("users:update:active"),
 			middleware.RequireScope("users:update:scopes"),
+			middleware.RequireScope("users:update:api_tokens"),
 			userHandler.UpdateUser, // Handler logic remains simpler
 		)
 
@@ -81,6 +83,9 @@ func RegisterRoutes(
 		// PATCH /api/v1/account/password (requires account:password:update)
 		// Define the scope string as needed, e.g., "account:password:update"
 		accountRoutes.PATCH("/password", middleware.RequireScope("account:password:update"), accountHandler.UpdatePassword)
+
+		// DELETE /api/v1/account/delete (requires account:self_delete:execute scope)
+		accountRoutes.DELETE("/delete", middleware.RequireScope("account:self_delete:execute"), accountHandler.DeleteSelf)
 
 		// API Tokens
 		tokenRoutes := accountRoutes.Group("/tokens")

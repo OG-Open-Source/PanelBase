@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"reflect"
 	"strings"
 	"time" // Need time package
 
@@ -26,12 +27,61 @@ const (
 
 // AccountHandler handles API requests related to the user's own account.
 type AccountHandler struct {
-	store storage.UserStore
+	store     storage.UserStore
+	authRules interface{} // Store auth rules as interface{}
 }
 
 // NewAccountHandler creates a new AccountHandler.
-func NewAccountHandler(store storage.UserStore) *AccountHandler {
-	return &AccountHandler{store: store}
+func NewAccountHandler(store storage.UserStore, authRules interface{}) *AccountHandler {
+	return &AccountHandler{
+		store:     store,
+		authRules: authRules,
+	}
+}
+
+// Helper function to safely get AuthConfigRules from the interface{} (similar to UserHandler)
+func (h *AccountHandler) getAuthConfigRules() (protectedUserIDs []string, allowSelfDelete bool, requireOldPassword bool) {
+	// Set defaults in case type assertion fails
+	protectedUserIDs = []string{}
+	allowSelfDelete = true
+	requireOldPassword = true
+
+	if h.authRules == nil {
+		log.Printf("WARN: Auth rules are nil in AccountHandler. Using default rules.")
+		return
+	}
+
+	// Use reflection to access fields without direct import
+	val := reflect.ValueOf(h.authRules)
+	if val.Kind() != reflect.Struct {
+		log.Printf("WARN: Auth rules in AccountHandler are not a struct (%s). Using default rules.", val.Kind())
+		return
+	}
+
+	preventField := val.FieldByName("ProtectedUserIDs")
+	if preventField.IsValid() && preventField.Kind() == reflect.Slice {
+		// Iterate through the slice and convert to string
+		protectedIDs := []string{}
+		for i := 0; i < preventField.Len(); i++ {
+			elem := preventField.Index(i)
+			if elem.Kind() == reflect.String {
+				protectedIDs = append(protectedIDs, elem.String())
+			}
+		}
+		protectedUserIDs = protectedIDs // Assign the successfully extracted slice
+	}
+
+	allowField := val.FieldByName("AllowSelfDelete")
+	if allowField.IsValid() && allowField.Kind() == reflect.Bool {
+		allowSelfDelete = allowField.Bool()
+	}
+
+	requireOldField := val.FieldByName("RequireOldPasswordForUpdate")
+	if requireOldField.IsValid() && requireOldField.Kind() == reflect.Bool {
+		requireOldPassword = requireOldField.Bool()
+	}
+
+	return
 }
 
 // --- DTOs ---
@@ -218,6 +268,9 @@ func (h *AccountHandler) UpdatePassword(c *gin.Context) {
 		return
 	}
 
+	// Get rules
+	_, _, requireOldPasswordRule := h.getAuthConfigRules()
+
 	// 2. Bind JSON request body
 	var req UpdatePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -237,11 +290,16 @@ func (h *AccountHandler) UpdatePassword(c *gin.Context) {
 		return
 	}
 
-	// 4. Verify old password
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.OldPassword)); err != nil {
-		log.Printf("DEBUG: Incorrect old password attempt for user %s", userIDStr)
-		c.AbortWithStatusJSON(http.StatusUnauthorized, response.Failure("Incorrect old password", nil))
-		return
+	// 4. Verify old password IF required by config
+	if requireOldPasswordRule {
+		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.OldPassword)); err != nil {
+			log.Printf("DEBUG: Incorrect old password attempt for user %s (Rule Enabled)", userIDStr)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, response.Failure("Incorrect old password", nil))
+			return
+		}
+		log.Printf("DEBUG: Old password verified for user %s (Rule Enabled)", userIDStr)
+	} else {
+		log.Printf("DEBUG: Skipping old password check for user %s (Rule Disabled)", userIDStr)
 	}
 
 	// 6. Hash the new password
@@ -252,8 +310,8 @@ func (h *AccountHandler) UpdatePassword(c *gin.Context) {
 		return
 	}
 
-	// 7. Update user.PasswordHash
-	user.PasswordHash = string(newHashedPassword)
+	// 7. Update user.Password
+	user.Password = string(newHashedPassword)
 
 	// 8. Save updated user to store
 	err = h.store.UpdateUser(c.Request.Context(), user)
@@ -462,6 +520,71 @@ func (h *AccountHandler) DeleteApiToken(c *gin.Context) {
 	// 4. Return 200 OK with Success response
 	log.Printf("INFO: Deleted API token %s for user %s", tokenID, userIDStr)
 	c.JSON(http.StatusOK, response.Success("API token deleted successfully", nil))
+}
+
+// Add a new handler for self-deletion
+
+// DeleteSelf godoc
+// @Summary Delete own account
+// @Description Permanently delete the currently authenticated user's account.
+// @Tags account
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} response.ApiResponse "Account deleted successfully"
+// @Failure 401 {object} response.ApiResponse "Unauthorized"
+// @Failure 403 {object} response.ApiResponse "Forbidden (self-delete disabled by config or trying to delete admin)"
+// @Failure 404 {object} response.ApiResponse "User not found"
+// @Failure 500 {object} response.ApiResponse "Internal server error"
+// @Router /api/v1/account/delete [delete] // Define the route path
+func (h *AccountHandler) DeleteSelf(c *gin.Context) {
+	// 1. Get userID
+	userIDVal, exists := c.Get(middleware.UserIDKey)
+	if !exists {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Auth context error: User ID missing", nil))
+		return
+	}
+	userIDStr, ok := userIDVal.(string)
+	if !ok || userIDStr == "" {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Auth context error: Invalid User ID", nil))
+		return
+	}
+
+	// 2. Get rules
+	protectedIDsRule, allowSelfDeleteRule, _ := h.getAuthConfigRules()
+
+	// 3. Check if self-delete is allowed by config
+	if !allowSelfDeleteRule {
+		log.Printf("WARN: Self-delete attempt by user %s blocked by configuration.", userIDStr)
+		c.AbortWithStatusJSON(http.StatusForbidden, response.Failure("Account self-deletion is disabled by configuration.", nil))
+		return
+	}
+
+	// 5. Check if deleting a protected user ID (even if it's self-delete)
+	for _, protectedID := range protectedIDsRule {
+		if userIDStr == protectedID {
+			log.Printf("WARN: Protected user ID (%s) attempted self-delete, blocked by configuration.", userIDStr)
+			c.AbortWithStatusJSON(http.StatusForbidden, response.Failure("Deleting this user account is forbidden by configuration, even via self-delete.", nil))
+			return
+		}
+	}
+
+	// 6. Perform deletion
+	err := h.store.DeleteUser(c.Request.Context(), userIDStr)
+	if err != nil {
+		if errors.Is(err, storage.ErrUserNotFound) {
+			// Already handled above, but log just in case
+			log.Printf("WARN: User %s not found during actual delete operation after checks.", userIDStr)
+			c.AbortWithStatusJSON(http.StatusNotFound, response.Failure("User not found during deletion", nil))
+		} else {
+			log.Printf("ERROR: Failed to delete user %s: %v", userIDStr, err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, response.Failure("Failed to delete account", nil))
+		}
+		return
+	}
+
+	// 7. Return success
+	log.Printf("INFO: User %s successfully deleted their own account.", userIDStr)
+	c.JSON(http.StatusOK, response.Success("Account deleted successfully", nil))
 }
 
 // Note: Consider moving newUserResponse helper to a shared location if used by both UserHandler and AccountHandler.

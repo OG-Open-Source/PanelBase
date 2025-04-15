@@ -215,9 +215,9 @@ func main() {
 		log.Fatalf("CRITICAL: UserStore is nil, cannot proceed with handler setup.")
 		// Or implement a fallback mechanism / limited functionality mode
 	}
-	authHandler := v1handlers.NewAuthHandler(userStore, config.Auth.JwtSecret, config.Auth.TokenDurationMinutes)
-	userHandler := v1handlers.NewUserHandler(userStore)
-	accountHandler := v1handlers.NewAccountHandler(userStore) // Create AccountHandler
+	authHandler := v1handlers.NewAuthHandler(userStore, config.Auth.JwtSecret, config.Auth.TokenDurationMinutes, make(map[string]interface{}))
+	userHandler := v1handlers.NewUserHandler(userStore, make(map[string]interface{}), nil)
+	accountHandler := v1handlers.NewAccountHandler(userStore, nil) // Create AccountHandler
 	// --- End Setup Handlers ---
 
 	// --- Register API Routes (Dynamic Prefix) ---

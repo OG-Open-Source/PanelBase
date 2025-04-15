@@ -412,6 +412,11 @@ func RegisterHandlers(
 		router.GET("/", rootPathHandler) // Handle root path when no entry
 	}
 
+	// Register debug endpoint if in debug mode
+	if config.Server.Mode == "debug" {
+		router.GET("/debug", debugInfoHandler(config))
+	}
+
 	// Register other specific web handlers (e.g., /robots.txt)
 	router.GET("/robots.txt", robotsHandler(config))
 }

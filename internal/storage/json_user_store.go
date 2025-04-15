@@ -277,20 +277,20 @@ func (s *JSONUserStore) UpdateUser(ctx context.Context, user *models.User) error
 	}
 
 	// Preserve original password hash and creation date - crucial!
-	updatedUser := *user // Create a copy to modify
-	updatedUser.PasswordHash = originalUser.PasswordHash
+	updatedUser := *user                         // Create a copy to modify
+	updatedUser.Password = originalUser.Password // Use renamed field Password
 	updatedUser.CreatedAt = originalUser.CreatedAt
 	s.users[user.ID] = &updatedUser // Store the updated copy
 
 	if err := s.saveInternal(); err != nil {
-		// Attempt simple rollback in memory (complex rollback is hard)
+		// Attempt simple rollback in memory
 		log.Printf("ERROR: Failed to save user update for ID %s: %v. Attempting rollback...", user.ID, err)
 		s.users[user.ID] = originalUser
 		if user.Username != originalUser.Username {
-			delete(s.usernameIndex, user.Username)           // Remove potentially added new username
-			s.usernameIndex[originalUser.Username] = user.ID // Restore old username mapping
+			delete(s.usernameIndex, user.Username)
+			s.usernameIndex[originalUser.Username] = user.ID
 		}
-		return err // Return the save error
+		return err
 	}
 	return nil
 }
