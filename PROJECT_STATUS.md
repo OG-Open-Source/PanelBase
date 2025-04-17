@@ -20,6 +20,10 @@ To build a web panel application using the Go programming language and the Gin w
     - `/internal/services`: Core business logic implementation.
   - `/pkg`: Shared libraries reusable within this project or potentially externally (logger, errors, utils).
   - `/web`: Frontend assets, including static files (`/web/static`) and HTML templates (`/web/templates`). HTML Templates are now rendered dynamically on request.
+  - `/ext`: Unified directory for all extension resources
+    - `/ext/plugins`: Plugin files and resources
+    - `/ext/themes`: Theme files and resources
+    - `/ext/commands`: Command files and resources
 - **API Versioning:** Implemented via URL path (`/api/v1`, `/api/v2`, ...). Routes are defined within their respective version directories (`internal/api/vX/routes.go`).
 - **Naming Convention:** Directory and file names use underscores (`_`) as separators (e.g., `api_token`).
 
@@ -92,6 +96,28 @@ To build a web panel application using the Go programming language and the Gin w
 - [x] Implement graceful shutdown handling.
 - [x] Implement configurable auth rules (require old password, allow self-delete, prevent admin delete via User ID) in `config.toml`.
 - [x] Implement default scope assignment based on `config.toml` for new users.
+- [x] All user IDs are now stored as `user_id` instead of `id` in users.json and API responses.
+- [x] All plugin IDs are generated with the `plg_` prefix and tracked in plugins.json.
+- [x] Added plugins.json to track installed plugins and their configuration.
 - [ ] Implement JTI validation for API tokens (requires DB or store modification).
 - [ ] Implement routes and scope checks for `themes`, `plugins`, `commands`.
 - [ ] Write comprehensive API tests for authorization scenarios.
+
+## Plugin System
+
+- Installed plugins are tracked in `configs/plugins.json`.
+- Each plugin entry uses a unique `plugins_id` (format: `plg_xxxxxxxx`).
+- Plugin objects include: `plugins_id`, `name`, `version`, `enabled`, `installed_at`, `config`, `ui_settings`, and optional `meta`.
+- See README.md for a full example and structure details.
+
+## User ID Convention
+
+- All user IDs are now stored as `user_id` (not `id`) in `users.json` and API responses.
+- The format is `usr_xxxxxxxx`.
+
+## Plugin ID Convention
+
+- All plugin IDs must be generated with the prefix `plg_` followed by a random string (e.g., `plg_xxxxxxxx`).
+- This ensures uniqueness and consistency across the system.
+
+- All plugins, themes, and commands are now managed under the `/ext/` directory (e.g., `/ext/plugins/`, `/ext/themes/`, `/ext/commands/`).

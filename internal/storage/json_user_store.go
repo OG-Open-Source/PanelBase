@@ -25,7 +25,7 @@ import (
 
 // usersFileFormat defines the structure of the entire users JSON file.
 type usersFileFormat struct {
-	Users map[string]*models.User `json:"users"` // Key is the user ID string (e.g., "usr_...")
+	Users map[string]*models.User `json:"users"` // Key is the user_id string (e.g., "usr_...")
 }
 
 // JSONUserStore implements the UserStore interface using a JSON file.
@@ -35,8 +35,8 @@ type usersFileFormat struct {
 type JSONUserStore struct {
 	filePath      string
 	mu            sync.RWMutex
-	users         map[string]*models.User // Key is user ID string
-	usernameIndex map[string]string       // Username to user ID string index
+	users         map[string]*models.User // Key is user_id string
+	usernameIndex map[string]string       // Username to user_id string index
 }
 
 // NewJSONUserStore creates a new JSONUserStore and loads initial data.
@@ -118,9 +118,9 @@ func (s *JSONUserStore) load() error {
 	s.users = fileData.Users
 	s.usernameIndex = make(map[string]string, len(s.users))
 	for idStr, u := range s.users {
-		// Sanity check for user ID consistency and prefix
-		if u.ID != idStr || !strings.HasPrefix(idStr, utils.UserIDPrefix) {
-			log.Printf("WARN: User ID mismatch or invalid format in user store file for key '%s'. User object ID: '%s'. Skipping this user.", idStr, u.ID)
+		// Sanity check for user_id consistency and prefix
+		if u.UserID != idStr || !strings.HasPrefix(idStr, utils.UserIDPrefix) {
+			log.Printf("WARN: User ID mismatch or invalid format in user store file for key '%s'. User object user_id: '%s'. Skipping this user.", idStr, u.UserID)
 			delete(s.users, idStr) // Remove inconsistent entry
 			continue
 		}
@@ -166,19 +166,19 @@ func (s *JSONUserStore) CreateUser(ctx context.Context, user *models.User) error
 		return ErrUserExists
 	}
 
-	// Generate ID with prefix if not provided
-	if user.ID == "" {
+	// Generate user_id with prefix if not provided
+	if user.UserID == "" {
 		var err error
-		user.ID, err = utils.GeneratePrefixedID(utils.UserIDPrefix, utils.UserIDRandomLength)
+		user.UserID, err = utils.GeneratePrefixedID(utils.UserIDPrefix, utils.UserIDRandomLength)
 		if err != nil {
-			return fmt.Errorf("failed to generate user ID: %w", err)
+			return fmt.Errorf("failed to generate user_id: %w", err)
 		}
 		// Extremely unlikely, but check for collision just in case
-		for _, exists := s.users[user.ID]; exists; _, exists = s.users[user.ID] {
-			log.Printf("WARN: User ID collision detected for %s. Regenerating...", user.ID)
-			user.ID, err = utils.GeneratePrefixedID(utils.UserIDPrefix, utils.UserIDRandomLength)
+		for _, exists := s.users[user.UserID]; exists; _, exists = s.users[user.UserID] {
+			log.Printf("WARN: User ID collision detected for %s. Regenerating...", user.UserID)
+			user.UserID, err = utils.GeneratePrefixedID(utils.UserIDPrefix, utils.UserIDRandomLength)
 			if err != nil {
-				return fmt.Errorf("failed to regenerate user ID after collision: %w", err)
+				return fmt.Errorf("failed to regenerate user_id after collision: %w", err)
 			}
 		}
 	}
@@ -187,11 +187,11 @@ func (s *JSONUserStore) CreateUser(ctx context.Context, user *models.User) error
 		user.CreatedAt = time.Now().UTC() // Set creation time if not provided
 	}
 
-	s.users[user.ID] = user
-	s.usernameIndex[user.Username] = user.ID
+	s.users[user.UserID] = user
+	s.usernameIndex[user.Username] = user.UserID
 
 	if err := s.saveInternal(); err != nil {
-		delete(s.users, user.ID)
+		delete(s.users, user.UserID)
 		delete(s.usernameIndex, user.Username)
 		return err
 	}
@@ -209,7 +209,7 @@ func (s *JSONUserStore) GetUserByUsername(ctx context.Context, username string) 
 	}
 	user, userExists := s.users[idStr]
 	if !userExists {
-		log.Printf("ERROR: Username index points to non-existent user ID string: %s", idStr)
+		log.Printf("ERROR: Username index points to non-existent user_id string: %s", idStr)
 		return nil, ErrUserNotFound
 	}
 
@@ -217,7 +217,7 @@ func (s *JSONUserStore) GetUserByUsername(ctx context.Context, username string) 
 	return &userCopy, nil
 }
 
-// GetUserByID retrieves a user by their ID string.
+// GetUserByID retrieves a user by their user_id string.
 func (s *JSONUserStore) GetUserByID(ctx context.Context, id string) (*models.User, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -252,11 +252,11 @@ func (s *JSONUserStore) UpdateUser(ctx context.Context, user *models.User) error
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if user.ID == "" {
-		return errors.New("cannot update user with empty ID")
+	if user.UserID == "" {
+		return errors.New("cannot update user with empty user_id")
 	}
 
-	originalUser, exists := s.users[user.ID]
+	originalUser, exists := s.users[user.UserID]
 	if !exists {
 		return ErrUserNotFound
 	}
@@ -264,38 +264,38 @@ func (s *JSONUserStore) UpdateUser(ctx context.Context, user *models.User) error
 	// Check for username conflict if username is being changed
 	if user.Username != originalUser.Username {
 		if _, existsInIndex := s.usernameIndex[user.Username]; existsInIndex {
-			// Check if the conflicting index entry points to the same user ID (shouldn't happen ideally)
-			// If it points to a *different* user ID, then it's a real conflict.
+			// Check if the conflicting index entry points to the same user_id (shouldn't happen ideally)
+			// If it points to a *different* user_id, then it's a real conflict.
 			conflictingID := s.usernameIndex[user.Username]
-			if conflictingID != user.ID {
+			if conflictingID != user.UserID {
 				return ErrUserExists
 			}
 		}
 		// Update index
 		delete(s.usernameIndex, originalUser.Username)
-		s.usernameIndex[user.Username] = user.ID
+		s.usernameIndex[user.Username] = user.UserID
 	}
 
 	// Preserve original password hash and creation date - crucial!
 	updatedUser := *user                         // Create a copy to modify
 	updatedUser.Password = originalUser.Password // Use renamed field Password
 	updatedUser.CreatedAt = originalUser.CreatedAt
-	s.users[user.ID] = &updatedUser // Store the updated copy
+	s.users[user.UserID] = &updatedUser // Store the updated copy
 
 	if err := s.saveInternal(); err != nil {
 		// Attempt simple rollback in memory
-		log.Printf("ERROR: Failed to save user update for ID %s: %v. Attempting rollback...", user.ID, err)
-		s.users[user.ID] = originalUser
+		log.Printf("ERROR: Failed to save user update for user_id %s: %v. Attempting rollback...", user.UserID, err)
+		s.users[user.UserID] = originalUser
 		if user.Username != originalUser.Username {
 			delete(s.usernameIndex, user.Username)
-			s.usernameIndex[originalUser.Username] = user.ID
+			s.usernameIndex[originalUser.Username] = user.UserID
 		}
 		return err
 	}
 	return nil
 }
 
-// DeleteUser removes a user by ID string.
+// DeleteUser removes a user by user_id string.
 func (s *JSONUserStore) DeleteUser(ctx context.Context, id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -314,7 +314,7 @@ func (s *JSONUserStore) DeleteUser(ctx context.Context, id string) error {
 		// Attempt rollback
 		s.users[id] = user
 		s.usernameIndex[username] = id
-		log.Printf("ERROR: Failed to save user deletion for ID %s: %v. Rolled back.", id, err)
+		log.Printf("ERROR: Failed to save user deletion for user_id %s: %v. Rolled back.", id, err)
 		return err
 	}
 	return nil

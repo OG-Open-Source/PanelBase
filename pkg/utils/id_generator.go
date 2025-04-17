@@ -7,11 +7,13 @@ import (
 )
 
 const (
-	idCharset          = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	defaultIDLength    = 8 // Define a default length for the random part
-	secretCharset      = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{};:,.<>/?"
-	UserIDPrefix       = "usr_" // Moved from storage
-	UserIDRandomLength = 12     // Moved from storage
+	idCharset            = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	defaultIDLength      = 8 // Default length for the random part
+	secretCharset        = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{};:,.<>/?"
+	UserIDPrefix         = "usr_" // Prefix for user IDs
+	UserIDRandomLength   = 12     // Random part length for user IDs
+	PluginIDPrefix       = "plg_" // Prefix for plugin IDs
+	PluginIDRandomLength = 12     // Random part length for plugin IDs
 )
 
 // GenerateRandomID creates a random string of a specified length using the idCharset.

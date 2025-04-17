@@ -2,7 +2,6 @@ package webserver
 
 import (
 	"encoding/json"
-	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -12,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/pelletier/go-toml/v2" // Required for AppConfig definition
 
 	// Import runtime for debug info (Placeholder - might need more specific packages later)
 	"runtime"
@@ -20,15 +18,14 @@ import (
 
 // --- Configuration (Copied from main.go, consider refactoring later) ---
 
-// AppConfig holds application configuration read from config.toml
-// TODO: Consider passing only necessary fields instead of the whole struct
+// AppConfig holds application configuration read from config.yaml
 type AppConfig struct {
 	Server struct {
-		Entry string `toml:"entry"`
+		Entry string `yaml:"entry"`
 		Mode  string // Added Mode field
 		// Add other fields if needed by webserver logic (e.g., Port, IP for logging?)
 	}
-	// Add other sections like Auth or Functions if directly needed here
+	// Add other sections like Auth or Features if directly needed here
 }
 
 const (
@@ -427,14 +424,6 @@ func RegisterHandlers(
 func LoadAppConfig(filePath string) (AppConfig, error) {
 	config := AppConfig{
 		// Set defaults if needed, or rely on main's defaults
-	}
-	configData, err := os.ReadFile(filePath)
-	if err != nil {
-		return config, fmt.Errorf("failed to read config file '%s': %w", filePath, err)
-	}
-	err = toml.Unmarshal(configData, &config)
-	if err != nil {
-		return config, fmt.Errorf("failed to parse config file '%s': %w", filePath, err)
 	}
 	return config, nil
 }

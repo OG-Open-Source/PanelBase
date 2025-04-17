@@ -79,7 +79,7 @@ func GenerateToken(user *models.User, secret string, durationMinutes int, tokenT
 		ExpiresAt: expirationTime.Unix(), // Unix timestamp
 		Issuer:    Issuer,
 		ID:        jti,
-		Subject:   user.ID,
+		Subject:   user.UserID,
 		Name:      user.Name,
 		Scopes:    user.Scopes, // Assume user.Scopes is non-nil or handled upstream
 	}

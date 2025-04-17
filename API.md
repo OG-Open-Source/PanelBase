@@ -20,7 +20,7 @@ This document lists the currently available API endpoints for PanelBase, along w
 - **Example:**
 
 ```powershell
-$body = @{ username = "newuser"; password = "yourpassword"; name = "User Name"; email = "user@example.com" }
+$body = @{ username = "newuser1"; password = "yourpassword"; name = "User Name"; email = "user@example.com" }
 $response = Invoke-RestMethod -Uri "http://localhost:$PORT/$ENTRY/api/v1/auth/register" -Method Post -Body ($body | ConvertTo-Json) -ContentType 'application/json'
 $token = $response.data.token
 ```
@@ -44,7 +44,7 @@ $token = $response.data.token
 - **Example:**
 
 ```powershell
-$body = @{ username = "admin"; password = "your_admin_password" }
+$body = @{ username = "admin"; password = "fXOp4DEB2qCe0ghj" }
 $response = Invoke-RestMethod -Uri "http://localhost:$PORT/$ENTRY/api/v1/auth/login" -Method Post -Body ($body | ConvertTo-Json) -ContentType 'application/json'
 $token = $response.data.token
 ```

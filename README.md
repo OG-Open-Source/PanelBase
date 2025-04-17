@@ -114,3 +114,67 @@ Run `go run cmd/server/main.go` to start the server.
 - Made authentication rules configurable via `configs/config.toml`: requiring old password for update, allowing self-deletion, and protecting specific User IDs from deletion.
 - Added default scope assignment for new users based on `configs/config.toml`.
 - Bootstrap process now adds the initial admin User ID to the protected list in `configs/config.toml`.
+- All user IDs are now stored as `user_id` instead of `id` in users.json and API responses.
+- All plugin IDs are generated with the `plg_` prefix and tracked in plugins.json.
+- Added plugins.json to track installed plugins and their configuration.
+
+## Plugin System
+
+PanelBase supports a plugin system. Installed plugins are tracked in `configs/plugins.json`.
+
+### plugins.json Structure
+
+- Top-level key: `plugins` (object)
+- Each key: `plugins_id` (e.g., `plg_example`)
+- Each plugin object contains:
+  - `plugins_id`: Unique plugin ID (format: `plg_xxxxxxxx`)
+  - `name`: Plugin name
+  - `version`: Plugin version
+  - `enabled`: Whether the plugin is enabled
+  - `installed_at`: Installation timestamp (RFC3339)
+  - `config`: Plugin-specific configuration (object)
+  - `ui_settings`: Plugin-specific UI settings (object)
+  - `meta`: Optional metadata (authors, description, etc.)
+
+Example:
+
+```json
+{
+  "plugins": {
+    "plg_example": {
+      "plugins_id": "plg_example",
+      "name": "ExamplePlugin",
+      "version": "1.0.0",
+      "enabled": true,
+      "installed_at": "2024-06-01T12:00:00Z",
+      "config": {},
+      "ui_settings": {},
+      "meta": {
+        "authors": ["PanelBase Team"],
+        "description": "This is an example plugin entry.",
+        "api_version": "v1"
+      }
+    }
+  }
+}
+```
+
+### Plugin ID Convention
+
+- All plugin IDs must be generated with the prefix `plg_` followed by a random string (e.g., `plg_xxxxxxxx`).
+- This ensures uniqueness and consistency across the system.
+
+### User ID Convention
+
+- All user IDs are now stored as `user_id` (not `id`) in `users.json` and API responses.
+- The format is `usr_xxxxxxxx`.
+
+## Directory Structure
+
+- All extension resources are now managed under the `/ext/` directory:
+  - `/ext/plugins/` for plugins
+  - `/ext/themes/` for themes
+  - `/ext/commands/` for commands
+- Corresponding state/configuration files remain in `/configs/` (e.g., `plugins.json`, `themes.json`, `commands.json`).
+
+- All plugins, themes, and commands are now managed under the `/ext/` directory (e.g., `/ext/plugins/`, `/ext/themes/`, `/ext/commands/`).

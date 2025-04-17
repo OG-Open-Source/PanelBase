@@ -21,38 +21,49 @@ import (
 	"github.com/OG-Open-Source/PanelBase/pkg/bootstrap"
 	"github.com/OG-Open-Source/PanelBase/pkg/logger"
 	"github.com/gin-gonic/gin"
-	"github.com/pelletier/go-toml/v2"
+	"gopkg.in/yaml.v3"
 	// "golang.org/x/time/rate" // No longer needed
 )
 
-// AppConfig holds application configuration read from config.toml
+// AppConfig holds application configuration read from config.yaml
 type AppConfig struct {
 	Server struct {
-		Port         int    `toml:"port"`
-		Entry        string `toml:"entry"`
-		Ip           string `toml:"ip"`
-		Mode         string `toml:"mode"`
-		TrustedProxy string `toml:"trusted_proxy"`
+		Port         int    `yaml:"port"`
+		Entry        string `yaml:"entry"`
+		Ip           string `yaml:"ip"`
+		Mode         string `yaml:"mode"`
+		TrustedProxy string `yaml:"trusted_proxy"`
 	}
 	Auth struct {
-		JwtSecret            string `toml:"jwt_secret"`
-		TokenDurationMinutes int    `toml:"token_duration_minutes"`
+		JwtSecret    string `yaml:"jwt_secret"`
+		TokenMinutes int    `yaml:"token_minutes"`
+		Defaults     struct {
+			Scopes map[string]interface{} `yaml:"scopes"`
+		} `yaml:"defaults"`
+		Rules struct {
+			RequireOldPw    bool     `yaml:"require_old_pw"`
+			AllowSelfDelete bool     `yaml:"allow_self_delete"`
+			ProtectedUsers  []string `yaml:"protected_users"`
+		} `yaml:"rules"`
 	}
-	Functions struct {
-		Users bool `toml:"users"`
-	}
+	Features struct {
+		Plugins  bool `yaml:"plugins"`
+		Commands bool `yaml:"commands"`
+		Users    bool `yaml:"users"`
+		Themes   bool `yaml:"themes"`
+	} `yaml:"features"`
 }
 
 const (
-	defaultPort          = 8080
-	defaultIP            = "0.0.0.0"
-	configFile           = "configs/config.toml"
-	usersFile            = "configs/users.json"
-	uiSettingsFile       = "configs/ui_settings.json"
-	defaultMode          = gin.ReleaseMode
-	defaultJwtSecret     = "change-this-in-config-toml" // Default secret (should be changed)
-	defaultTokenDuration = 60                           // Default duration in minutes
-	defaultTrustedProxy  = ""                           // Default: No trusted proxy
+	defaultPort         = 8080
+	defaultIP           = "0.0.0.0"
+	configFile          = "configs/config.yaml"
+	usersFile           = "configs/users.json"
+	uiSettingsFile      = "configs/ui_settings.json"
+	defaultMode         = gin.ReleaseMode
+	defaultJwtSecret    = "change-this-in-config-yaml" // Default secret (should be changed)
+	defaultTokenMinutes = 60                           // Default duration in minutes
+	defaultTrustedProxy = ""                           // Default: No trusted proxy
 )
 
 func main() {
@@ -79,25 +90,36 @@ func main() {
 	// --- Load Configuration ---
 	config := AppConfig{
 		Server: struct {
-			Port         int    `toml:"port"`
-			Entry        string `toml:"entry"`
-			Ip           string `toml:"ip"`
-			Mode         string `toml:"mode"`
-			TrustedProxy string `toml:"trusted_proxy"`
+			Port         int    `yaml:"port"`
+			Entry        string `yaml:"entry"`
+			Ip           string `yaml:"ip"`
+			Mode         string `yaml:"mode"`
+			TrustedProxy string `yaml:"trusted_proxy"`
 		}{Port: defaultPort, Ip: defaultIP, Mode: defaultMode, TrustedProxy: defaultTrustedProxy},
 		Auth: struct {
-			JwtSecret            string `toml:"jwt_secret"`
-			TokenDurationMinutes int    `toml:"token_duration_minutes"`
-		}{JwtSecret: defaultJwtSecret, TokenDurationMinutes: defaultTokenDuration},
-		Functions: struct {
-			Users bool `toml:"users"`
+			JwtSecret    string `yaml:"jwt_secret"`
+			TokenMinutes int    `yaml:"token_minutes"`
+			Defaults     struct {
+				Scopes map[string]interface{} `yaml:"scopes"`
+			} `yaml:"defaults"`
+			Rules struct {
+				RequireOldPw    bool     `yaml:"require_old_pw"`
+				AllowSelfDelete bool     `yaml:"allow_self_delete"`
+				ProtectedUsers  []string `yaml:"protected_users"`
+			} `yaml:"rules"`
+		}{JwtSecret: defaultJwtSecret, TokenMinutes: defaultTokenMinutes},
+		Features: struct {
+			Plugins  bool `yaml:"plugins"`
+			Commands bool `yaml:"commands"`
+			Users    bool `yaml:"users"`
+			Themes   bool `yaml:"themes"`
 		}{Users: false},
 	}
 	configData, err := os.ReadFile(configFile)
 	if err != nil {
 		log.Printf("WARN: Failed to read config file '%s': %v. Using default settings.", configFile, err)
 	} else {
-		err = toml.Unmarshal(configData, &config)
+		err = yaml.Unmarshal(configData, &config)
 		if err != nil {
 			log.Printf("WARN: Failed to parse config file '%s': %v. Using default/incomplete settings.", configFile, err)
 			// Reset to defaults if parsing failed for specific fields
@@ -113,10 +135,10 @@ func main() {
 			if config.Auth.JwtSecret == "" {
 				config.Auth.JwtSecret = defaultJwtSecret
 			}
-			if config.Auth.TokenDurationMinutes <= 0 {
-				config.Auth.TokenDurationMinutes = defaultTokenDuration
+			if config.Auth.TokenMinutes <= 0 {
+				config.Auth.TokenMinutes = defaultTokenMinutes
 			}
-			// Functions.Users defaults to false
+			// Features.Users defaults to false
 		}
 	}
 	// Final checks/defaults after potential partial parse
@@ -132,9 +154,9 @@ func main() {
 		config.Auth.JwtSecret = defaultJwtSecret
 		log.Printf("WARN: Using default JWT secret. Change 'jwt_secret' in %s for production!", configFile)
 	}
-	if config.Auth.TokenDurationMinutes <= 0 {
-		config.Auth.TokenDurationMinutes = defaultTokenDuration
-		log.Printf("WARN: Invalid token duration, defaulting to %d minutes", defaultTokenDuration)
+	if config.Auth.TokenMinutes <= 0 {
+		config.Auth.TokenMinutes = defaultTokenMinutes
+		log.Printf("WARN: Invalid token duration, defaulting to %d minutes", defaultTokenMinutes)
 	}
 
 	// --- Mode-Specific Overrides ---
@@ -215,8 +237,8 @@ func main() {
 		log.Fatalf("CRITICAL: UserStore is nil, cannot proceed with handler setup.")
 		// Or implement a fallback mechanism / limited functionality mode
 	}
-	authHandler := v1handlers.NewAuthHandler(userStore, config.Auth.JwtSecret, config.Auth.TokenDurationMinutes, make(map[string]interface{}))
-	userHandler := v1handlers.NewUserHandler(userStore, make(map[string]interface{}), nil)
+	authHandler := v1handlers.NewAuthHandler(userStore, config.Auth.JwtSecret, config.Auth.TokenMinutes, config.Auth.Defaults.Scopes)
+	userHandler := v1handlers.NewUserHandler(userStore, config.Auth.Defaults.Scopes, nil)
 	accountHandler := v1handlers.NewAccountHandler(userStore, nil) // Create AccountHandler
 	// --- End Setup Handlers ---
 
@@ -240,7 +262,7 @@ func main() {
 				userHandler,
 				accountHandler,
 				config.Auth.JwtSecret,
-				config.Functions.Users,
+				config.Features.Users,
 			)
 		}
 		// Register other API versions relative to apiGroup here...
@@ -251,7 +273,7 @@ func main() {
 	// Pass the determined apiPrefix to RegisterHandlers
 	webServerConfig := webserver.AppConfig{
 		Server: struct {
-			Entry string `toml:"entry"`
+			Entry string `yaml:"entry"`
 			Mode  string
 		}{
 			Entry: config.Server.Entry,

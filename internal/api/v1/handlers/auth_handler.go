@@ -85,7 +85,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	respData := gin.H{"user_id": user.ID}
+	respData := gin.H{"user_id": user.UserID}
 	c.JSON(http.StatusCreated, response.Success("User registered successfully", respData))
 }
 
