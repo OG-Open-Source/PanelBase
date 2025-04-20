@@ -19,6 +19,7 @@ import (
 
 const (
 	configDir      = "configs"
+	webDir         = "web"
 	extDir         = "ext"
 	themeDir       = "ext/themes"
 	pluginDir      = "ext/plugins"
@@ -185,50 +186,54 @@ func createDefaultConfig(entry string, port int) ([]byte, error) {
 func InitializeProject() error {
 	// log.Println("Checking project structure...")
 
-	// 1. Ensure mandatory directories exist (EXCLUDING themes now)
+	// Step 1: Ensure config directory exists
 	if err := ensureDir(configDir); err != nil {
 		return err
 	}
-	if err := ensureDir(extDir); err != nil {
+
+	// Step 2: Ensure config.yaml exists (create with dynamic defaults if not)
+	configAbsPath, _ := filepath.Abs(configFile)
+	if _, err := os.Stat(configAbsPath); os.IsNotExist(err) {
+		defaultConfigBytes, err := createDefaultConfig(generateRandomString(entryLength), rand.Intn(maxPort-minPort+1)+minPort)
+		if err != nil {
+			return err
+		}
+		err = os.WriteFile(configAbsPath, defaultConfigBytes, 0644)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Step 3: Load config.yaml into config struct
+	var config configStructure
+	configBytes, err := os.ReadFile(configAbsPath)
+	if err != nil {
+		return err
+	}
+	err = yaml.Unmarshal(configBytes, &config)
+	if err != nil {
 		return err
 	}
 
-	// 2. Ensure config.yaml exists (create with dynamic defaults if not)
-	configAbsPath, _ := filepath.Abs(configFile)
-	if _, err := os.Stat(configAbsPath); os.IsNotExist(err) {
-		// log.Printf("Creating configuration file: %s", configFile) // Remove creation log
-
-		// Generate random entry
-		entry := generateRandomString(entryLength)
-
-		// Find available port
-		var port int = -1
-		for i := 0; i < portCheckRetries; i++ {
-			testPort := rand.Intn(maxPort-minPort+1) + minPort
-			if isPortAvailable(testPort) {
-				port = testPort
-				// log.Printf("Found available port: %d", port)
-				break
-			}
+	// Step 4: Conditionally create ext subdirectories based on enabled features
+	// [SECURITY] The ext directory will only be created if at least one feature (themes, plugins, commands) is enabled.
+	if config.Features.Themes {
+		if err := ensureDir(themeDir); err != nil {
+			return err
 		}
-		if port == -1 {
-			return fmt.Errorf("failed to find an available port after %d retries", portCheckRetries)
+	}
+	if config.Features.Plugins {
+		if err := ensureDir(pluginDir); err != nil {
+			return err
 		}
-
-		// Write the new config file
-		defaultContentBytes, errCreate := createDefaultConfig(entry, port)
-		if errCreate != nil {
-			return fmt.Errorf("failed to create default config content: %w", errCreate)
+	}
+	if config.Features.Commands {
+		if err := ensureDir(commandDir); err != nil {
+			return err
 		}
-		if errWrite := os.WriteFile(configAbsPath, defaultContentBytes, 0664); errWrite != nil {
-			return fmt.Errorf("failed to create file %s: %w", configFile, errWrite)
-		}
-
-	} else if err != nil {
-		return fmt.Errorf("failed to check config file %s: %w", configFile, err)
 	}
 
-	// 3. Ensure ui_settings.json exists (create with default if not)
+	// 5. Ensure ui_settings.json exists (create with default if not)
 	uiSettingsAbsPath, _ := filepath.Abs(uiSettingsFile)
 	if _, err := os.Stat(uiSettingsAbsPath); os.IsNotExist(err) {
 		// log.Printf("Creating file: %s", uiSettingsFile) // Remove creation log
@@ -239,7 +244,7 @@ func InitializeProject() error {
 		log.Printf("WARN: Failed to check file %s: %v", uiSettingsFile, err)
 	}
 
-	// 4. Ensure users.json exists and create initial admin user if it does not.
+	// 6. Ensure users.json exists and create initial admin user if it does not.
 	usersAbsPath, _ := filepath.Abs(usersFile)
 	if _, err := os.Stat(usersAbsPath); os.IsNotExist(err) {
 		// log.Printf("INFO: users.json not found. Creating file and initial admin user...") // Removed this log
@@ -308,33 +313,21 @@ func InitializeProject() error {
 		// log.Printf("INFO: users.json found.")
 	}
 
-	// --- Reading config for conditional creation (moved down) ---
-	configData, err := os.ReadFile(configFile)
-	config := configStructure{} // Default values are false
-
-	if err != nil {
-		log.Printf("WARN: Failed to read %s: %v. Assuming all optional features disabled.", configFile, err)
-	} else {
-		err = yaml.Unmarshal(configData, &config)
-		if err != nil {
-			log.Printf("WARN: Failed to parse %s: %v. Assuming all optional features disabled.", configFile, err)
-		}
-	}
-
-	// 5. Ensure entry-specific web directory exists (using the config.Server.Entry value)
-	targetWebDir := extDir // Default to base web directory
+	// 7. Ensure entry-specific web directory exists (using the config.Server.Entry value)
+	// [SECURITY] Web content must only be placed in webDir or webDir/<entry>. Fallback to ext is strictly prohibited.
+	targetWebDir := webDir // Default to base web directory
 	if config.Server.Entry != "" {
-		entryWebDir := filepath.Join(extDir, config.Server.Entry)
+		entryWebDir := filepath.Join(webDir, config.Server.Entry)
 		if err := ensureDir(entryWebDir); err != nil {
 			log.Printf("WARN: Failed to create entry-specific web directory '%s': %v", entryWebDir, err)
 		} else {
 			targetWebDir = entryWebDir // Update target if successfully created/exists
 		}
 	} else {
-		// log.Printf("INFO: server.entry is empty, using base web directory '%s'", extDir)
+		// log.Printf("INFO: server.entry is empty, using base web directory '%s'", webDir)
 	}
 
-	// 6. Conditional directory creation based on config
+	// 8. Conditional directory creation based on config
 	if config.Features.Plugins {
 		if err := ensureDir(pluginDir); err != nil {
 			log.Printf("WARN: Failed during conditional directory creation (plugins): %v", err)
@@ -384,7 +377,7 @@ func InitializeProject() error {
 		}
 	}
 
-	// 7. Ensure a default index file exists in the target web directory
+	// 9. Ensure a default index file exists in the target web directory
 	indexPathHtml := filepath.Join(targetWebDir, "index.html")
 	indexPathHtm := filepath.Join(targetWebDir, "index.htm")
 
@@ -481,3 +474,5 @@ func addAdminToProtectedList(configPath string, adminID string) error {
 
 	return nil
 }
+
+// [SECURITY] All directory logic and comments are now in English and use webDir for web content paths. No fallback to extDir is allowed.

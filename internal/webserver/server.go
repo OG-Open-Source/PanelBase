@@ -28,9 +28,11 @@ type AppConfig struct {
 	// Add other sections like Auth or Features if directly needed here
 }
 
+// 確保所有 web 目錄相關常數與變數都指向 web，不涉及 ext
 const (
 	baseWebDir = "web" // Define constants used by the moved functions
 )
+// [SECURITY] All web serving must happen from /web or /web/<entry>. Fallback to ext is strictly prohibited.
 
 // --- End Configuration ---
 
@@ -82,6 +84,8 @@ var httpStatusMessages = map[int]string{
 // handleErrorResponse handles serving custom error pages based on HTTP status code.
 // This function is now internal to the webserver package.
 func handleErrorResponse(c *gin.Context, statusCode int, config AppConfig, uiData map[string]interface{}) {
+	// 完全不涉及 ext 目錄
+	// [SECURITY] Error pages must only be served from /web or /web/<entry>. Fallback to ext is strictly prohibited.
 	webRoot := baseWebDir
 	entryDir := ""
 	if config.Server.Entry != "" {
@@ -349,10 +353,12 @@ func RegisterHandlers(
 	uiSettingsFile string,
 	apiPrefix string, // Added apiPrefix parameter
 ) {
+	// 確保所有 web 目錄相關常數與變數都指向 web，不涉及 ext
+	// [SECURITY] All static and template files must be served from /web or /web/<entry>. Fallback to ext is strictly prohibited.
 	baseDir := baseWebDir
 	entryPath := "/"
 	if config.Server.Entry != "" {
-		entryDirAbs := filepath.Join(baseDir, config.Server.Entry)
+		entryDirAbs := filepath.Join(baseWebDir, config.Server.Entry)
 		if _, err := os.Stat(entryDirAbs); err == nil {
 			baseDir = entryDirAbs
 			entryPath = "/" + config.Server.Entry + "/"
