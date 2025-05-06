@@ -1,0 +1,19 @@
+---
+name: 科技lion面板
+authors:
+- PanelBase Team
+version: 1.0.0
+description: 轻量级Linux服务器运维管理面板
+source_link: https://raw.githubusercontent.com/OG-Open-Source/PanelBase/main/example/ex_kejilion.yaml
+directory: kejilion
+structure:
+  style.css: https://raw.githubusercontent.com/OG-Open-Source/PanelBase/main/example/assets/kejilion/style.css
+  js:
+    nav.js: https://raw.githubusercontent.com/OG-Open-Source/PanelBase/main/example/assets/kejilion/js/nav.js
+    script.js: https://raw.githubusercontent.com/OG-Open-Source/PanelBase/main/example/assets/kejilion/js/script.js
+  index.html: https://raw.githubusercontent.com/OG-Open-Source/PanelBase/main/example/assets/kejilion/index.html
+  docker.html: https://raw.githubusercontent.com/OG-Open-Source/PanelBase/main/example/assets/kejilion/docker.html
+  filemanager.html: https://raw.githubusercontent.com/OG-Open-Source/PanelBase/main/example/assets/kejilion/filemanager.html
+  market.html: https://raw.githubusercontent.com/OG-Open-Source/PanelBase/main/example/assets/kejilion/market.html
+  settings.html: https://raw.githubusercontent.com/OG-Open-Source/PanelBase/main/example/assets/kejilion/settings.html
+  website.html: https://raw.githubusercontent.com/OG-Open-Source/PanelBase/main/example/assets/kejilion/website.html
